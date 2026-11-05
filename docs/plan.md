@@ -67,7 +67,7 @@ The mock USDT is for local Foundry tests only. It mirrors this surface so tests 
 
 ### 3b. Whitechain qualification checklist (hard requirements for every track)
 
-- [ ] Contracts deployed on Whitechain Sepolia (1874) and **verified** on the explorer
+- [x] Contracts deployed on Whitechain Sepolia (1874) and **verified** on the explorer
 - [ ] At least one **USDT payment settled on Whitechain in the main flow**, with the explorer link in the README. Self-minted test tokens don't count.
 - [ ] README line: why this flow needs onchain stablecoin settlement on Whitechain, and what a normal payment rail couldn't do. (A rail can't stop us over-charging or over-issuing. The contract does.)
 - [ ] README covers setup, architecture and **current limitations**
@@ -203,9 +203,9 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 **Done when:** everyone can run the repo and the wallets hold testnet funds.
 
 ### Step 2: Deploy CreditVault to Whitechain
-- [ ] Deploy against the official test USDT; commit the deploy broadcast
-- [ ] Verify on the Whitechain explorer
-- [ ] Put the vault address and a real deposit tx link in the README
+- [x] Deploy against the official test USDT; commit the deploy broadcast
+- [x] Verify on the Whitechain explorer
+- [x] Put the vault address and a real deposit tx link in the README
 
 **Done when:** the verified contract is on the explorer. Tag `m1-contract-deployed`.
 

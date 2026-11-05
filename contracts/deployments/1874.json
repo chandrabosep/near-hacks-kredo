@@ -1,0 +1,9 @@
+{
+  "chainId": 1874,
+  "creditVault": "0xaaA19C7160FDe7532F5f4Fbd698b549A884c664A",
+  "deployBlock": 12322125,
+  "feeRecipient": "0xA81acADf1D474d14B98b0499E727ebdB1600e3EF",
+  "operator": "0xA81acADf1D474d14B98b0499E727ebdB1600e3EF",
+  "owner": "0xA81acADf1D474d14B98b0499E727ebdB1600e3EF",
+  "usdt": "0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7"
+}
