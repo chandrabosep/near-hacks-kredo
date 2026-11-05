@@ -24,6 +24,8 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     /// @notice Highest network fee an app can be set to: 20%.
     uint16 public constant MAX_FEE_BPS = 2_000;
     uint256 internal constant BPS = 10_000;
+    /// @notice Longest a hold can last. Caps how long even a leaked operator key could freeze credits.
+    uint64 public constant MAX_HOLD_DURATION = 1 days;
 
     bytes32 public constant APPROVE_APP_TYPEHASH =
         keccak256("ApproveApp(address user,address app,uint256 limit,uint64 expiry,bytes32 nonce,uint256 deadline)");
@@ -33,6 +35,23 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     struct Limit {
         uint128 remaining; // units the app may still charge
         uint64 expiry; // unix time the limit stops working (0 = never)
+        uint32 version; // bumps on every approve and revoke
+    }
+
+    enum HoldStatus {
+        None,
+        Open,
+        Captured,
+        Released
+    }
+
+    struct Hold {
+        address user;
+        address app;
+        uint128 amount;
+        uint64 expiry;
+        uint32 limitVersion; // the limit version when the hold was taken
+        HoldStatus status;
     }
 
     struct App {
@@ -58,6 +77,9 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
 
     /// @notice What each app may still charge each user, as signed by the user.
     mapping(address user => mapping(address app => Limit)) internal _limits;
+
+    /// @notice Holds by id. The id is keccak256(app, ref), so the app knows it before the tx lands.
+    mapping(bytes32 holdId => Hold) internal _holds;
 
     /// @notice USDT units each app has earned and not yet been paid out.
     mapping(address app => uint256 units) public earningsOf;
@@ -85,6 +107,11 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     event AppApproved(address indexed user, address indexed app, uint256 limit, uint64 expiry);
     event AppRevoked(address indexed user, address indexed app);
     event Charged(address indexed user, address indexed app, bytes32 indexed ref, uint256 amount, uint256 fee);
+    event Held(
+        bytes32 indexed holdId, address indexed user, address indexed app, bytes32 ref, uint256 amount, uint64 expiry
+    );
+    event Captured(bytes32 indexed holdId, uint256 actual, uint256 fee, uint256 returned);
+    event Released(bytes32 indexed holdId, uint256 amount, address by);
 
     error NotOperator();
     error NotOwnerOrOperator();
@@ -107,6 +134,11 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     error InsufficientBalance();
     error ZeroRef();
     error RefUsed();
+    error BadExpiry();
+    error HoldNotOpen();
+    error HoldExpired();
+    error HoldNotExpired();
+    error OverHeld();
 
     modifier onlyOperator() {
         if (!isOperator[msg.sender]) revert NotOperator();
@@ -274,8 +306,11 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
                 signature
             );
         }
+        Limit storage l = _limits[user][app];
         // forge-lint: disable-next-line(unsafe-typecast)
-        _limits[user][app] = Limit({remaining: uint128(limit), expiry: expiry});
+        l.remaining = uint128(limit);
+        l.expiry = expiry;
+        ++l.version;
         emit AppApproved(user, app, limit, expiry);
     }
 
@@ -286,7 +321,10 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
                 user, keccak256(abi.encode(REVOKE_APP_TYPEHASH, user, app, nonce, deadline)), nonce, deadline, signature
             );
         }
-        delete _limits[user][app];
+        Limit storage l = _limits[user][app];
+        l.remaining = 0;
+        l.expiry = 0;
+        ++l.version;
         emit AppRevoked(user, app);
     }
 
@@ -315,6 +353,82 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
         totalBalances -= amount;
         uint256 fee = _earn(app, amount);
         emit Charged(user, app, ref, amount, fee);
+    }
+
+    // ---------------------------------------------------------------------
+    // Holds (long jobs)
+    // ---------------------------------------------------------------------
+
+    /// @notice Reserves credits at the start of a long job. Uses up the user's limit now.
+    /// @param ref The app's unique id for this job. The hold id is keccak256(app, ref).
+    /// @param expiry When the hold can be released by anyone. At most MAX_HOLD_DURATION away.
+    function hold(address user, address app, uint256 amount, bytes32 ref, uint64 expiry)
+        external
+        onlyOperator
+        whenNotPaused
+        returns (bytes32 holdId)
+    {
+        // forge-lint: disable-next-line(block-timestamp)
+        if (expiry <= block.timestamp || expiry > block.timestamp + MAX_HOLD_DURATION) revert BadExpiry();
+        _useRef(app, ref);
+        _consumeLimit(user, app, amount);
+        _debit(user, amount);
+        totalBalances -= amount;
+        totalHeld += amount;
+
+        holdId = holdIdOf(app, ref);
+        _holds[holdId] = Hold({
+            user: user,
+            app: app,
+            // forge-lint: disable-next-line(unsafe-typecast)
+            amount: uint128(amount), // fits: _consumeLimit checked it against a uint128 limit
+            expiry: expiry,
+            limitVersion: _limits[user][app].version,
+            status: HoldStatus.Open
+        });
+        emit Held(holdId, user, app, ref, amount, expiry);
+    }
+
+    /// @notice The job succeeded. Charges `actual` (at most the held amount) and returns the rest.
+    /// Only before the hold expires: after that the user can take it back.
+    function capture(bytes32 holdId, uint256 actual) external onlyOperator whenNotPaused {
+        Hold storage h = _holds[holdId];
+        if (h.status != HoldStatus.Open) revert HoldNotOpen();
+        // forge-lint: disable-next-line(block-timestamp)
+        if (block.timestamp >= h.expiry) revert HoldExpired();
+        if (actual == 0) revert ZeroAmount();
+        uint256 amount = h.amount;
+        if (actual > amount) revert OverHeld();
+
+        h.status = HoldStatus.Captured;
+        totalHeld -= amount;
+        uint256 returned = amount - actual;
+        if (returned != 0) _returnToUser(h, returned);
+        uint256 fee = _earn(h.app, actual);
+        emit Captured(holdId, actual, fee, returned);
+    }
+
+    /// @notice The job failed, or the hold ran out. The operator can release at any time.
+    /// After expiry anyone can, even while paused, so held credits always come back.
+    function release(bytes32 holdId) external {
+        Hold storage h = _holds[holdId];
+        if (h.status != HoldStatus.Open) revert HoldNotOpen();
+        // forge-lint: disable-next-line(block-timestamp)
+        if (block.timestamp < h.expiry && !isOperator[msg.sender]) revert HoldNotExpired();
+
+        h.status = HoldStatus.Released;
+        uint256 amount = h.amount;
+        totalHeld -= amount;
+        _returnToUser(h, amount);
+        emit Released(holdId, amount, msg.sender);
+    }
+
+    function holdIdOf(address app, bytes32 ref) public pure returns (bytes32) {
+        return keccak256(abi.encode(app, ref));
+    }
+
+    function getHold(bytes32 holdId) external view returns (Hold memory) {
+        return _holds[holdId];
     }
 
     // ---------------------------------------------------------------------
@@ -373,6 +487,17 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
         if (amount > l.remaining) revert OverLimit();
         // forge-lint: disable-next-line(unsafe-typecast)
         l.remaining -= uint128(amount);
+    }
+
+    /// @dev Gives unused held credits back to the user, and back to the app's limit only if the
+    /// user hasn't approved or revoked since the hold. Otherwise a revoked app would regain a limit,
+    /// or a new limit would grow past what the user signed.
+    function _returnToUser(Hold storage h, uint256 amount) internal {
+        balanceOf[h.user] += amount;
+        totalBalances += amount;
+        Limit storage l = _limits[h.user][h.app];
+        // forge-lint: disable-next-line(unsafe-typecast)
+        if (l.version == h.limitVersion) l.remaining += uint128(amount);
     }
 
     function _debit(address user, uint256 amount) internal {
