@@ -23,6 +23,7 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     uint256 public constant UNITS_PER_CREDIT = 10_000;
     /// @notice Highest network fee an app can be set to: 20%.
     uint16 public constant MAX_FEE_BPS = 2_000;
+    uint256 internal constant BPS = 10_000;
 
     bytes32 public constant APPROVE_APP_TYPEHASH =
         keccak256("ApproveApp(address user,address app,uint256 limit,uint64 expiry,bytes32 nonce,uint256 deadline)");
@@ -58,6 +59,12 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     /// @notice What each app may still charge each user, as signed by the user.
     mapping(address user => mapping(address app => Limit)) internal _limits;
 
+    /// @notice USDT units each app has earned and not yet been paid out.
+    mapping(address app => uint256 units) public earningsOf;
+
+    /// @notice Charge references already used per app, so a retried transaction can't charge twice.
+    mapping(address app => mapping(bytes32 ref => bool used)) public refUsed;
+
     /// @notice Used signature nonces. Unordered, so the relayer can submit in any order.
     mapping(address user => mapping(bytes32 nonce => bool used)) public nonceUsed;
 
@@ -77,6 +84,7 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     event Deposited(address indexed user, address indexed payer, uint256 amount);
     event AppApproved(address indexed user, address indexed app, uint256 limit, uint64 expiry);
     event AppRevoked(address indexed user, address indexed app);
+    event Charged(address indexed user, address indexed app, bytes32 indexed ref, uint256 amount, uint256 fee);
 
     error NotOperator();
     error NotOwnerOrOperator();
@@ -93,6 +101,12 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     error SignatureExpired();
     error NonceUsed();
     error BadSignature();
+    error OverLimit();
+    error LimitExpired();
+    error OverMaxCharge();
+    error InsufficientBalance();
+    error ZeroRef();
+    error RefUsed();
 
     modifier onlyOperator() {
         if (!isOperator[msg.sender]) revert NotOperator();
@@ -287,6 +301,23 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     }
 
     // ---------------------------------------------------------------------
+    // Charges
+    // ---------------------------------------------------------------------
+
+    /// @notice Instant charge for a finished action, such as one chat message.
+    /// Operator only, and only within the limit the user signed for this app. The contract
+    /// rejects anything above that limit, even from our own operator key.
+    /// @param ref The app's unique id for this charge. A second charge with the same ref reverts.
+    function charge(address user, address app, uint256 amount, bytes32 ref) external onlyOperator whenNotPaused {
+        _useRef(app, ref);
+        _consumeLimit(user, app, amount);
+        _debit(user, amount);
+        totalBalances -= amount;
+        uint256 fee = _earn(app, amount);
+        emit Charged(user, app, ref, amount, fee);
+    }
+
+    // ---------------------------------------------------------------------
     // Backing
     // ---------------------------------------------------------------------
 
@@ -322,6 +353,41 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
         balanceOf[user] += received;
         totalBalances += received;
         emit Deposited(user, payer, received);
+    }
+
+    /// @dev Marks a charge reference as used for this app.
+    function _useRef(address app, bytes32 ref) internal {
+        if (ref == bytes32(0)) revert ZeroRef();
+        if (refUsed[app][ref]) revert RefUsed();
+        refUsed[app][ref] = true;
+    }
+
+    /// @dev Checks the app, its per-charge cap and the user's signed limit, then lowers the limit.
+    function _consumeLimit(address user, address app, uint256 amount) internal {
+        if (amount == 0) revert ZeroAmount();
+        App storage a = _requireActiveApp(app);
+        if (a.maxCharge != 0 && amount > a.maxCharge) revert OverMaxCharge();
+        Limit storage l = _limits[user][app];
+        // forge-lint: disable-next-line(block-timestamp)
+        if (l.expiry != 0 && block.timestamp >= l.expiry) revert LimitExpired();
+        if (amount > l.remaining) revert OverLimit();
+        // forge-lint: disable-next-line(unsafe-typecast)
+        l.remaining -= uint128(amount);
+    }
+
+    function _debit(address user, uint256 amount) internal {
+        uint256 bal = balanceOf[user];
+        if (amount > bal) revert InsufficientBalance();
+        balanceOf[user] = bal - amount;
+    }
+
+    /// @dev Splits a captured amount between the app and the network fee. Returns the fee.
+    function _earn(address app, uint256 amount) internal returns (uint256 fee) {
+        fee = (amount * _apps[app].feeBps) / BPS;
+        uint256 net = amount - fee;
+        earningsOf[app] += net;
+        totalEarnings += net;
+        protocolFees += fee;
     }
 
     /// @dev Checks a user's EIP-712 signature and burns its nonce. Accepts EOA and ERC-1271 signers.

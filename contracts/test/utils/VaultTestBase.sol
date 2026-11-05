@@ -32,6 +32,16 @@ abstract contract VaultTestBase is Test {
         vault.registerApp(videoApp, videoPayout, FEE_BPS, 0);
     }
 
+    /// @dev Deposits `units` for `user` and approves `app` for `limitUnits`.
+    function fundAndConnect(address user, uint256 units, address app, uint256 limitUnits) internal {
+        usdt.mint(user, units);
+        vm.startPrank(user);
+        usdt.approve(address(vault), units);
+        vault.deposit(user, units);
+        vault.approveApp(user, app, limitUnits, 0, keccak256(abi.encode(user, app, limitUnits)), 0, "");
+        vm.stopPrank();
+    }
+
     /// @dev Signs a CreditVault EIP-712 message and returns the 65-byte signature.
     function signVault(uint256 pk, bytes32 structHash) internal view returns (bytes memory) {
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", vault.DOMAIN_SEPARATOR(), structHash));
