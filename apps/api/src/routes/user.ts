@@ -15,7 +15,7 @@ import type { Context } from "../context.js";
 import { HttpError, requireUser, userOf } from "../http.js";
 import { deadlineIn, newNonce, permitTypes, signRequest, usdtDomain, vaultDomain } from "../typedData.js";
 import { amount, creditsToUnits } from "../units.js";
-import { addressSchema, creditsSchema, txInfo } from "./shared.js";
+import { activityFor, addressSchema, creditsSchema, involves, txInfo } from "./shared.js";
 
 const uint = z.string().regex(/^\d+$/, "must be a whole number");
 const bytes32 = z.string().refine((v) => isHex(v) && v.length === 66, "must be 32 bytes");
@@ -88,6 +88,11 @@ export function userRoutes(ctx: Context): Router {
         expiresAt: new Date(c.expiry * 1000).toISOString(),
       })),
     });
+  });
+
+  /** Everything that moved this user's credits, newest first. */
+  r.get("/me/activity", (req, res) => {
+    res.json(activityFor(ctx, involves(me(res)), req.query.limit));
   });
 
   // ---------------------------------------------------------------- sign

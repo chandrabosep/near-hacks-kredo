@@ -6,6 +6,7 @@ import { privyVerifier, type UserVerifier } from "./auth.js";
 import { createClients } from "./chain.js";
 import { loadConfig, type Config } from "./config.js";
 import { bindToGenesis, dbFileFor, openDb } from "./db.js";
+import { createIndexer } from "./indexer.js";
 import { createRelayer } from "./relayer.js";
 import { createStore } from "./store.js";
 
@@ -28,12 +29,17 @@ export async function createContext(config: Config = loadConfig(), opts: { verif
   const verifier =
     opts.verifier ?? (config.privy ? privyVerifier(config.privy.appId, config.privy.appSecret) : undefined);
 
+  const store = createStore(db);
+  const relayer = createRelayer({ clients, db, txTimeoutMs: config.txTimeoutMs, limits: config.relayerLimits });
+  const indexer = createIndexer({ config, publicClient: clients.publicClient, chain: clients.chain, db, store, relayer });
+
   return {
     config,
     ...clients,
     db,
-    store: createStore(db),
-    relayer: createRelayer({ clients, db, txTimeoutMs: config.txTimeoutMs, limits: config.relayerLimits }),
+    store,
+    relayer,
+    indexer,
     vault,
     usdt,
     usdtName,

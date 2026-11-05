@@ -8,10 +8,13 @@ app.listen(ctx.config.port, () => {
   console.log(`api listening on http://localhost:${ctx.config.port}`);
   console.log(`chain ${ctx.config.chainId}, vault ${ctx.config.vault}, relayer ${ctx.relayer.operator}`);
   console.log(`user login: ${ctx.verifier ? "Privy" : "off (set PRIVY_APP_ID and PRIVY_APP_SECRET)"}`);
+  ctx.indexer.start();
+  console.log(`indexer: every ${ctx.config.indexerIntervalMs}ms, ${ctx.config.logChunk} blocks per call`);
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
+    ctx.indexer.stop();
     ctx.db.flush();
     process.exit(0);
   });

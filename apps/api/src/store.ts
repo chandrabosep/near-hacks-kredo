@@ -2,10 +2,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import { getAddress, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import type { AppRecord, ClaimRecord, Db, HoldRecord, OpRecord, UserRecord } from "./db.js";
+import type { ActivityEvent, AppRecord, ClaimRecord, Db, HoldRecord, OpRecord, UserRecord, WebhookDelivery } from "./db.js";
 import type { PriceList } from "./pricing.js";
 
-export type { AppRecord, ClaimRecord, HoldRecord, OpRecord, UserRecord };
+export type { ActivityEvent, AppRecord, ClaimRecord, HoldRecord, OpRecord, UserRecord, WebhookDelivery };
 
 const API_KEY_PREFIX = "uc_live_";
 
@@ -71,12 +71,12 @@ export function createStore(db: Db) {
     setWebhook(app: AppRecord, url: string | undefined): string | undefined {
       app.webhookUrl = url;
       if (!url) {
-        app.webhookSecretHash = undefined;
+        app.webhookSecret = undefined;
         db.save();
         return undefined;
       }
       const secret = `whsec_${randomBytes(24).toString("hex")}`;
-      app.webhookSecretHash = sha256(secret);
+      app.webhookSecret = secret;
       db.save();
       return secret;
     },
@@ -94,6 +94,9 @@ export function createStore(db: Db) {
       data.ops.find((o) => same(o.app, app) && o.kind === kind && o.ref === ref),
 
     opsForApp: (app: Address) => data.ops.filter((o) => same(o.app, app)),
+
+    /** The op a transaction belongs to, so events can carry the app's own ref. */
+    opByTx: (txHash: string) => data.ops.find((o) => o.txHash.toLowerCase() === txHash.toLowerCase()),
 
     // ---------------------------------------------------------------- holds
 

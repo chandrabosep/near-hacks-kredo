@@ -127,9 +127,9 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] rate limits (120 writes/min per API key, 429 with retry-after)
 
 **Indexer**
-- [ ] log indexer: `eth_getLogs` paged by 1,000 blocks, 2s poll, backing-check alarm
-- [ ] expired-hold sweeper and HMAC-signed webhooks
-- [ ] user and merchant activity, stats
+- [x] log indexer: `eth_getLogs` paged by 1,000 blocks, 2s poll, backing-check alarm
+- [x] expired-hold sweeper and HMAC-signed webhooks
+- [x] user and merchant activity, stats
 
 **SDK**
 - [ ] backend kit: client and auth, `quote`, `charge`, `hold`, `capture`, `release`, `refund`

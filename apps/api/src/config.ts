@@ -53,6 +53,9 @@ const envSchema = z.object({
   RELAYER_MIN_BALANCE: wbt.default(parseEther("0.05")),
   MAX_TX_GAS: z.coerce.bigint().positive().default(500_000n),
   MAX_GAS_PRICE_GWEI: z.coerce.number().positive().default(50),
+  /** How often the indexer reads new blocks, and how many blocks one eth_getLogs call covers. */
+  INDEXER_INTERVAL_MS: z.coerce.number().int().min(250).default(2_000),
+  LOG_CHUNK: z.coerce.number().int().min(1).max(10_000).default(1_000),
 });
 
 const deploymentSchema = z.object({
@@ -79,6 +82,8 @@ export type Config = {
   rateLimitPerMin: number;
   holdTtlSeconds: number;
   relayerLimits: RelayerLimits;
+  indexerIntervalMs: number;
+  logChunk: number;
 };
 
 /**
@@ -143,5 +148,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       appDailyBudget: e.APP_DAILY_GAS_BUDGET,
       minBalance: e.RELAYER_MIN_BALANCE,
     },
+    indexerIntervalMs: e.INDEXER_INTERVAL_MS,
+    logChunk: e.LOG_CHUNK,
   };
 }

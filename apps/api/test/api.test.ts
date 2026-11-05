@@ -6,6 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
+import { createServer as createHttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,6 +17,7 @@ import { mockUSDTAbi } from "../src/abi/MockUSDT.js";
 import { AuthError, type UserVerifier } from "../src/auth.js";
 import { loadConfig } from "../src/config.js";
 import { createContext, type Context } from "../src/context.js";
+import { signWebhook } from "../src/indexer.js";
 import { createServer } from "../src/server.js";
 import { ANVIL_KEY, skipChainTests as skip, startLocalChain, type LocalChain } from "./localChain.js";
 import { vaultTypes } from "../src/typedData.js";
@@ -285,5 +287,113 @@ describe("api", { skip }, () => {
     const r = await call("GET", "/v1/reserves");
     assert.equal(r.body.backed, true);
     assert.equal(r.body.surplus.units, "0");
+  });
+
+  // ---------------------------------------------------------------- indexer
+
+  test("the indexer reads every vault event into activity and stats", async () => {
+    await ctx.indexer.tick();
+    const status = (await call("GET", "/v1/health")).body.indexer;
+    assert.equal(status.lag, 0);
+    assert.equal(status.backed, true);
+    assert.equal(status.error, null);
+
+    const mine = await call("GET", "/v1/me/activity", { user: "alice" });
+    const types = new Set(mine.body.map((e: Json) => e.type));
+    for (const t of ["Deposited", "AppApproved", "Charged", "Held", "Captured", "Released", "Refunded", "Sent", "AppRevoked"]) {
+      assert.ok(types.has(t), `alice's activity has ${t}`);
+    }
+    assert.ok(mine.body[0].at >= mine.body.at(-1).at, "newest first");
+    assert.ok(mine.body.every((e: Json) => e.explorer === undefined || typeof e.explorer === "string"));
+
+    // Captured and Released name no user onchain; the indexer fills them in from the hold.
+    const captured = mine.body.find((e: Json) => e.type === "Captured");
+    assert.equal(captured.user, alice.address);
+    assert.equal(captured.app, appId);
+
+    const theirs = await company("GET", "/v1/activity?limit=500");
+    assert.ok(theirs.body.length > 0);
+    assert.ok(theirs.body.every((e: Json) => e.app === appId));
+    const charge = theirs.body.find((e: Json) => e.type === "Charged" && e.ref);
+    assert.ok(charge, "charges carry the app's own ref");
+    assert.equal(charge.appName, "Video Studio");
+
+    const stats = await call("GET", "/v1/stats");
+    assert.equal(stats.body.deposited.credits, "1000");
+    assert.ok(Number(stats.body.spent.credits) > 0);
+    assert.ok(Number(stats.body.paidOut.units) > 0);
+
+    // A second pass adds nothing: events are stored once.
+    const count = ctx.db.data.events.length;
+    await ctx.indexer.tick();
+    assert.equal(ctx.db.data.events.length, count);
+  });
+
+  test("webhooks are signed, and a failed delivery is retried", async () => {
+    const received: { headers: Record<string, string | string[] | undefined>; body: string }[] = [];
+    let failNext = true;
+    const hook = createHttpServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        received.push({ headers: req.headers, body });
+        res.statusCode = failNext ? 500 : 200;
+        failNext = false;
+        res.end();
+      });
+    }).listen(0);
+    await new Promise((r) => hook.once("listening", r));
+    try {
+      const url = `http://127.0.0.1:${(hook.address() as AddressInfo).port}/hook`;
+      const set = await company("PUT", "/v1/webhook", { url });
+      const secret: string = set.body.secret;
+      assert.match(secret, /^whsec_/);
+
+      assert.equal((await act("alice", "connect", { app: appId, credits: 50 })).status, 201);
+      const charged = await company("POST", "/v1/charges", { user: alice.address, credits: 3, ref: "hooked" });
+      assert.equal(charged.status, 201, JSON.stringify(charged.body));
+
+      await ctx.indexer.tick();
+      assert.equal(received.length, 2, "connection.approved, then charge.succeeded");
+      const pending = ctx.db.data.deliveries.filter((d) => d.status === "pending");
+      assert.equal(pending.length, 1, "the first delivery failed and waits for a retry");
+
+      for (const d of pending) d.nextAt = 0;
+      await ctx.indexer.deliverDue();
+      assert.equal(ctx.db.data.deliveries.filter((d) => d.status === "pending").length, 0);
+
+      const last = received.find((r) => JSON.parse(r.body).type === "charge.succeeded")!;
+      const payload = JSON.parse(last.body);
+      assert.equal(payload.data.ref, "hooked");
+      assert.equal(payload.data.amount.credits, "3");
+      assert.equal(last.headers["x-credits-event"], "charge.succeeded");
+
+      const sig = String(last.headers["x-credits-signature"]);
+      const t = Number(/t=(\d+)/.exec(sig)![1]);
+      assert.equal(sig, signWebhook(secret, last.body, t), "the signature checks out with the app's secret");
+
+      const deliveries = await company("GET", "/v1/webhook/deliveries");
+      assert.ok(deliveries.body.some((d: Json) => d.type === "charge.succeeded" && d.status === "delivered" && d.attempts >= 1));
+    } finally {
+      hook.close();
+      await company("PUT", "/v1/webhook", { url: null });
+    }
+  });
+
+  test("the sweeper releases an expired hold back to the user", async () => {
+    const before = (await call("GET", "/v1/me", { user: "alice" })).body.balance.units;
+    const held = await company("POST", "/v1/holds", { user: alice.address, credits: 4 });
+    assert.equal(held.status, 201, JSON.stringify(held.body));
+
+    // Pretend the hold's time is up. The operator may release at any time onchain.
+    ctx.store.hold(held.body.holdId)!.expiry = 0;
+    assert.equal(await ctx.indexer.sweep(), 1);
+    assert.equal(ctx.store.hold(held.body.holdId)!.status, "released");
+    assert.equal(await ctx.indexer.sweep(), 0, "nothing left to sweep");
+
+    const after = (await call("GET", "/v1/me", { user: "alice" })).body.balance.units;
+    assert.equal(after, before);
+    const h = await company("GET", `/v1/holds/${held.body.holdId}`);
+    assert.equal(h.body.status, "released");
   });
 });

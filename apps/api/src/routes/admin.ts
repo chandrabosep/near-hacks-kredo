@@ -79,6 +79,7 @@ export function adminRoutes(ctx: Context): Router {
       allTime: { transactions: all.count, wei: all.wei.toString() },
       daysOfRunway: today.wei === 0n ? null : Number(balance / today.wei),
       exitsOnly,
+      indexer: ctx.indexer.status(),
       limits: limits && {
         dailyBudgetWei: limits.dailyBudget.toString(),
         budgetLeftWei: budgetLeft?.toString(),

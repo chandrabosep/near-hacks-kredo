@@ -21,6 +21,38 @@ export function publicRoutes(ctx: Context): Router {
       usdt: config.usdt,
       relayer: { address: ctx.relayer.operator, balance: formatEther(balance), symbol: ctx.chain.nativeCurrency.symbol },
       login: ctx.verifier ? "privy" : "disabled",
+      indexer: ctx.indexer.status(),
+    });
+  });
+
+  /** Network totals from the indexed events. */
+  r.get("/stats", (_req, res) => {
+    let deposited = 0n;
+    let spent = 0n;
+    let fees = 0n;
+    let paidOut = 0n;
+    let refunded = 0n;
+    const users = new Set<string>();
+    for (const e of ctx.db.data.events) {
+      if (e.event === "Deposited") deposited += e.units ?? 0n;
+      if (e.event === "Charged" || e.event === "Captured") {
+        spent += e.units ?? 0n;
+        fees += e.fee ?? 0n;
+      }
+      if (e.event === "PaidOut") paidOut += e.units ?? 0n;
+      if (e.event === "Refunded") refunded += e.units ?? 0n;
+      if (e.user) users.add(e.user.toLowerCase());
+    }
+    res.json({
+      apps: ctx.store.listApps().length,
+      users: users.size,
+      events: ctx.db.data.events.length,
+      deposited: amount(deposited),
+      spent: amount(spent),
+      networkFees: amount(fees),
+      refunded: amount(refunded),
+      paidOut: amount(paidOut),
+      indexedToBlock: ctx.indexer.status().block,
     });
   });
 

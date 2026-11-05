@@ -11,7 +11,7 @@ import { appOf, HttpError, rateLimit, requireApiKey } from "../http.js";
 import { amountInputSchema, priceListSchema, resolveAmount } from "../pricing.js";
 import type { OpRecord } from "../store.js";
 import { amount, creditsToUnits, unitsToCreditsString, UNITS_PER_CREDIT } from "../units.js";
-import { addressSchema, creditsSchema, newRef, onchainRef, refSchema, txInfo, vaultEvent } from "./shared.js";
+import { activityFor, addressSchema, creditsSchema, forApp, newRef, onchainRef, refSchema, txInfo, vaultEvent } from "./shared.js";
 
 const chargeSchema = z.intersection(
   amountInputSchema,
@@ -364,6 +364,23 @@ export function appRoutes(ctx: Context): Router {
       symbol: ctx.chain.nativeCurrency.symbol,
       paidBy: "network",
     });
+  });
+
+  /** Every vault event for this app, newest first. */
+  r.get("/activity", (req, res) => {
+    res.json(activityFor(ctx, forApp(appOf(res).id), req.query.limit));
+  });
+
+  /** Recent webhook deliveries, so a company can see what reached it. */
+  r.get("/webhook/deliveries", (_req, res) => {
+    const app = appOf(res);
+    res.json(
+      ctx.db.data.deliveries
+        .filter((d) => d.app.toLowerCase() === app.id.toLowerCase())
+        .slice(-50)
+        .reverse()
+        .map((d) => ({ id: d.id, type: d.type, status: d.status, attempts: d.attempts, lastStatus: d.lastStatus ?? null, lastError: d.lastError ?? null })),
+    );
   });
 
   r.put("/webhook", (req, res) => {

@@ -14,6 +14,7 @@ import { z } from "zod";
 import { creditVaultAbi } from "../abi/CreditVault.js";
 import { explorerTx } from "../chain.js";
 import type { Context } from "../context.js";
+import type { ActivityEvent } from "../db.js";
 
 export const addressSchema = z
   .string()
@@ -39,6 +40,22 @@ export function onchainRef(kind: string, ref: string): Hex {
 export function newRef(): string {
   return randomUUID();
 }
+
+const same = (a?: string, b?: string) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+
+/** Newest first, then capped. `limit` comes from the query string. */
+export function activityFor(ctx: Context, match: (e: ActivityEvent) => boolean, limitParam: unknown) {
+  const limit = Math.min(Math.max(Number(limitParam) || 50, 1), 500);
+  const rows: ActivityEvent[] = [];
+  const events = ctx.db.data.events;
+  for (let i = events.length - 1; i >= 0 && rows.length < limit; i--) if (match(events[i])) rows.push(events[i]);
+  return rows.map(ctx.indexer.present);
+}
+
+export const involves = (address: string) => (e: ActivityEvent) =>
+  same(e.user, address) || same(e.from, address) || same(e.to, address);
+
+export const forApp = (app: string) => (e: ActivityEvent) => same(e.app, app);
 
 export function txInfo(ctx: Context, hash: Hex) {
   return { txHash: hash, explorer: explorerTx(ctx.chain, hash) };

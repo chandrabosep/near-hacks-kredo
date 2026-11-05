@@ -25,8 +25,8 @@ export type AppRecord = {
   /** Light mode: how many of our credits buy one of the app's own credits (e.g. "2"). */
   exchangeRate?: string;
   webhookUrl?: string;
-  /** Signs webhook payloads (HMAC-SHA256). Shown once, like the API key. */
-  webhookSecretHash?: Hex;
+  /** Signs webhook payloads (HMAC-SHA256). Kept in full: signing needs the secret itself. */
+  webhookSecret?: string;
   createdAt: number;
 };
 
@@ -90,6 +90,42 @@ export type RelayerTx = {
   at: number;
 };
 
+/** One decoded vault event. Read models (activity, stats, webhooks) are built from these. */
+export type ActivityEvent = {
+  /** txHash:logIndex, unique per event. */
+  id: string;
+  event: string;
+  block: number;
+  logIndex: number;
+  txHash: Hash;
+  /** Block time, ms. */
+  at: number;
+  user?: Address;
+  app?: Address;
+  from?: Address;
+  to?: Address;
+  units?: bigint;
+  fee?: bigint;
+  /** Credits a partial capture handed back. */
+  returned?: bigint;
+  holdId?: Hex;
+  claimKey?: Address;
+};
+
+/** A webhook waiting to be delivered, or already delivered. Retried with backoff. */
+export type WebhookDelivery = {
+  /** eventId, so each event is delivered to its app once. */
+  id: string;
+  app: Address;
+  type: string;
+  body: string;
+  status: "pending" | "delivered" | "failed";
+  attempts: number;
+  nextAt: number;
+  lastStatus?: number;
+  lastError?: string;
+};
+
 export type Data = {
   /** Hash of block 0. A local chain restarts with a new genesis, which makes this file stale. */
   genesis?: Hash;
@@ -99,6 +135,10 @@ export type Data = {
   users: UserRecord[];
   claims: ClaimRecord[];
   txs: RelayerTx[];
+  events: ActivityEvent[];
+  /** Last block the indexer has fully read. */
+  cursor?: number;
+  deliveries: WebhookDelivery[];
 };
 
 export type Db = {
@@ -112,7 +152,7 @@ export type Db = {
   reset(): void;
 };
 
-const empty = (): Data => ({ apps: [], holds: [], ops: [], users: [], claims: [], txs: [] });
+const empty = (): Data => ({ apps: [], holds: [], ops: [], users: [], claims: [], txs: [], events: [], deliveries: [] });
 
 const replacer = (_key: string, v: unknown) => (typeof v === "bigint" ? { $bigint: v.toString() } : v);
 const reviver = (_key: string, v: unknown) =>
@@ -140,7 +180,7 @@ export function openDb(file: string, debounceMs = 50): Db {
       renameSync(tmp, file);
     },
     reset() {
-      Object.assign(data, empty(), { genesis: undefined });
+      Object.assign(data, empty(), { genesis: undefined, cursor: undefined });
       db.flush();
     },
   };
