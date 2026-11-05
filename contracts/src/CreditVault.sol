@@ -5,6 +5,8 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {IERC3009} from "./interfaces/IERC3009.sol";
 
 /// @title CreditVault
 /// @notice Holds USDT and every credit balance, app limit, hold, claim and payout.
@@ -166,6 +168,42 @@ contract CreditVault is Ownable2Step, Pausable {
     /// This is the only way credits are created.
     function deposit(address user, uint256 amount) external whenNotPaused {
         _pullAndCredit(msg.sender, user, amount);
+    }
+
+    /// @notice Gasless buy with an EIP-2612 permit. The user signs a permit for this vault and
+    /// anyone (normally our relayer) submits it. Credits always go to the signer.
+    /// @dev The permit is wrapped in try/catch so a front-run permit doesn't block the deposit:
+    /// the allowance is already set, and transferFrom still enforces it. A bad signature with
+    /// no allowance fails at transferFrom. Side effect: a user who also gave the vault a
+    /// standing allowance can be topped up from it by anyone, always to their own balance.
+    /// Our apps only use exact-amount permits, which are spent in the same call.
+    function depositWithPermit(address user, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        external
+        whenNotPaused
+    {
+        try IERC20Permit(address(usdt)).permit(user, address(this), amount, deadline, v, r, s) {} catch {}
+        _pullAndCredit(user, user, amount);
+    }
+
+    /// @notice Gasless buy with an EIP-3009 ReceiveWithAuthorization signed by the user with
+    /// `to` set to this vault. The token only lets the payee submit it, so nobody can move the
+    /// USDT without crediting the signer, and the nonce can't be replayed.
+    function depositWithAuthorization(
+        address user,
+        uint256 amount,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external whenNotPaused {
+        if (user == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        uint256 before = usdt.balanceOf(address(this));
+        IERC3009(address(usdt))
+            .receiveWithAuthorization(user, address(this), amount, validAfter, validBefore, nonce, v, r, s);
+        _credit(user, user, usdt.balanceOf(address(this)) - before);
     }
 
     // ---------------------------------------------------------------------

@@ -92,7 +92,7 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] vault skeleton: storage, running totals, owner/operator roles, `pause()`, `checkBacking()`
 - [x] app registry (`registerApp`, payout address, `feeBps`) and its tests
 - [x] `deposit` and tests, including the backing check
-- [ ] `depositWithPermit` (try/catch around permit) and `depositWithAuthorization`, with tests: relayed by a stranger, after a front-run permit, bad signature, nonce replay, wrong `to`
+- [x] `depositWithPermit` (try/catch around permit) and `depositWithAuthorization`, with tests: relayed by a stranger, after a front-run permit, bad signature, nonce replay, wrong `to`
 
 **Vault: limits and charges**
 - [ ] EIP-712 `approveApp` / `revokeApp`, signed or direct, with tests
