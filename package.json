@@ -2,7 +2,8 @@
   "name": "universal-credits",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "engines": {
     "node": ">=22"
@@ -17,6 +18,7 @@
     "contracts:test": "cd contracts && forge test -vv",
     "contracts:fork": "cd contracts && FORK=1 forge test --match-path \"test/fork/*\" -vv",
     "test:api": "npm test -w @credits/api",
-    "abi": "npm run abi -w @credits/api"
+    "abi": "npm run abi -w @credits/api",
+    "test:sdk": "npm test -w @credits/sdk"
   }
 }

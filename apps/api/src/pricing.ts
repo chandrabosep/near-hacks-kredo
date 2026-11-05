@@ -50,7 +50,8 @@ export function resolveAmount(input: AmountInput, prices: PriceList): { units: b
   if (input.credits !== undefined) {
     const units = parse(input.credits);
     if (units === 0n) throw new PricingError("amount must be more than 0");
-    return { units, label: `${unitsToCreditsString(units)} credits` };
+    const n = unitsToCreditsString(units);
+    return { units, label: `${n} ${n === "1" ? "credit" : "credits"}` };
   }
   const action = input.action!;
   const e = prices[action];
