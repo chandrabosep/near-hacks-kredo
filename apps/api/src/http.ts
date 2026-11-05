@@ -42,6 +42,15 @@ const CONTRACT_ERRORS: Record<string, string> = {
   ZeroAmount: "Nothing to do: the amount is zero.",
 };
 
+/** The relayer's own limits. Nothing was sent, so nothing was spent. */
+const RELAYER_LIMITS: Record<string, string> = {
+  GasTooHigh: "This transaction needs more gas than the network allows.",
+  GasPriceTooHigh: "Gas prices are unusually high right now. Try again shortly.",
+  DailyBudgetReached: "The network has hit its daily gas budget. Try again later.",
+  AppBudgetReached: "This app has hit its daily gas budget. Try again later.",
+  RelayerLowBalance: "The network is low on gas. Only releases, revokes and payouts go through right now.",
+};
+
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof HttpError) return void res.status(err.status).json({ error: err.message, code: err.code });
   if (err instanceof ZodError) {
@@ -50,6 +59,9 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   }
   if (err instanceof PricingError) return void res.status(400).json({ error: err.message, code: "pricing" });
   if (err instanceof AuthError) return void res.status(401).json({ error: err.message, code: "unauthenticated" });
+  if (err instanceof RelayerError && RELAYER_LIMITS[err.reason]) {
+    return void res.status(503).json({ error: RELAYER_LIMITS[err.reason], code: err.reason });
+  }
   if (err instanceof RelayerError) {
     const message = CONTRACT_ERRORS[err.reason];
     return void res.status(message ? 422 : 502).json({

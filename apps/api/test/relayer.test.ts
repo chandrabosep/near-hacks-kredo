@@ -4,10 +4,10 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import type { Address } from "viem";
+import { parseEther, parseGwei, type Address } from "viem";
 import { creditVaultAbi } from "../src/abi/CreditVault.js";
 import { openDb, type Db } from "../src/db.js";
-import { createRelayer, RelayerError, type Relayer } from "../src/relayer.js";
+import { createRelayer, RelayerError, type Relayer, type RelayerLimits } from "../src/relayer.js";
 import { skipChainTests as skip, startLocalChain, type LocalChain } from "./localChain.js";
 
 let chain: LocalChain | undefined;
@@ -87,4 +87,90 @@ test("spent() totals sent transactions, overall and per app", { skip }, () => {
   const one = relayer.spent(0, appAddr(1));
   assert.equal(one.count, 1);
   assert.ok(one.wei > 0n);
+});
+
+// ---------------------------------------------------------------- limits
+
+const roomy: RelayerLimits = {
+  maxTxGas: 500_000n,
+  maxGasPrice: parseGwei("50"),
+  dailyBudget: parseEther("1"),
+  appDailyBudget: parseEther("1"),
+  minBalance: 0n,
+};
+
+function limited(overrides: Partial<RelayerLimits>) {
+  const ldb = openDb(join(mkdtempSync(join(tmpdir(), "uc-limits-")), "db.json"));
+  return { ldb, r: createRelayer({ clients: chain!.clients, db: ldb, txTimeoutMs: 10_000, limits: { ...roomy, ...overrides } }) };
+}
+
+const registerWith = (r: Relayer, i: number, tagApp = true) =>
+  r.write(
+    {
+      address: chain!.vault,
+      abi: creditVaultAbi,
+      functionName: "registerApp",
+      args: [appAddr(i), appAddr(100 + i), 500, 0n],
+    },
+    tagApp ? { app: appAddr(i) } : {},
+  );
+
+const refused = (reason: string) => (err: unknown) => err instanceof RelayerError && err.reason === reason && !err.hash;
+
+async function sentCount() {
+  const { publicClient, operator } = chain!.clients;
+  return publicClient.getTransactionCount({ address: operator.address });
+}
+
+test("within the limits, a transaction goes out with a capped gas limit", { skip }, async () => {
+  const { r } = limited({});
+  const res = await registerWith(r, 20);
+  const tx = await chain!.clients.publicClient.getTransaction({ hash: res.hash });
+  assert.ok(tx.gas <= roomy.maxTxGas);
+  assert.equal(res.tx.status, "success");
+});
+
+test("a transaction above the gas ceiling is refused before sending", { skip }, async () => {
+  const { r, ldb } = limited({ maxTxGas: 21_000n });
+  const before = await sentCount();
+  await assert.rejects(registerWith(r, 21), refused("GasTooHigh"));
+  assert.equal(await sentCount(), before);
+  assert.equal(ldb.data.txs.at(-1)!.error, "GasTooHigh");
+});
+
+test("a gas price above the ceiling is refused", { skip }, async () => {
+  const { r } = limited({ maxGasPrice: 1n });
+  await assert.rejects(registerWith(r, 22), refused("GasPriceTooHigh"));
+});
+
+test("the daily budget stops new work but exits still go out", { skip }, async () => {
+  const { r } = limited({ dailyBudget: 1n, appDailyBudget: 1n });
+  await assert.rejects(registerWith(r, 23), refused("DailyBudgetReached"));
+
+  // The operator revoking its own limit is an exit: no signature needed, and it skips the budget.
+  const operator = chain!.clients.operator.address;
+  const res = await r.write({
+    address: chain!.vault,
+    abi: creditVaultAbi,
+    functionName: "revokeApp",
+    args: [operator, appAddr(1), `0x${"00".repeat(32)}`, 0n, "0x"],
+  });
+  assert.equal(res.tx.status, "success");
+
+  const s = await r.status();
+  assert.equal(s.exitsOnly, true);
+  assert.equal(s.budgetLeft, 0n);
+});
+
+test("one app's budget can't spend the whole relayer's", { skip }, async () => {
+  const { r } = limited({ appDailyBudget: 1n });
+  await assert.rejects(registerWith(r, 24), refused("AppBudgetReached"));
+  const res = await registerWith(r, 24, false);
+  assert.equal(res.tx.status, "success");
+});
+
+test("below the minimum balance, only exits go out", { skip }, async () => {
+  const { r } = limited({ minBalance: parseEther("1000000") });
+  await assert.rejects(registerWith(r, 25), refused("RelayerLowBalance"));
+  assert.equal((await r.status()).exitsOnly, true);
 });

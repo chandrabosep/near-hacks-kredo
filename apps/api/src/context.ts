@@ -33,7 +33,7 @@ export async function createContext(config: Config = loadConfig(), opts: { verif
     ...clients,
     db,
     store: createStore(db),
-    relayer: createRelayer({ clients, db, txTimeoutMs: config.txTimeoutMs }),
+    relayer: createRelayer({ clients, db, txTimeoutMs: config.txTimeoutMs, limits: config.relayerLimits }),
     vault,
     usdt,
     usdtName,

@@ -70,9 +70,7 @@ export function adminRoutes(ctx: Context): Router {
 
   /** The relayer's gas position: balance, spend today and transaction count. */
   r.get("/ops", async (_req, res) => {
-    const dayAgo = Date.now() - 86_400_000;
-    const [balance] = await Promise.all([relayer.balance()]);
-    const today = relayer.spent(dayAgo);
+    const { balance, today, limits, budgetLeft, exitsOnly } = await relayer.status();
     const all = relayer.spent();
     res.json({
       relayer: relayer.operator,
@@ -80,6 +78,15 @@ export function adminRoutes(ctx: Context): Router {
       last24h: { transactions: today.count, wei: today.wei.toString() },
       allTime: { transactions: all.count, wei: all.wei.toString() },
       daysOfRunway: today.wei === 0n ? null : Number(balance / today.wei),
+      exitsOnly,
+      limits: limits && {
+        dailyBudgetWei: limits.dailyBudget.toString(),
+        budgetLeftWei: budgetLeft?.toString(),
+        appDailyBudgetWei: limits.appDailyBudget.toString(),
+        minBalanceWei: limits.minBalance.toString(),
+        maxTxGas: limits.maxTxGas.toString(),
+        maxGasPriceWei: limits.maxGasPrice.toString(),
+      },
     });
   });
 

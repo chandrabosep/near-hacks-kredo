@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { getAddress, isAddress, isHex, type Address, type Hex } from "viem";
+import { getAddress, isAddress, isHex, parseEther, parseGwei, type Address, type Hex } from "viem";
 import { z } from "zod";
+import type { RelayerLimits } from "./relayer.js";
 
 export const WHITECHAIN_SEPOLIA = 1874;
 export const LOCAL_CHAIN = 31337;
@@ -14,6 +15,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_DEPLOYMENTS_DIR = resolve(here, "../../../contracts/deployments");
 
 const address = z.string().refine((v) => isAddress(v), "must be an address").transform((v) => getAddress(v));
+/** A decimal amount of the gas token, such as "0.25", read as wei. */
+const wbt = z.string().regex(/^\d+(\.\d{1,18})?$/, "must be a decimal amount, like 0.25").transform((v) => parseEther(v));
 const privateKey = z.string().refine((v) => isHex(v) && v.length === 66, "must be a 32-byte hex key");
 
 const envSchema = z.object({
@@ -43,6 +46,13 @@ const envSchema = z.object({
   RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(120),
   /** Default and longest hold, in seconds. The contract caps holds at one day. */
   HOLD_TTL_SECONDS: z.coerce.number().int().min(60).max(86_400).default(3_600),
+  /** Relayer limits. Most WBT spent in any rolling 24 hours, overall and per app. */
+  RELAYER_DAILY_BUDGET: wbt.default(parseEther("0.25")),
+  APP_DAILY_GAS_BUDGET: wbt.default(parseEther("0.1")),
+  /** Below this WBT balance, only exits go out: release, payout, revoke, cancel claim. */
+  RELAYER_MIN_BALANCE: wbt.default(parseEther("0.05")),
+  MAX_TX_GAS: z.coerce.bigint().positive().default(500_000n),
+  MAX_GAS_PRICE_GWEI: z.coerce.number().positive().default(50),
 });
 
 const deploymentSchema = z.object({
@@ -68,6 +78,7 @@ export type Config = {
   networkFeeBps: number;
   rateLimitPerMin: number;
   holdTtlSeconds: number;
+  relayerLimits: RelayerLimits;
 };
 
 /**
@@ -101,6 +112,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     startBlock ??= d.deployBlock;
   }
 
+  if (e.APP_DAILY_GAS_BUDGET > e.RELAYER_DAILY_BUDGET) {
+    throw new Error("APP_DAILY_GAS_BUDGET can't be above RELAYER_DAILY_BUDGET");
+  }
+
   if ((e.PRIVY_APP_ID === undefined) !== (e.PRIVY_APP_SECRET === undefined)) {
     throw new Error("Set both PRIVY_APP_ID and PRIVY_APP_SECRET, or neither");
   }
@@ -121,5 +136,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     networkFeeBps: e.NETWORK_FEE_BPS,
     rateLimitPerMin: e.RATE_LIMIT_PER_MIN,
     holdTtlSeconds: e.HOLD_TTL_SECONDS,
+    relayerLimits: {
+      maxTxGas: e.MAX_TX_GAS,
+      maxGasPrice: parseGwei(String(e.MAX_GAS_PRICE_GWEI)),
+      dailyBudget: e.RELAYER_DAILY_BUDGET,
+      appDailyBudget: e.APP_DAILY_GAS_BUDGET,
+      minBalance: e.RELAYER_MIN_BALANCE,
+    },
   };
 }

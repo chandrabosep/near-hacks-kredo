@@ -67,3 +67,22 @@ test("rejects a deployment file for another chain", () => {
   writeFileSync(join(dir, "31337.json"), JSON.stringify({ chainId: 1874, creditVault: VAULT, usdt: USDT, deployBlock: 0 }));
   assert.throws(() => loadConfig({ DEPLOYMENTS_DIR: dir }), /is for chain 1874/);
 });
+
+test("relayer limits default to safe values and read WBT amounts", () => {
+  const c = loadConfig({ DEPLOYMENTS_DIR: deploymentsDir(31337) });
+  assert.equal(c.relayerLimits.dailyBudget, 250_000_000_000_000_000n);
+  assert.equal(c.relayerLimits.maxTxGas, 500_000n);
+  assert.equal(c.relayerLimits.maxGasPrice, 50_000_000_000n);
+
+  const custom = loadConfig({ DEPLOYMENTS_DIR: deploymentsDir(31337), RELAYER_DAILY_BUDGET: "2", APP_DAILY_GAS_BUDGET: "0.5" });
+  assert.equal(custom.relayerLimits.dailyBudget, 2_000_000_000_000_000_000n);
+  assert.equal(custom.relayerLimits.appDailyBudget, 500_000_000_000_000_000n);
+});
+
+test("an app budget above the relayer budget is refused", () => {
+  assert.throws(
+    () => loadConfig({ DEPLOYMENTS_DIR: deploymentsDir(31337), RELAYER_DAILY_BUDGET: "0.1", APP_DAILY_GAS_BUDGET: "0.2" }),
+    /APP_DAILY_GAS_BUDGET/,
+  );
+  assert.throws(() => loadConfig({ DEPLOYMENTS_DIR: deploymentsDir(31337), RELAYER_DAILY_BUDGET: "abc" }), /decimal/);
+});

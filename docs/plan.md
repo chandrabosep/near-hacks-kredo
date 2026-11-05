@@ -68,7 +68,7 @@ The mock USDT is for local Foundry tests only. It mirrors this surface so tests 
 ### 3b. Whitechain qualification checklist (hard requirements for every track)
 
 - [x] Contracts deployed on Whitechain Sepolia (1874) and **verified** on the explorer
-- [ ] At least one **USDT payment settled on Whitechain in the main flow**, with the explorer link in the README. Self-minted test tokens don't count.
+- [x] At least one **USDT payment settled on Whitechain in the main flow**, with the explorer link in the README. Self-minted test tokens don't count.
 - [ ] README line: why this flow needs onchain stablecoin settlement on Whitechain, and what a normal payment rail couldn't do. (A rail can't stop us over-charging or over-issuing. The contract does.)
 - [ ] README covers setup, architecture and **current limitations**
 - [ ] 2 to 4 minute video showing **each party**: customer, merchant, and the relayer's gas view
@@ -198,7 +198,7 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 - [ ] Wallets: deployer, operator/relayer, fee recipient (keys never committed)
 - [ ] WBT for gas from the faucet; test USDT from the Whitechain booth (a few thousand, spread over the demo user wallets)
 - [ ] Ask the booth: does the vault design count as "USDT payments settled on Whitechain"?
-- [ ] Record the real gas cost of one `charge()`
+- [x] Record the real gas cost of one `charge()`
 
 **Done when:** everyone can run the repo and the wallets hold testnet funds.
 
@@ -210,12 +210,12 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 **Done when:** the verified contract is on the explorer. Tag `m1-contract-deployed`.
 
 ### Step 3: Backend on Whitechain, gas economics and anti-drain
-- [ ] Run the backend against Whitechain; a curl charge appears on the explorer and in the database (tag `m2-charge-end-to-end`)
+- [x] Run the backend against Whitechain; a curl charge appears on the explorer and in the database (tag `m2-charge-end-to-end`)
 - [ ] Relayer retries
 - [ ] Ops panel (hidden route): relayer WBT balance, txs today, WBT spent today, days of runway
-- [ ] Daily WBT budget with auto-pause, per-tx gas ceiling
+- [x] Daily WBT budget with auto-pause, per-tx gas ceiling
 - [ ] Per-IP limits on signup and claim; minimum amounts on charge and send
-- [ ] README "Relayer security" section, updated with the real numbers
+- [x] README "Relayer security" section, updated with the real numbers
 
 ### Step 4: SDK test mode and starter app
 - [ ] Test mode: test API keys that work with fake credits
