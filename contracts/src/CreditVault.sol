@@ -14,6 +14,15 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 ///   usdt.balanceOf(vault) >= totalBalances + totalHeld + totalClaims + totalEarnings + protocolFees
 contract CreditVault is Ownable2Step, Pausable {
     uint256 public constant UNITS_PER_CREDIT = 10_000;
+    /// @notice Highest network fee an app can be set to: 20%.
+    uint16 public constant MAX_FEE_BPS = 2_000;
+
+    struct App {
+        address payout; // receives the company's USDT earnings
+        uint16 feeBps; // network fee taken from the company's share of each charge
+        uint128 maxCharge; // largest single charge or hold, in units (0 = no cap)
+        bool active;
+    }
 
     IERC20Metadata public immutable usdt;
 
@@ -22,6 +31,9 @@ contract CreditVault is Ownable2Step, Pausable {
 
     /// @notice Relayer keys allowed to submit user-signed actions and app charges.
     mapping(address account => bool allowed) public isOperator;
+
+    /// @notice Registered apps, keyed by the app's id address.
+    mapping(address app => App) internal _apps;
 
     // Running totals of every liability the vault owes.
     uint256 public totalBalances;
@@ -32,12 +44,21 @@ contract CreditVault is Ownable2Step, Pausable {
 
     event OperatorSet(address indexed account, bool allowed);
     event FeeRecipientSet(address indexed account);
+    event AppRegistered(address indexed app, address payout, uint16 feeBps, uint128 maxCharge);
+    event AppTermsSet(address indexed app, uint16 feeBps, uint128 maxCharge);
+    event AppPayoutSet(address indexed app, address payout);
+    event AppActiveSet(address indexed app, bool active);
 
     error NotOperator();
     error NotOwnerOrOperator();
     error ZeroAddress();
     error WrongDecimals();
     error RenounceDisabled();
+    error AppExists();
+    error UnknownApp();
+    error AppInactive();
+    error FeeTooHigh();
+    error NotAuthorized();
 
     modifier onlyOperator() {
         if (!isOperator[msg.sender]) revert NotOperator();
@@ -86,6 +107,50 @@ contract CreditVault is Ownable2Step, Pausable {
     }
 
     // ---------------------------------------------------------------------
+    // App registry
+    // ---------------------------------------------------------------------
+
+    /// @notice Registers a company's app. The backend calls this when a company signs up.
+    /// A registered app still can't charge anyone until that user signs a limit for it.
+    function registerApp(address app, address payout, uint16 feeBps, uint128 maxCharge) external onlyOwnerOrOperator {
+        if (app == address(0) || payout == address(0)) revert ZeroAddress();
+        if (_apps[app].payout != address(0)) revert AppExists();
+        if (feeBps > MAX_FEE_BPS) revert FeeTooHigh();
+        _apps[app] = App({payout: payout, feeBps: feeBps, maxCharge: maxCharge, active: true});
+        emit AppRegistered(app, payout, feeBps, maxCharge);
+    }
+
+    /// @notice Changes an app's fee and per-charge cap. Owner only, so a leaked operator
+    /// key can't raise a company's fee.
+    function setAppTerms(address app, uint16 feeBps, uint128 maxCharge) external onlyOwner {
+        App storage a = _requireApp(app);
+        if (feeBps > MAX_FEE_BPS) revert FeeTooHigh();
+        a.feeBps = feeBps;
+        a.maxCharge = maxCharge;
+        emit AppTermsSet(app, feeBps, maxCharge);
+    }
+
+    /// @notice Moves an app's payouts to a new address. Only the current payout address
+    /// or the owner can do this, never an operator.
+    function setAppPayout(address app, address payout) external {
+        App storage a = _requireApp(app);
+        if (msg.sender != a.payout && msg.sender != owner()) revert NotAuthorized();
+        if (payout == address(0)) revert ZeroAddress();
+        a.payout = payout;
+        emit AppPayoutSet(app, payout);
+    }
+
+    /// @notice An inactive app can't charge or hold, but can still refund and be paid out.
+    function setAppActive(address app, bool active) external onlyOwnerOrOperator {
+        _requireApp(app).active = active;
+        emit AppActiveSet(app, active);
+    }
+
+    function getApp(address app) external view returns (App memory) {
+        return _apps[app];
+    }
+
+    // ---------------------------------------------------------------------
     // Backing
     // ---------------------------------------------------------------------
 
@@ -105,6 +170,16 @@ contract CreditVault is Ownable2Step, Pausable {
     // ---------------------------------------------------------------------
     // Internal
     // ---------------------------------------------------------------------
+
+    function _requireApp(address app) internal view returns (App storage a) {
+        a = _apps[app];
+        if (a.payout == address(0)) revert UnknownApp();
+    }
+
+    function _requireActiveApp(address app) internal view returns (App storage a) {
+        a = _requireApp(app);
+        if (!a.active) revert AppInactive();
+    }
 
     function _setFeeRecipient(address account) private {
         if (account == address(0)) revert ZeroAddress();

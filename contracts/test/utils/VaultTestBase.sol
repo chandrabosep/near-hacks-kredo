@@ -17,10 +17,19 @@ abstract contract VaultTestBase is Test {
     address internal feeRecipient = makeAddr("feeRecipient");
     address internal stranger = makeAddr("stranger");
 
+    address internal videoApp = makeAddr("videoApp");
+    address internal videoPayout = makeAddr("videoPayout");
+    uint16 internal constant FEE_BPS = 500; // 5%
+
     function setUp() public virtual {
         vm.warp(1_000_000);
         usdt = new MockUSDT();
         vault = new CreditVault(usdt, owner, operator, feeRecipient);
+    }
+
+    function registerVideoApp() internal {
+        vm.prank(operator);
+        vault.registerApp(videoApp, videoPayout, FEE_BPS, 0);
     }
 
     /// @dev Exact equality: tests never send USDT to the vault outside the vault's own functions.
