@@ -89,7 +89,7 @@ Never commit secrets, local data or build output. Commit example env files inste
 
 **Vault: core** (built in slices, each with its tests)
 - [x] mock USDT with 6 decimals, the `Tether USD` / `1` domain, `permit`, `receiveWithAuthorization`
-- [ ] vault skeleton: storage, running totals, owner/operator roles, `pause()`, `checkBacking()`
+- [x] vault skeleton: storage, running totals, owner/operator roles, `pause()`, `checkBacking()`
 - [ ] app registry (`registerApp`, payout address, `feeBps`) and its tests
 - [ ] `deposit` and tests, including the backing check
 - [ ] `depositWithPermit` (try/catch around permit) and `depositWithAuthorization`, with tests: relayed by a stranger, after a front-run permit, bad signature, nonce replay, wrong `to`
