@@ -165,17 +165,28 @@ export function openDb(file: string, debounceMs = 50): Db {
     : empty();
 
   let timer: NodeJS.Timeout | undefined;
+  let writes = 0;
+
+  // A failed background save is retried on the next change; it must never crash the server.
+  const scheduledFlush = () => {
+    try {
+      db.flush();
+    } catch (err) {
+      console.error(`[db] could not save ${file}: ${(err as Error).message}`);
+    }
+  };
 
   const db: Db = {
     data,
     file,
     save() {
-      if (!timer) timer = setTimeout(db.flush, debounceMs);
+      if (!timer) timer = setTimeout(scheduledFlush, debounceMs);
     },
     flush() {
       if (timer) clearTimeout(timer);
       timer = undefined;
-      const tmp = `${file}.tmp`;
+      // A temp file per write: an old and a new process (a dev reload) never share one.
+      const tmp = `${file}.${process.pid}.${++writes}.tmp`;
       writeFileSync(tmp, JSON.stringify(data, replacer, 2));
       renameSync(tmp, file);
     },

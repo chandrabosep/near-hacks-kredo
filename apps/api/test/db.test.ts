@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { bindToGenesis, dbFileFor, openDb } from "../src/db.js";
 import { createStore, hashApiKey } from "../src/store.js";
@@ -18,7 +18,19 @@ test("bigints survive a write and reload", () => {
   const again = openDb(file);
   assert.equal(again.data.txs[0].l2Fee, 10n ** 18n);
   assert.equal(typeof again.data.txs[0].gasUsed, "bigint");
-  assert.equal(existsSync(`${file}.tmp`), false, "temp file is renamed away");
+  assert.deepEqual(readdirSync(dirname(file)), ["db.json"], "temp file is renamed away");
+});
+
+test("two processes on one file never trip over each other's temp file", () => {
+  // A dev reload briefly runs the old and new server side by side on the same file.
+  const file = tmpFile();
+  const a = openDb(file);
+  const b = openDb(file);
+  for (let i = 0; i < 20; i++) {
+    a.flush();
+    b.flush();
+  }
+  assert.deepEqual(readdirSync(dirname(file)), ["db.json"]);
 });
 
 test("save is debounced into one write", async () => {
