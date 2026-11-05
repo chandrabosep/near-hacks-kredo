@@ -50,3 +50,98 @@ export type UserState = {
   /** The smaller of balance and limit: the most a charge can be right now. */
   spendable: Amount;
 };
+
+/** Flat price, or a per-unit rate that's multiplied by `quantity`. In credits. */
+export type PriceEntry = { price: string } | { rate: string; unit: string };
+export type PriceList = Record<string, PriceEntry>;
+export type PriceListInput = Record<string, { price: Credits } | { rate: Credits; unit: string }>;
+
+export type AppInfo = {
+  id: string;
+  name: string;
+  payout: string;
+  feeBps: number;
+  maxCharge: Amount | null;
+  active: boolean;
+  unpaidEarnings: Amount;
+  prices: PriceList;
+  exchangeRate: string | null;
+  webhookUrl: string | null;
+  apiKeyPrefix: string;
+};
+
+export type Conversion = Operation & { kind: "convert"; appCredits: string };
+
+export type Payout = Operation & { kind: "payout"; to: string; usdt: string };
+
+export type GasReport = { transactions: number; wei: string; gas: string; symbol: string; paidBy: "network" };
+
+/** One vault event, newest first in every feed. */
+export type ActivityItem = {
+  id: string;
+  type: string;
+  at: string;
+  user?: string;
+  app?: string;
+  appName?: string;
+  from?: string;
+  to?: string;
+  amount?: Amount;
+  fee?: Amount;
+  returned?: Amount;
+  ref?: string;
+  label?: string;
+  holdId?: string;
+  claimKey?: string;
+  block: number;
+  txHash: string;
+  explorer?: string;
+};
+
+export type WebhookDelivery = {
+  id: string;
+  type: string;
+  status: "pending" | "delivered" | "failed";
+  attempts: number;
+  lastStatus: number | null;
+  lastError: string | null;
+};
+
+export type WebhookEvent = {
+  id: string;
+  type:
+    | "charge.succeeded"
+    | "hold.created"
+    | "hold.captured"
+    | "hold.released"
+    | "refund.succeeded"
+    | "connection.approved"
+    | "connection.revoked"
+    | "payout.paid";
+  createdAt: string;
+  data: ActivityItem;
+};
+
+export type Reserves = {
+  backed: boolean;
+  usdtInVault: Amount;
+  owed: Amount;
+  surplus: Amount;
+  breakdown: Record<"userBalances" | "held" | "claimLinks" | "companyEarnings" | "networkFees", Amount>;
+  vault: string;
+  explorer?: string;
+};
+
+export type NetworkStats = {
+  apps: number;
+  users: number;
+  events: number;
+  deposited: Amount;
+  spent: Amount;
+  networkFees: Amount;
+  refunded: Amount;
+  paidOut: Amount;
+  indexedToBlock: number;
+};
+
+export type DirectoryEntry = { id: string; name: string; prices: PriceList; exchangeRate: string | null };

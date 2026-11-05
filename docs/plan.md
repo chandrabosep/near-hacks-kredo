@@ -132,8 +132,8 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] user and merchant activity, stats
 
 **SDK**
-- [ ] backend kit: client and auth, `quote`, `charge`, `hold`, `capture`, `release`, `refund`
-- [ ] the rest: `convert`, `connect`, `disconnect`, `balance`, `setPrices`, `payout`, `activity`, `exportCsv`, `gas`, `setWebhook`, network-side helpers
+- [x] backend kit: client and auth, `quote`, `charge`, `hold`, `capture`, `release`, `refund`
+- [x] the rest: `convert`, `connect`, `disconnect`, `balance`, `setPrices`, `payout`, `activity`, `exportCsv`, `gas`, `setWebhook`, network-side helpers
 - [ ] end-to-end demo script
 
 **Hosted pages**

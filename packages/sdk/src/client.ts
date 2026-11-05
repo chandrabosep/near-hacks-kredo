@@ -11,13 +11,32 @@
  */
 import { randomUUID } from "node:crypto";
 import { CreditsError } from "./errors.js";
-import type { AmountInput, Capture, Credits as CreditAmount, Hold, HoldStatus, Operation, Quote, UserState } from "./types.js";
+import type {
+  ActivityItem,
+  AmountInput,
+  AppInfo,
+  Capture,
+  Conversion,
+  Credits as CreditAmount,
+  GasReport,
+  Hold,
+  HoldStatus,
+  Operation,
+  Payout,
+  PriceList,
+  PriceListInput,
+  Quote,
+  UserState,
+  WebhookDelivery,
+} from "./types.js";
 
 export type CreditsOptions = {
   /** Your app's API key, `uc_live_...`. */
   apiKey: string;
   /** The network's API. Defaults to http://localhost:4000. */
   baseUrl?: string;
+  /** The network's hosted pages (connect, buy, wallet). Defaults to http://localhost:3000. */
+  pagesUrl?: string;
   /** Extra tries after a network failure or a rate limit. Writes are safe to retry: each carries a ref. Default 2. */
   retries?: number;
   /** Per-request timeout. Default 60s, long enough for a transaction to confirm. */
@@ -32,7 +51,9 @@ const MAX_RETRY_WAIT_MS = 10_000;
 
 export class Credits {
   readonly baseUrl: string;
+  readonly pagesUrl: string;
   private readonly apiKey: string;
+  private appId?: string;
   private readonly retries: number;
   private readonly timeoutMs: number;
   private readonly fetchFn: typeof fetch;
@@ -41,9 +62,28 @@ export class Credits {
     if (!opts.apiKey) throw new Error("Credits: apiKey is required");
     this.apiKey = opts.apiKey;
     this.baseUrl = (opts.baseUrl ?? "http://localhost:4000").replace(/\/+$/, "");
+    this.pagesUrl = (opts.pagesUrl ?? "http://localhost:3000").replace(/\/+$/, "");
     this.retries = opts.retries ?? 2;
     this.timeoutMs = opts.timeoutMs ?? 60_000;
     this.fetchFn = opts.fetch ?? globalThis.fetch;
+  }
+
+  // ---------------------------------------------------------------- your app
+
+  /** Your app: payout address, fee, unpaid earnings, prices and webhook. */
+  async app(): Promise<AppInfo> {
+    const app = await this.request<AppInfo>("GET", "/v1/app");
+    this.appId = app.id;
+    return app;
+  }
+
+  prices(): Promise<PriceList> {
+    return this.request("GET", "/v1/prices");
+  }
+
+  /** Replaces your price list, in credits: `{ "chat.message": { price: 2 }, "video.render": { rate: 8, unit: "second" } }`. */
+  setPrices(prices: PriceListInput): Promise<PriceList> {
+    return this.request("PUT", "/v1/prices", { body: { prices } });
   }
 
   // ---------------------------------------------------------------- prices and users
@@ -93,7 +133,80 @@ export class Credits {
     return this.request("POST", "/v1/refunds", { body: withRef(input) });
   }
 
+  // ---------------------------------------------------------------- light mode
+
+  /** Light mode: how many of our credits buy one of yours. Pass null to turn it off. */
+  setExchangeRate(rate: CreditAmount | null): Promise<{ exchangeRate: string | null }> {
+    return this.request("PUT", "/v1/exchange-rate", { body: { rate } });
+  }
+
+  /** Light mode: spends `credits` of ours. Add the returned `appCredits` to the user's balance in your own system. */
+  convert(input: { user: string; credits: CreditAmount; ref?: string }): Promise<Conversion> {
+    return this.request("POST", "/v1/convert", { body: withRef(input) });
+  }
+
+  // ---------------------------------------------------------------- connecting users
+
+  /**
+   * A link to the network's connect page. The user signs in with email, approves a spending
+   * limit for your app, and comes back to `returnTo`. Nobody can charge them until they do.
+   */
+  async connectUrl(opts: { credits: CreditAmount; returnTo?: string; expiresInDays?: number }): Promise<string> {
+    const app = this.appId ?? (await this.app()).id;
+    return this.page("/connect", { app, credits: String(opts.credits), days: opts.expiresInDays, returnTo: opts.returnTo });
+  }
+
+  /** A link to the buy page, for a user who is out of credits. */
+  buyUrl(opts: { credits?: CreditAmount; returnTo?: string } = {}): string {
+    return this.page("/buy", { credits: opts.credits === undefined ? undefined : String(opts.credits), returnTo: opts.returnTo });
+  }
+
+  /** The user's wallet, where they see their balance and can disconnect any app. */
+  walletUrl(): string {
+    return this.page("/wallet", {});
+  }
+
+  // ---------------------------------------------------------------- money out and reporting
+
+  /** Pays all your unpaid earnings in USDT to your payout address, on Whitechain. */
+  payout(): Promise<Payout> {
+    return this.request("POST", "/v1/payout", { body: {} });
+  }
+
+  /** Every vault event for your app, newest first. */
+  activity(opts: { limit?: number } = {}): Promise<ActivityItem[]> {
+    return this.request("GET", "/v1/activity", { query: { limit: opts.limit } });
+  }
+
+  /** Charges, holds, refunds and payouts as CSV text, for your accountant. */
+  exportCsv(): Promise<string> {
+    return this.request("GET", "/v1/export.csv", { raw: true });
+  }
+
+  /** Gas the network spent on your transactions. You never pay it: the network fee covers it. */
+  gas(opts: { since?: Date } = {}): Promise<GasReport> {
+    return this.request("GET", "/v1/gas", { query: { since: opts.since?.toISOString() } });
+  }
+
+  /**
+   * Sends every event about your app to `url` as a signed POST. Returns the signing secret once;
+   * check each delivery with `verifyWebhook`. Pass null to stop.
+   */
+  setWebhook(url: string | null): Promise<{ url: string | null; secret: string | null }> {
+    return this.request("PUT", "/v1/webhook", { body: { url } });
+  }
+
+  webhookDeliveries(): Promise<WebhookDelivery[]> {
+    return this.request("GET", "/v1/webhook/deliveries");
+  }
+
   // ---------------------------------------------------------------- transport
+
+  private page(path: string, params: Query): string {
+    const url = new URL(this.pagesUrl + path);
+    for (const [k, v] of Object.entries(params)) if (v !== undefined) url.searchParams.set(k, String(v));
+    return url.toString();
+  }
 
   /** @internal Shared by every call. Retries network failures and rate limits; throws CreditsError. */
   async request<T>(method: string, path: string, opts: { query?: Query; body?: unknown; raw?: boolean } = {}): Promise<T> {
