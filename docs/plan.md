@@ -109,10 +109,10 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] contracts README and example env
 
 **Backend: foundation**
-- [ ] project setup, config and example env
-- [ ] ABI generation from the contracts
-- [ ] JSON-file database and store
-- [ ] relayer queue (serial nonces, receipt wait, gas recorded per tx)
+- [x] project setup, config and example env
+- [x] ABI generation from the contracts
+- [x] JSON-file database and store
+- [x] relayer queue (serial nonces, receipt wait, gas recorded per tx)
 - [ ] email sessions: one-time code, `full` and `read` scopes
 
 **Backend: API**
