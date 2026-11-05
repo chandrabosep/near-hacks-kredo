@@ -83,9 +83,9 @@ The contract, backend, SDK, hosted pages and first demo app, running locally. Ea
 Never commit secrets, local data or build output. Commit example env files instead.
 
 **Scaffold**
-- [ ] pnpm workspace
+- [ ] npm workspaces: `apps/web` (Next.js, Tailwind, shadcn), `apps/api` (Express, viem)
 - [ ] Foundry project with the Whitechain testnet RPC
-- [ ] `forge-std` as a git submodule
+- [ ] `forge-std` and OpenZeppelin as git submodules
 
 **Vault: core** (built in slices, each with its tests)
 - [ ] mock USDT with 6 decimals, the `Tether USD` / `1` domain, `permit`, `receiveWithAuthorization`
