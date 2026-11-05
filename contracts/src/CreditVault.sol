@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title CreditVault
 /// @notice Holds USDT and every credit balance, app limit, hold, claim and payout.
@@ -13,6 +14,8 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 /// Backing invariant:
 ///   usdt.balanceOf(vault) >= totalBalances + totalHeld + totalClaims + totalEarnings + protocolFees
 contract CreditVault is Ownable2Step, Pausable {
+    using SafeERC20 for IERC20Metadata;
+
     uint256 public constant UNITS_PER_CREDIT = 10_000;
     /// @notice Highest network fee an app can be set to: 20%.
     uint16 public constant MAX_FEE_BPS = 2_000;
@@ -35,6 +38,9 @@ contract CreditVault is Ownable2Step, Pausable {
     /// @notice Registered apps, keyed by the app's id address.
     mapping(address app => App) internal _apps;
 
+    /// @notice Spendable credits per user, in units.
+    mapping(address user => uint256 units) public balanceOf;
+
     // Running totals of every liability the vault owes.
     uint256 public totalBalances;
     uint256 public totalHeld;
@@ -48,6 +54,7 @@ contract CreditVault is Ownable2Step, Pausable {
     event AppTermsSet(address indexed app, uint16 feeBps, uint128 maxCharge);
     event AppPayoutSet(address indexed app, address payout);
     event AppActiveSet(address indexed app, bool active);
+    event Deposited(address indexed user, address indexed payer, uint256 amount);
 
     error NotOperator();
     error NotOwnerOrOperator();
@@ -59,6 +66,7 @@ contract CreditVault is Ownable2Step, Pausable {
     error AppInactive();
     error FeeTooHigh();
     error NotAuthorized();
+    error ZeroAmount();
 
     modifier onlyOperator() {
         if (!isOperator[msg.sender]) revert NotOperator();
@@ -151,6 +159,16 @@ contract CreditVault is Ownable2Step, Pausable {
     }
 
     // ---------------------------------------------------------------------
+    // Deposits
+    // ---------------------------------------------------------------------
+
+    /// @notice Pulls `amount` USDT from the caller and credits `user`. Anyone can pay for anyone.
+    /// This is the only way credits are created.
+    function deposit(address user, uint256 amount) external whenNotPaused {
+        _pullAndCredit(msg.sender, user, amount);
+    }
+
+    // ---------------------------------------------------------------------
     // Backing
     // ---------------------------------------------------------------------
 
@@ -170,6 +188,23 @@ contract CreditVault is Ownable2Step, Pausable {
     // ---------------------------------------------------------------------
     // Internal
     // ---------------------------------------------------------------------
+
+    /// @dev Credits are only created after the USDT is in the vault.
+    function _pullAndCredit(address payer, address user, uint256 amount) internal {
+        if (user == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        uint256 before = usdt.balanceOf(address(this));
+        usdt.safeTransferFrom(payer, address(this), amount);
+        _credit(user, payer, usdt.balanceOf(address(this)) - before);
+    }
+
+    /// @dev Credits exactly what arrived, so a token-side transfer fee can never under-back credits.
+    function _credit(address user, address payer, uint256 received) internal {
+        if (received == 0) revert ZeroAmount();
+        balanceOf[user] += received;
+        totalBalances += received;
+        emit Deposited(user, payer, received);
+    }
 
     function _requireApp(address app) internal view returns (App storage a) {
         a = _apps[app];
