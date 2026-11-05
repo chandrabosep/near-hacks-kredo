@@ -6,6 +6,8 @@ import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {IERC3009} from "./interfaces/IERC3009.sol";
 
 /// @title CreditVault
@@ -15,12 +17,22 @@ import {IERC3009} from "./interfaces/IERC3009.sol";
 ///
 /// Backing invariant:
 ///   usdt.balanceOf(vault) >= totalBalances + totalHeld + totalClaims + totalEarnings + protocolFees
-contract CreditVault is Ownable2Step, Pausable {
+contract CreditVault is Ownable2Step, Pausable, EIP712 {
     using SafeERC20 for IERC20Metadata;
 
     uint256 public constant UNITS_PER_CREDIT = 10_000;
     /// @notice Highest network fee an app can be set to: 20%.
     uint16 public constant MAX_FEE_BPS = 2_000;
+
+    bytes32 public constant APPROVE_APP_TYPEHASH =
+        keccak256("ApproveApp(address user,address app,uint256 limit,uint64 expiry,bytes32 nonce,uint256 deadline)");
+    bytes32 public constant REVOKE_APP_TYPEHASH =
+        keccak256("RevokeApp(address user,address app,bytes32 nonce,uint256 deadline)");
+
+    struct Limit {
+        uint128 remaining; // units the app may still charge
+        uint64 expiry; // unix time the limit stops working (0 = never)
+    }
 
     struct App {
         address payout; // receives the company's USDT earnings
@@ -43,6 +55,12 @@ contract CreditVault is Ownable2Step, Pausable {
     /// @notice Spendable credits per user, in units.
     mapping(address user => uint256 units) public balanceOf;
 
+    /// @notice What each app may still charge each user, as signed by the user.
+    mapping(address user => mapping(address app => Limit)) internal _limits;
+
+    /// @notice Used signature nonces. Unordered, so the relayer can submit in any order.
+    mapping(address user => mapping(bytes32 nonce => bool used)) public nonceUsed;
+
     // Running totals of every liability the vault owes.
     uint256 public totalBalances;
     uint256 public totalHeld;
@@ -57,6 +75,8 @@ contract CreditVault is Ownable2Step, Pausable {
     event AppPayoutSet(address indexed app, address payout);
     event AppActiveSet(address indexed app, bool active);
     event Deposited(address indexed user, address indexed payer, uint256 amount);
+    event AppApproved(address indexed user, address indexed app, uint256 limit, uint64 expiry);
+    event AppRevoked(address indexed user, address indexed app);
 
     error NotOperator();
     error NotOwnerOrOperator();
@@ -69,6 +89,10 @@ contract CreditVault is Ownable2Step, Pausable {
     error FeeTooHigh();
     error NotAuthorized();
     error ZeroAmount();
+    error LimitTooHigh();
+    error SignatureExpired();
+    error NonceUsed();
+    error BadSignature();
 
     modifier onlyOperator() {
         if (!isOperator[msg.sender]) revert NotOperator();
@@ -80,7 +104,10 @@ contract CreditVault is Ownable2Step, Pausable {
         _;
     }
 
-    constructor(IERC20Metadata usdt_, address owner_, address operator_, address feeRecipient_) Ownable(owner_) {
+    constructor(IERC20Metadata usdt_, address owner_, address operator_, address feeRecipient_)
+        Ownable(owner_)
+        EIP712("CreditVault", "1")
+    {
         if (address(usdt_) == address(0)) revert ZeroAddress();
         // UNITS_PER_CREDIT assumes 6 decimals. Refuse any other token.
         if (usdt_.decimals() != 6) revert WrongDecimals();
@@ -207,6 +234,59 @@ contract CreditVault is Ownable2Step, Pausable {
     }
 
     // ---------------------------------------------------------------------
+    // App limits (user-signed)
+    // ---------------------------------------------------------------------
+
+    /// @notice Sets how much `app` may charge `user` in total, replacing any earlier limit.
+    /// The user calls it directly, or anyone submits it with the user's EIP-712 signature.
+    /// @param expiry Unix time the limit stops working. 0 means it never expires.
+    function approveApp(
+        address user,
+        address app,
+        uint256 limit,
+        uint64 expiry,
+        bytes32 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external whenNotPaused {
+        _requireActiveApp(app);
+        if (limit > type(uint128).max) revert LimitTooHigh();
+        if (msg.sender != user) {
+            _useSignature(
+                user,
+                keccak256(abi.encode(APPROVE_APP_TYPEHASH, user, app, limit, expiry, nonce, deadline)),
+                nonce,
+                deadline,
+                signature
+            );
+        }
+        // forge-lint: disable-next-line(unsafe-typecast)
+        _limits[user][app] = Limit({remaining: uint128(limit), expiry: expiry});
+        emit AppApproved(user, app, limit, expiry);
+    }
+
+    /// @notice Removes an app's limit. Works even while paused, so a user can always cut an app off.
+    function revokeApp(address user, address app, bytes32 nonce, uint256 deadline, bytes calldata signature) external {
+        if (msg.sender != user) {
+            _useSignature(
+                user, keccak256(abi.encode(REVOKE_APP_TYPEHASH, user, app, nonce, deadline)), nonce, deadline, signature
+            );
+        }
+        delete _limits[user][app];
+        emit AppRevoked(user, app);
+    }
+
+    function limitOf(address user, address app) external view returns (Limit memory) {
+        return _limits[user][app];
+    }
+
+    /// @notice EIP-712 domain separator for signing approve, revoke, send and claim messages.
+    // forge-lint: disable-next-line(mixed-case-function)
+    function DOMAIN_SEPARATOR() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
+    // ---------------------------------------------------------------------
     // Backing
     // ---------------------------------------------------------------------
 
@@ -242,6 +322,19 @@ contract CreditVault is Ownable2Step, Pausable {
         balanceOf[user] += received;
         totalBalances += received;
         emit Deposited(user, payer, received);
+    }
+
+    /// @dev Checks a user's EIP-712 signature and burns its nonce. Accepts EOA and ERC-1271 signers.
+    function _useSignature(address user, bytes32 structHash, bytes32 nonce, uint256 deadline, bytes calldata signature)
+        internal
+    {
+        // forge-lint: disable-next-line(block-timestamp)
+        if (block.timestamp > deadline) revert SignatureExpired();
+        if (nonceUsed[user][nonce]) revert NonceUsed();
+        if (!SignatureChecker.isValidSignatureNow(user, _hashTypedDataV4(structHash), signature)) {
+            revert BadSignature();
+        }
+        nonceUsed[user][nonce] = true;
     }
 
     function _requireApp(address app) internal view returns (App storage a) {

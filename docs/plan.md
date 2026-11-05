@@ -95,7 +95,7 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] `depositWithPermit` (try/catch around permit) and `depositWithAuthorization`, with tests: relayed by a stranger, after a front-run permit, bad signature, nonce replay, wrong `to`
 
 **Vault: limits and charges**
-- [ ] EIP-712 `approveApp` / `revokeApp`, signed or direct, with tests
+- [x] EIP-712 `approveApp` / `revokeApp`, signed or direct, with tests
 - [ ] `charge` with the limit check, fee split and per-charge cap. Tests: over-limit reverts **even from the operator key**, charge after revoke reverts.
 - [ ] `hold` → `capture` / `release`. Anyone can release after expiry. A partial capture returns the unused part to the limit. Tests for each.
 - [ ] `refund` and tests

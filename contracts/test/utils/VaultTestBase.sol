@@ -32,6 +32,13 @@ abstract contract VaultTestBase is Test {
         vault.registerApp(videoApp, videoPayout, FEE_BPS, 0);
     }
 
+    /// @dev Signs a CreditVault EIP-712 message and returns the 65-byte signature.
+    function signVault(uint256 pk, bytes32 structHash) internal view returns (bytes memory) {
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", vault.DOMAIN_SEPARATOR(), structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
+        return abi.encodePacked(r, s, v);
+    }
+
     /// @dev Exact equality: tests never send USDT to the vault outside the vault's own functions.
     function assertBacked() internal view {
         (bool backed, uint256 held, uint256 owed) = vault.checkBacking();
