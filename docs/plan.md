@@ -98,15 +98,15 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] EIP-712 `approveApp` / `revokeApp`, signed or direct, with tests
 - [x] `charge` with the limit check, fee split and per-charge cap. Tests: over-limit reverts **even from the operator key**, charge after revoke reverts.
 - [x] `hold` → `capture` / `release`. Anyone can release after expiry. A partial capture returns the unused part to the limit. Tests for each.
-- [ ] `refund` and tests
+- [x] `refund` and tests
 
 **Vault: transfers and payouts**
-- [ ] `send` (user to user, signed) and tests
-- [ ] `createClaim` / `claim` / `cancelClaim` and tests
-- [ ] `payout(app)`, `withdrawFees()` and tests. The backing check is asserted after every test.
-- [ ] fork test against the real Whitechain USDT
-- [ ] deploy script: defaults to the official USDT on 1874 and refuses the mock there
-- [ ] contracts README and example env
+- [x] `send` (user to user, signed) and tests
+- [x] `createClaim` / `claim` / `cancelClaim` and tests
+- [x] `payout(app)`, `withdrawFees()` and tests. The backing check is asserted after every test.
+- [x] fork test against the real Whitechain USDT
+- [x] deploy script: defaults to the official USDT on 1874 and refuses the mock there
+- [x] contracts README and example env
 
 **Backend: foundation**
 - [ ] project setup, config and example env

@@ -8,6 +8,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC3009} from "./interfaces/IERC3009.sol";
 
 /// @title CreditVault
@@ -31,6 +32,12 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
         keccak256("ApproveApp(address user,address app,uint256 limit,uint64 expiry,bytes32 nonce,uint256 deadline)");
     bytes32 public constant REVOKE_APP_TYPEHASH =
         keccak256("RevokeApp(address user,address app,bytes32 nonce,uint256 deadline)");
+    bytes32 public constant SEND_TYPEHASH =
+        keccak256("Send(address from,address to,uint256 amount,bytes32 nonce,uint256 deadline)");
+    bytes32 public constant CREATE_CLAIM_TYPEHASH = keccak256(
+        "CreateClaim(address from,uint256 amount,address claimKey,uint64 expiry,bytes32 nonce,uint256 deadline)"
+    );
+    bytes32 public constant REDEEM_CLAIM_TYPEHASH = keccak256("RedeemClaim(address claimKey,address to)");
 
     struct Limit {
         uint128 remaining; // units the app may still charge
@@ -52,6 +59,20 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
         uint64 expiry;
         uint32 limitVersion; // the limit version when the hold was taken
         HoldStatus status;
+    }
+
+    enum ClaimStatus {
+        None,
+        Open,
+        Claimed,
+        Cancelled
+    }
+
+    struct Claim {
+        address from;
+        uint64 expiry;
+        ClaimStatus status;
+        uint128 amount;
     }
 
     struct App {
@@ -81,8 +102,15 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     /// @notice Holds by id. The id is keccak256(app, ref), so the app knows it before the tx lands.
     mapping(bytes32 holdId => Hold) internal _holds;
 
+    /// @notice Claim links, keyed by the address of the one-time key inside the link.
+    mapping(address claimKey => Claim) internal _claims;
+
     /// @notice USDT units each app has earned and not yet been paid out.
     mapping(address app => uint256 units) public earningsOf;
+
+    /// @notice Credits each user has spent with each app, net of refunds. Caps refunds, so a
+    /// leaked operator key can't move a company's earnings to an arbitrary account.
+    mapping(address user => mapping(address app => uint256 units)) public spentOf;
 
     /// @notice Charge references already used per app, so a retried transaction can't charge twice.
     mapping(address app => mapping(bytes32 ref => bool used)) public refUsed;
@@ -112,6 +140,13 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     );
     event Captured(bytes32 indexed holdId, uint256 actual, uint256 fee, uint256 returned);
     event Released(bytes32 indexed holdId, uint256 amount, address by);
+    event Refunded(address indexed app, address indexed user, bytes32 indexed ref, uint256 amount);
+    event Sent(address indexed from, address indexed to, uint256 amount);
+    event ClaimCreated(address indexed claimKey, address indexed from, uint256 amount, uint64 expiry);
+    event Claimed(address indexed claimKey, address indexed to, uint256 amount);
+    event ClaimCancelled(address indexed claimKey, address indexed by, uint256 amount);
+    event PaidOut(address indexed app, address indexed to, uint256 amount);
+    event FeesWithdrawn(address indexed to, uint256 amount);
 
     error NotOperator();
     error NotOwnerOrOperator();
@@ -139,6 +174,12 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     error HoldExpired();
     error HoldNotExpired();
     error OverHeld();
+    error OverSpent();
+    error InsufficientEarnings();
+    error ClaimExists();
+    error ClaimNotOpen();
+    error ClaimExpired();
+    error ClaimNotExpired();
 
     modifier onlyOperator() {
         if (!isOperator[msg.sender]) revert NotOperator();
@@ -351,7 +392,7 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
         _consumeLimit(user, app, amount);
         _debit(user, amount);
         totalBalances -= amount;
-        uint256 fee = _earn(app, amount);
+        uint256 fee = _earn(user, app, amount);
         emit Charged(user, app, ref, amount, fee);
     }
 
@@ -404,7 +445,7 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
         totalHeld -= amount;
         uint256 returned = amount - actual;
         if (returned != 0) _returnToUser(h, returned);
-        uint256 fee = _earn(h.app, actual);
+        uint256 fee = _earn(h.user, h.app, actual);
         emit Captured(holdId, actual, fee, returned);
     }
 
@@ -429,6 +470,163 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
 
     function getHold(bytes32 holdId) external view returns (Hold memory) {
         return _holds[holdId];
+    }
+
+    // ---------------------------------------------------------------------
+    // Refunds
+    // ---------------------------------------------------------------------
+
+    /// @notice Gives credits back to a user out of the app's unpaid earnings. The user gets the
+    /// full amount; the network fee already taken stays, so the company covers it.
+    /// Capped at what this user has spent with this app. Works for inactive apps too.
+    /// @param ref The app's unique id for this refund. Shares the ref space with charges and holds.
+    function refund(address app, address user, uint256 amount, bytes32 ref) external onlyOperator whenNotPaused {
+        if (amount == 0) revert ZeroAmount();
+        _requireApp(app);
+        _useRef(app, ref);
+        uint256 spent = spentOf[user][app];
+        if (amount > spent) revert OverSpent();
+        uint256 earned = earningsOf[app];
+        if (amount > earned) revert InsufficientEarnings();
+
+        spentOf[user][app] = spent - amount;
+        earningsOf[app] = earned - amount;
+        totalEarnings -= amount;
+        balanceOf[user] += amount;
+        totalBalances += amount;
+        emit Refunded(app, user, ref, amount);
+    }
+
+    // ---------------------------------------------------------------------
+    // User to user
+    // ---------------------------------------------------------------------
+
+    /// @notice Moves credits between users. Called by `from` directly, or relayed with their signature.
+    function send(address from, address to, uint256 amount, bytes32 nonce, uint256 deadline, bytes calldata signature)
+        external
+        whenNotPaused
+    {
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (msg.sender != from) {
+            _useSignature(
+                from,
+                keccak256(abi.encode(SEND_TYPEHASH, from, to, amount, nonce, deadline)),
+                nonce,
+                deadline,
+                signature
+            );
+        }
+        _debit(from, amount);
+        balanceOf[to] += amount;
+        emit Sent(from, to, amount);
+    }
+
+    // ---------------------------------------------------------------------
+    // Claim links
+    // ---------------------------------------------------------------------
+
+    /// @notice Locks credits behind a claim link. The link carries a one-time private key;
+    /// `claimKey` is its address. Called by `from` directly, or relayed with their signature.
+    function createClaim(
+        address from,
+        uint256 amount,
+        address claimKey,
+        uint64 expiry,
+        bytes32 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external whenNotPaused {
+        if (claimKey == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (amount > type(uint128).max) revert LimitTooHigh();
+        // forge-lint: disable-next-line(block-timestamp)
+        if (expiry <= block.timestamp) revert BadExpiry();
+        if (_claims[claimKey].status != ClaimStatus.None) revert ClaimExists();
+        if (msg.sender != from) {
+            _useSignature(
+                from,
+                keccak256(abi.encode(CREATE_CLAIM_TYPEHASH, from, amount, claimKey, expiry, nonce, deadline)),
+                nonce,
+                deadline,
+                signature
+            );
+        }
+        _debit(from, amount);
+        totalBalances -= amount;
+        totalClaims += amount;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        _claims[claimKey] = Claim({from: from, expiry: expiry, status: ClaimStatus.Open, amount: uint128(amount)});
+        emit ClaimCreated(claimKey, from, amount, expiry);
+    }
+
+    /// @notice Redeems a claim link to `to`. The link's key signs `to`, so anyone who copies
+    /// the transaction from the mempool can't redirect the credits to themselves.
+    function claim(address claimKey, address to, bytes calldata keySignature) external whenNotPaused {
+        if (to == address(0)) revert ZeroAddress();
+        Claim storage c = _claims[claimKey];
+        if (c.status != ClaimStatus.Open) revert ClaimNotOpen();
+        // forge-lint: disable-next-line(block-timestamp)
+        if (block.timestamp >= c.expiry) revert ClaimExpired();
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(REDEEM_CLAIM_TYPEHASH, claimKey, to)));
+        (address signer, ECDSA.RecoverError err,) = ECDSA.tryRecover(digest, keySignature);
+        if (err != ECDSA.RecoverError.NoError || signer != claimKey) revert BadSignature();
+
+        c.status = ClaimStatus.Claimed;
+        uint256 amount = c.amount;
+        totalClaims -= amount;
+        balanceOf[to] += amount;
+        totalBalances += amount;
+        emit Claimed(claimKey, to, amount);
+    }
+
+    /// @notice Returns an unclaimed link's credits to its creator. The creator or an operator can
+    /// cancel at any time; anyone can after expiry, even while paused.
+    function cancelClaim(address claimKey) external {
+        Claim storage c = _claims[claimKey];
+        if (c.status != ClaimStatus.Open) revert ClaimNotOpen();
+        // forge-lint: disable-next-line(block-timestamp)
+        if (msg.sender != c.from && !isOperator[msg.sender] && block.timestamp < c.expiry) {
+            revert ClaimNotExpired();
+        }
+        c.status = ClaimStatus.Cancelled;
+        uint256 amount = c.amount;
+        totalClaims -= amount;
+        balanceOf[c.from] += amount;
+        totalBalances += amount;
+        emit ClaimCancelled(claimKey, msg.sender, amount);
+    }
+
+    function getClaim(address claimKey) external view returns (Claim memory) {
+        return _claims[claimKey];
+    }
+
+    // ---------------------------------------------------------------------
+    // Payouts
+    // ---------------------------------------------------------------------
+
+    /// @notice Pays an app all its unpaid earnings in USDT, always to its own payout address.
+    /// Callable by that address, an operator or the owner. Works while paused and for inactive apps.
+    function payout(address app) external returns (uint256 amount) {
+        App storage a = _requireApp(app);
+        address to = a.payout;
+        if (msg.sender != to && !isOperator[msg.sender] && msg.sender != owner()) revert NotAuthorized();
+        amount = earningsOf[app];
+        if (amount == 0) revert ZeroAmount();
+        earningsOf[app] = 0;
+        totalEarnings -= amount;
+        usdt.safeTransfer(to, amount);
+        emit PaidOut(app, to, amount);
+    }
+
+    /// @notice Sends the collected network fees to the fee recipient.
+    function withdrawFees() external onlyOwner returns (uint256 amount) {
+        amount = protocolFees;
+        if (amount == 0) revert ZeroAmount();
+        protocolFees = 0;
+        address to = feeRecipient;
+        usdt.safeTransfer(to, amount);
+        emit FeesWithdrawn(to, amount);
     }
 
     // ---------------------------------------------------------------------
@@ -507,7 +705,8 @@ contract CreditVault is Ownable2Step, Pausable, EIP712 {
     }
 
     /// @dev Splits a captured amount between the app and the network fee. Returns the fee.
-    function _earn(address app, uint256 amount) internal returns (uint256 fee) {
+    function _earn(address user, address app, uint256 amount) internal returns (uint256 fee) {
+        spentOf[user][app] += amount;
         fee = (amount * _apps[app].feeBps) / BPS;
         uint256 net = amount - fee;
         earningsOf[app] += net;

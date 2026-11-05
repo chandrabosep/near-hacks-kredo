@@ -18,3 +18,5 @@ docs/
 .env
 .env.*
 !.env.example
+# Local anvil deployments change every run
+/deployments/31337.json

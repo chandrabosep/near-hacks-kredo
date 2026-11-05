@@ -14,6 +14,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "contracts:build": "cd contracts && forge build",
-    "contracts:test": "cd contracts && forge test -vv"
+    "contracts:test": "cd contracts && forge test -vv",
+    "contracts:fork": "cd contracts && FORK=1 forge test --match-path \"test/fork/*\" -vv"
   }
 }
