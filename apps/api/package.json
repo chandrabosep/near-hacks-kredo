@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "typecheck": "tsc --noEmit",
     "abi": "node scripts/abi.mjs",
-    "test": "node --import tsx --test \"src/**/*.test.ts\""
+    "test": "node --import tsx --test \"test/**/*.test.ts\""
   },
   "dependencies": {
+    "@privy-io/node": "^0.38.0",
     "express": "^5.3.0",
     "viem": "^2.57.16",
     "zod": "^4.6.7"

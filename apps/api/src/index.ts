@@ -1,18 +1,13 @@
-import express from "express";
 import { createContext } from "./context.js";
+import { createServer } from "./server.js";
 
 const ctx = await createContext();
-const app = express();
-
-app.use(express.json());
-
-app.get("/v1/health", (_req, res) => {
-  res.json({ ok: true });
-});
+const app = createServer(ctx);
 
 app.listen(ctx.config.port, () => {
   console.log(`api listening on http://localhost:${ctx.config.port}`);
   console.log(`chain ${ctx.config.chainId}, vault ${ctx.config.vault}, relayer ${ctx.relayer.operator}`);
+  console.log(`user login: ${ctx.verifier ? "Privy" : "off (set PRIVY_APP_ID and PRIVY_APP_SECRET)"}`);
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

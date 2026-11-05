@@ -64,6 +64,7 @@ export function createRelayer(opts: { clients: Clients; db: Db; txTimeoutMs: num
 
   async function send<abi extends Abi, name extends ContractFunctionName<abi, "nonpayable" | "payable">>(
     request: WriteRequest<abi, name>,
+    app?: Address,
   ): Promise<RelayResult> {
     const fn = request.functionName as string;
 
@@ -77,13 +78,13 @@ export function createRelayer(opts: { clients: Clients; db: Db; txTimeoutMs: num
       prepared = simulated.request as unknown as WriteArgs;
     } catch (err) {
       const reason = revertReason(err);
-      record({ fn, status: "failed", gasUsed: 0n, l2Fee: 0n, l1Fee: 0n, error: reason, at: Date.now() });
+      record({ fn, app, status: "failed", gasUsed: 0n, l2Fee: 0n, l1Fee: 0n, error: reason, at: Date.now() });
       throw new RelayerError(reason);
     }
 
     const hash = await walletClient.writeContract(prepared);
     // Recorded before waiting, so a crash mid-flight still leaves the hash in the ledger.
-    const tx = record({ hash, fn, status: "pending", gasUsed: 0n, l2Fee: 0n, l1Fee: 0n, at: Date.now() });
+    const tx = record({ hash, fn, app, status: "pending", gasUsed: 0n, l2Fee: 0n, l1Fee: 0n, at: Date.now() });
 
     let receipt: TransactionReceipt;
     try {
@@ -106,22 +107,24 @@ export function createRelayer(opts: { clients: Clients; db: Db; txTimeoutMs: num
   return {
     operator: operator.address,
 
-    /** Simulates, sends and waits for one contract call, in queue order. */
+    /** Simulates, sends and waits for one contract call, in queue order. `app` tags its gas. */
     write<abi extends Abi, name extends ContractFunctionName<abi, "nonpayable" | "payable">>(
       request: WriteRequest<abi, name>,
+      opts: { app?: Address } = {},
     ): Promise<RelayResult> {
-      return enqueue(() => send(request));
+      return enqueue(() => send(request, opts.app));
     },
 
     /** The relayer's gas balance, in wei. */
     balance: () => publicClient.getBalance({ address: operator.address }),
 
-    /** Gas spent on transactions since `since` (ms timestamp), in wei. */
-    spent(since = 0) {
+    /** Gas spent on sent transactions since `since` (ms timestamp), in wei. Optionally for one app. */
+    spent(since = 0, app?: Address) {
       let total = 0n;
       let count = 0;
       for (const t of db.data.txs) {
         if (t.at < since || t.status === "failed") continue;
+        if (app && t.app?.toLowerCase() !== app.toLowerCase()) continue;
         total += t.l2Fee + t.l1Fee;
         count++;
       }

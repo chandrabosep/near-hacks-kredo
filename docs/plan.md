@@ -113,18 +113,18 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] ABI generation from the contracts
 - [x] JSON-file database and store
 - [x] relayer queue (serial nonces, receipt wait, gas recorded per tx)
-- [ ] email sessions: one-time code, `full` and `read` scopes
+- [x] user login with Privy: email code, embedded wallet, identity token verified on the backend
 
 **Backend: API**
-- [ ] server bootstrap and `/v1/health`
-- [ ] auth routes
-- [ ] pricing and price routes (flat, per-unit, `quote`)
-- [ ] buy routes (permit typed data, relayed deposit)
-- [ ] connection routes (approve/revoke)
-- [ ] charge, hold, capture, release and refund routes
-- [ ] send, claim and convert routes
-- [ ] app routes: payout, gas, CSV export, webhooks
-- [ ] rate limits (120 writes/min per API key, 429 with retry-after)
+- [x] server bootstrap and `/v1/health`
+- [x] auth routes (Privy for users, API keys for companies, admin token)
+- [x] pricing and price routes (flat, per-unit, `quote`)
+- [x] buy routes (permit typed data, relayed deposit)
+- [x] connection routes (approve/revoke)
+- [x] charge, hold, capture, release and refund routes
+- [x] send, claim and convert routes
+- [x] app routes: payout, gas, CSV export, webhook settings
+- [x] rate limits (120 writes/min per API key, 429 with retry-after)
 
 **Indexer**
 - [ ] log indexer: `eth_getLogs` paged by 1,000 blocks, 2s poll, backing-check alarm

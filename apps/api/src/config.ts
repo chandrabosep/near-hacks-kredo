@@ -30,6 +30,19 @@ const envSchema = z.object({
   DATA_DIR: z.string().default("./data"),
   /** How long the relayer waits for a receipt before giving up on a transaction. */
   TX_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+  /** Privy app credentials. Without them, user routes answer 503. */
+  PRIVY_APP_ID: z.string().min(1).optional(),
+  PRIVY_APP_SECRET: z.string().min(1).optional(),
+  /** Origins of our hosted pages, comma separated. They may call user routes with cookies. */
+  WEB_ORIGINS: z.string().default("http://localhost:3000"),
+  /** Guards /v1/admin. Without it, admin routes are off (except locally, where it defaults to "dev-admin"). */
+  ADMIN_TOKEN: z.string().min(8).optional(),
+  /** Network fee for new apps, in basis points. 500 = 5%. */
+  NETWORK_FEE_BPS: z.coerce.number().int().min(0).max(2_000).default(500),
+  /** Write requests per minute per API key. */
+  RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(120),
+  /** Default and longest hold, in seconds. The contract caps holds at one day. */
+  HOLD_TTL_SECONDS: z.coerce.number().int().min(60).max(86_400).default(3_600),
 });
 
 const deploymentSchema = z.object({
@@ -49,6 +62,12 @@ export type Config = {
   startBlock: number;
   dataDir: string;
   txTimeoutMs: number;
+  privy?: { appId: string; appSecret: string };
+  webOrigins: string[];
+  adminToken?: string;
+  networkFeeBps: number;
+  rateLimitPerMin: number;
+  holdTtlSeconds: number;
 };
 
 /**
@@ -82,6 +101,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     startBlock ??= d.deployBlock;
   }
 
+  if ((e.PRIVY_APP_ID === undefined) !== (e.PRIVY_APP_SECRET === undefined)) {
+    throw new Error("Set both PRIVY_APP_ID and PRIVY_APP_SECRET, or neither");
+  }
+
   return {
     port: e.PORT,
     chainId: e.CHAIN_ID,
@@ -92,5 +115,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     startBlock: startBlock ?? 0,
     dataDir: e.DATA_DIR,
     txTimeoutMs: e.TX_TIMEOUT_MS,
+    privy: e.PRIVY_APP_ID && e.PRIVY_APP_SECRET ? { appId: e.PRIVY_APP_ID, appSecret: e.PRIVY_APP_SECRET } : undefined,
+    webOrigins: e.WEB_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean),
+    adminToken: e.ADMIN_TOKEN ?? (local ? "dev-admin" : undefined),
+    networkFeeBps: e.NETWORK_FEE_BPS,
+    rateLimitPerMin: e.RATE_LIMIT_PER_MIN,
+    holdTtlSeconds: e.HOLD_TTL_SECONDS,
   };
 }

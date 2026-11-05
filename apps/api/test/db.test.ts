@@ -3,8 +3,8 @@ import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { bindToGenesis, dbFileFor, openDb } from "./db.js";
-import { createStore, hashApiKey } from "./store.js";
+import { bindToGenesis, dbFileFor, openDb } from "../src/db.js";
+import { createStore, hashApiKey } from "../src/store.js";
 
 const tmpFile = () => join(mkdtempSync(join(tmpdir(), "uc-db-")), "db.json");
 const PAYOUT = "0x00000000000000000000000000000000000000aa";

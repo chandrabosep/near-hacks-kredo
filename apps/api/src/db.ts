@@ -8,6 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Address, Hash, Hex } from "viem";
+import type { PriceList } from "./pricing.js";
 
 export type AppRecord = {
   /** The app's id address onchain. Only an identifier: nobody holds its key. */
@@ -19,6 +20,47 @@ export type AppRecord = {
   apiKeyHash: Hex;
   /** First characters of the key, so the dashboard can show which key is which. */
   apiKeyPrefix: string;
+  /** Deep mode: what each action costs, in credits. */
+  prices: PriceList;
+  /** Light mode: how many of our credits buy one of the app's own credits (e.g. "2"). */
+  exchangeRate?: string;
+  webhookUrl?: string;
+  /** Signs webhook payloads (HMAC-SHA256). Shown once, like the API key. */
+  webhookSecretHash?: Hex;
+  createdAt: number;
+};
+
+/** Every credit-moving action the API performed for an app. Feeds idempotency, CSV and gas. */
+export type OpRecord = {
+  app: Address;
+  kind: "charge" | "hold" | "capture" | "release" | "refund" | "payout" | "convert";
+  /** The app's own reference, as it sent it. Unique per app and kind. */
+  ref?: string;
+  user?: Address;
+  units: bigint;
+  fee?: bigint;
+  label?: string;
+  holdId?: Hex;
+  txHash: Hash;
+  at: number;
+};
+
+/** A user, as first seen through Privy. Balances live onchain. */
+export type UserRecord = {
+  privyId: string;
+  address: Address;
+  email?: string;
+  createdAt: number;
+};
+
+/** Claim links a user created, so the wallet can list and cancel them. */
+export type ClaimRecord = {
+  claimKey: Address;
+  from: Address;
+  units: bigint;
+  expiry: number;
+  status: "open" | "claimed" | "cancelled";
+  txHash: Hash;
   createdAt: number;
 };
 
@@ -38,6 +80,8 @@ export type HoldRecord = {
 export type RelayerTx = {
   hash?: Hash;
   fn: string;
+  /** The app this transaction was for, when there is one. */
+  app?: Address;
   status: "pending" | "success" | "reverted" | "failed";
   gasUsed: bigint;
   l2Fee: bigint;
@@ -51,6 +95,9 @@ export type Data = {
   genesis?: Hash;
   apps: AppRecord[];
   holds: HoldRecord[];
+  ops: OpRecord[];
+  users: UserRecord[];
+  claims: ClaimRecord[];
   txs: RelayerTx[];
 };
 
@@ -65,7 +112,7 @@ export type Db = {
   reset(): void;
 };
 
-const empty = (): Data => ({ apps: [], holds: [], txs: [] });
+const empty = (): Data => ({ apps: [], holds: [], ops: [], users: [], claims: [], txs: [] });
 
 const replacer = (_key: string, v: unknown) => (typeof v === "bigint" ? { $bigint: v.toString() } : v);
 const reviver = (_key: string, v: unknown) =>
