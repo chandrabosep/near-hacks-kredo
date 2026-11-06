@@ -18,8 +18,18 @@ export type ActivityItem = {
   label?: string;
   holdId?: string;
   claimKey?: string;
+  txHash?: string;
   explorer?: string;
 };
+
+/** Filters on the activity page. */
+export type ActivityFilter = "all" | "spent" | "received" | "apps";
+
+/** Which filter an event belongs to, from this user's side. */
+export function filterOf(e: ActivityItem, sign: Described["sign"]): Exclude<ActivityFilter, "all"> {
+  if (e.type === "AppApproved" || e.type === "AppRevoked") return "apps";
+  return sign === "+" ? "received" : "spent";
+}
 
 export type Described = {
   title: string;
