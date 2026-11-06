@@ -5,6 +5,7 @@ import { Field, Notice, Spinner, TxLink } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { ApiError, useAction } from "@/lib/api";
 import { credits, parseCredits, type Amount } from "@/lib/format";
+import { AmountField } from "./amount-field";
 
 type Prepared = Awaited<ReturnType<ReturnType<typeof useAction>["prepare"]>>;
 
@@ -49,37 +50,31 @@ export function SendCredits({ balance, onSent }: { balance: Amount; onSent: () =
     });
 
   return (
-    <div className="mt-8 max-w-md space-y-5">
+    <div className="space-y-6">
       {sent && (
         <Notice tone="success">
           Sent {credits(sent.amount)}. <TxLink href={sent.explorer} />
         </Notice>
       )}
-      <Field label="To" placeholder="friend@example.com or 0x…" value={to} onChange={(e) => (setTo(e.target.value), setReview(undefined))} />
-      <Field
-        label="Credits"
-        inputMode="decimal"
-        placeholder="50"
-        value={amount}
-        onChange={(e) => (setAmount(e.target.value), setReview(undefined))}
-        hint={over ? `You have ${credits(balance)}.` : undefined}
-      />
+      <Field label="To" placeholder="friend@example.com or 0x…" value={to} onChange={(e) => (setTo(e.target.value), setReview(undefined))} hint="Anyone who has signed in, by email or wallet address." />
+      <AmountField value={amount} onChange={(v) => (setAmount(v), setReview(undefined))} balance={balance} />
       {error && <Notice tone="error">{error}</Notice>}
       {review ? (
-        <div className="space-y-4">
-          <Notice>{review.summary}</Notice>
+        <div className="space-y-4 rounded-[16px] border border-wc-border-light bg-wc-bg p-5">
+          <p className="text-[13px] font-medium text-wc-text-muted">You&apos;re about to sign</p>
+          <p className="text-[16px] leading-6 text-wc-text-1">{review.summary}</p>
           <div className="flex gap-3">
-            <Button disabled={busy} onClick={send}>
+            <Button size="lg" className="h-12 flex-1" disabled={busy} onClick={send}>
               {busy && <Spinner />}
               Confirm and send
             </Button>
-            <Button variant="outline" disabled={busy} onClick={() => setReview(undefined)}>
+            <Button size="lg" variant="outline" className="h-12" disabled={busy} onClick={() => setReview(undefined)}>
               Change
             </Button>
           </div>
         </div>
       ) : (
-        <Button variant="primary" disabled={!parsed || over || recipient.length < 3 || busy} onClick={check}>
+        <Button size="lg" className="h-12 w-full" disabled={!parsed || over || recipient.length < 3 || busy} onClick={check}>
           {busy && <Spinner />}
           Review
         </Button>
