@@ -140,7 +140,7 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] shared styles and helpers
 - [x] connect page
 - [x] buy page
-- [ ] wallet page
+- [x] wallet page
 - [ ] claim page
 - [ ] landing page
 
