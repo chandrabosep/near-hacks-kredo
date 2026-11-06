@@ -4,6 +4,7 @@ import { Plus, X } from "lucide-react";
 import { useState } from "react";
 import { Notice, Spinner } from "@/components/shell";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ApiError, useApi } from "@/lib/api";
 import { creditsToUsd, parseCredits, usd } from "@/lib/format";
 import type { PriceEntry } from "@/lib/public";
@@ -17,7 +18,7 @@ const toRows = (prices: Record<string, PriceEntry>): Row[] =>
   );
 
 const ACTION = /^[a-z0-9][a-z0-9._-]{0,63}$/;
-const input = "h-10 w-full rounded-control border border-wc-border bg-wc-surface px-3 text-[15px] outline-none focus:border-wc-blue";
+const input = "h-10 rounded-control border-wc-border bg-wc-surface px-3 text-[15px] md:text-[15px] focus-visible:border-wc-blue focus-visible:ring-3 focus-visible:ring-wc-blue/20 disabled:bg-wc-bg";
 
 /** Edits the price list. Shows what each price costs the user and what the company keeps. */
 export function PricesEditor({ base, prices, feeBps, onSaved }: { base: string; prices: Record<string, PriceEntry>; feeBps: number; onSaved: () => void }) {
@@ -70,13 +71,13 @@ export function PricesEditor({ base, prices, feeBps, onSaved }: { base: string; 
           const earn = pay ? (Number(pay) * (1 - feeBps / 10_000)).toFixed(6).replace(/\.?0+$/, "") : undefined;
           return (
             <div key={r.key} className="grid grid-cols-2 gap-3 border-b border-wc-border-light pb-3 md:grid-cols-[1.4fr_0.9fr_0.8fr_0.8fr_1.2fr_32px] md:items-center md:border-0 md:pb-0">
-              <input className={`${input} col-span-2 font-mono text-[14px] md:col-span-1`} placeholder="video.render" value={r.action} onChange={(e) => set(r.key, { action: e.target.value.toLowerCase() })} aria-label="Action" />
-              <select className={input} value={r.mode} onChange={(e) => set(r.key, { mode: e.target.value as Row["mode"] })} aria-label="Type">
+              <Input className={`${input} col-span-2 font-mono text-[14px] md:col-span-1 md:text-[14px]`} placeholder="video.render" value={r.action} onChange={(e) => set(r.key, { action: e.target.value.toLowerCase() })} aria-label="Action" />
+              <select className={`${input} w-full border outline-none`} value={r.mode} onChange={(e) => set(r.key, { mode: e.target.value as Row["mode"] })} aria-label="Type">
                 <option value="flat">Flat</option>
                 <option value="rate">Per unit</option>
               </select>
-              <input className={input} inputMode="decimal" placeholder="8" value={r.credits} onChange={(e) => set(r.key, { credits: e.target.value })} aria-label="Credits" />
-              <input
+              <Input className={input} inputMode="decimal" placeholder="8" value={r.credits} onChange={(e) => set(r.key, { credits: e.target.value })} aria-label="Credits" />
+              <Input
                 className={input}
                 placeholder={r.mode === "rate" ? "second" : "—"}
                 disabled={r.mode === "flat"}

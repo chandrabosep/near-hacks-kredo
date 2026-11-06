@@ -3,8 +3,10 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { ArrowUpRight, CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 /** The brand mark: a notched square with the leaf inside. */
@@ -171,16 +173,26 @@ export function Field({
   label,
   hint,
   suffix,
+  className,
+  id,
   ...input
-}: React.InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: ReactNode; suffix?: ReactNode }) {
+}: React.ComponentProps<"input"> & { label: string; hint?: ReactNode; suffix?: ReactNode }) {
+  const auto = useId();
+  const inputId = id ?? auto;
   return (
-    <label className="block">
-      <span className="text-[13px] leading-[19.5px] font-medium text-wc-text-muted">{label}</span>
-      <span className="mt-2 flex h-12 items-center rounded-control border border-wc-border bg-wc-surface px-4 focus-within:border-wc-blue focus-within:ring-2 focus-within:ring-wc-blue/20">
-        <input {...input} className="min-w-0 flex-1 bg-transparent text-[17px] text-wc-text-1 outline-none placeholder:text-wc-mute" />
-        {suffix && <span className="ml-3 shrink-0 text-[15px] text-wc-text-muted">{suffix}</span>}
-      </span>
-      {hint && <span className="mt-2 block text-[13px] text-wc-icon-muted">{hint}</span>}
-    </label>
+    <div className={className}>
+      <Label htmlFor={inputId} className="text-[13px] leading-[19.5px] font-medium text-wc-text-muted">
+        {label}
+      </Label>
+      <div className="relative mt-2">
+        <Input id={inputId} className={cn(fieldInput, suffix && "pr-44")} {...input} />
+        {suffix && <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[15px] text-wc-text-muted">{suffix}</span>}
+      </div>
+      {hint && <p className="mt-2 text-[13px] text-wc-icon-muted">{hint}</p>}
+    </div>
   );
 }
+
+/** Our sizes and colours on top of the shadcn Input. */
+export const fieldInput =
+  "h-12 rounded-control border-wc-border bg-wc-surface px-4 text-[17px] text-wc-text-1 md:text-[17px] placeholder:text-wc-mute focus-visible:border-wc-blue focus-visible:ring-3 focus-visible:ring-wc-blue/20 disabled:bg-wc-bg";
