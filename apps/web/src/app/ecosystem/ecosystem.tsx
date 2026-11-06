@@ -245,18 +245,13 @@ function Tab({ active, onClick, count, children }: { active: boolean; onClick: (
   );
 }
 
-/** Rows in a card's price block. Every card reserves this many, so all cards line up. */
-const PRICE_ROWS = 3;
-
 /**
  * One app. Every section has a fixed height and is always present, even when empty,
- * so cards in a row line up exactly: header, tags, description, prices, footer.
+ * so cards in a row line up exactly: header, tags, description, price, footer.
  */
 function AppCard({ app, badge }: { app: DirectoryApp; badge?: string }) {
   const prices = Object.entries(app.prices);
-  // With more prices than rows, the last row says how many are hidden.
-  const visible = prices.length > PRICE_ROWS ? prices.slice(0, PRICE_ROWS - 1) : prices;
-  const hidden = prices.length - visible.length;
+  const first = prices[0];
   const Wrapper = app.website ? "a" : "div";
   const tags = [app.category && CATEGORIES[app.category], app.exchangeRate && `Own credits · ${app.exchangeRate} of ours buy 1`].filter(Boolean) as string[];
 
@@ -292,27 +287,20 @@ function AppCard({ app, badge }: { app: DirectoryApp; badge?: string }) {
       {/* Description: two lines, 48px. */}
       <p className={cn("mt-4 line-clamp-2 h-12 text-[15px] leading-6", app.description ? "text-wc-text-2" : "text-wc-icon-muted")}>{app.description ?? "No description yet."}</p>
 
-      {/* Prices: three 40px rows. */}
-      <dl className="mt-6 mb-6 border-t border-wc-border-light">
-        {Array.from({ length: PRICE_ROWS }, (_, i) => {
-          const row = visible[i];
-          const isMore = !row && i === visible.length && hidden > 0;
-          return (
-            <div key={i} className={cn("flex h-10 items-center justify-between gap-4 text-[14px]", i > 0 && (row || isMore) && "border-t border-wc-border-light")}>
-              {row ? (
-                <>
-                  <dt className="truncate font-mono text-[13px] text-wc-text-2">{row[0]}</dt>
-                  <dd className="shrink-0 font-medium text-wc-text-1">{describePrice(row[1])}</dd>
-                </>
-              ) : isMore ? (
-                <dt className="text-[13px] text-wc-text-muted">+{hidden} more prices</dt>
-              ) : i === 0 ? (
-                <dt className="text-[13px] text-wc-icon-muted">{app.exchangeRate ? "Sells its own credits for ours" : "No prices listed yet"}</dt>
-              ) : null}
-            </div>
-          );
-        })}
-      </dl>
+      {/* Price: one 44px row, the first price and how many more. */}
+      <div className="mt-5 mb-5 flex h-11 items-center justify-between gap-4 border-y border-wc-border-light text-[14px]">
+        {first ? (
+          <>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-mono text-[13px] text-wc-text-2">{first[0]}</span>
+              {prices.length > 1 && <span className="shrink-0 text-[12px] text-wc-icon-muted">+{prices.length - 1} more</span>}
+            </span>
+            <span className="shrink-0 font-medium text-wc-text-1">{describePrice(first[1])}</span>
+          </>
+        ) : (
+          <span className="text-[13px] text-wc-icon-muted">{app.exchangeRate ? "Sells its own credits for ours" : "No prices listed yet"}</span>
+        )}
+      </div>
 
       {/* Footer: 20px, pinned to the bottom. */}
       <div className="mt-auto flex h-5 shrink-0 items-center justify-between gap-4 text-[13px] leading-5 text-wc-text-muted">
