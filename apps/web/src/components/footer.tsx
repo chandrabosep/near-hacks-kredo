@@ -2,7 +2,7 @@ import Link from "next/link";
 import { DitherField } from "@/components/dots";
 
 const COLUMNS = [
-  { title: "Use", links: [["Wallet", "/wallet"], ["Buy credits", "/buy"], ["Reserves", "/reserves"]] },
+  { title: "Use", links: [["Account", "/account"], ["Buy credits", "/buy"], ["Reserves", "/reserves"]] },
   { title: "Build", links: [["Docs", "/docs"], ["Quickstart", "/docs/quickstart"], ["SDK", "https://github.com/chandrabosep/ethglobal-mumbai/tree/main/packages/sdk"], ["Contracts", "https://github.com/chandrabosep/ethglobal-mumbai/tree/main/contracts"]] },
   { title: "Network", links: [["Vault on explorer", "https://explorer.testnet.whitechain.io/address/0xaaA19C7160FDe7532F5f4Fbd698b549A884c664A"], ["Whitechain", "https://whitechain.io"]] },
 ];

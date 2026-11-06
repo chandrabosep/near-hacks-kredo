@@ -20,7 +20,7 @@ const credits = new Credits({ apiKey: process.env.CREDITS_API_KEY! });
 |---|---|---|
 | `apiKey` | required | Your app's live (`uc_live_`) or test (`uc_test_`) key |
 | `baseUrl` | `http://localhost:4000` | The network's API |
-| `pagesUrl` | `http://localhost:3000` | The hosted connect, buy and wallet pages |
+| `pagesUrl` | `http://localhost:3000` | The hosted connect, buy and account pages |
 | `retries` | `2` | Extra tries after a network failure or rate limit. Writes are safe to retry: each carries a ref |
 | `timeoutMs` | `60000` | Per request. Long enough for a transaction to confirm |
 
@@ -42,7 +42,7 @@ Amounts are credits, as a number or an exact decimal string such as `"0.5"`. Eve
 | `exchangeCode(code)` | Swaps the one-time code for `{ user }` |
 | `user(address)` | Balance, limit, whether they're connected, and what's spendable now |
 | `session(user)` | Everything the React kit renders, for a user or `undefined` |
-| `buyUrl({ credits, returnTo })`, `walletUrl()` | Links to the buy and wallet pages |
+| `buyUrl({ credits, returnTo })`, `accountUrl()` | Links to the buy and account pages |
 
 ## Moving credits
 

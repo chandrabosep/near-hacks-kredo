@@ -34,7 +34,7 @@ export function KredoMark({ className }: { className?: string }) {
 }
 
 const NAV = [
-  { href: "/wallet", label: "Wallet" },
+  { href: "/account", label: "Account" },
   { href: "/buy", label: "Buy" },
   { href: "/send", label: "Send" },
   { href: "/ecosystem", label: "Ecosystem" },

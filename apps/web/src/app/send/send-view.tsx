@@ -124,8 +124,8 @@ function Hero({ balance }: { balance?: { units: string; credits: string; usd: st
               <Link href="/buy" className="text-wc-blue hover:underline">
                 Buy more
               </Link>
-              <Link href="/wallet" className="text-wc-text-muted hover:text-wc-navy">
-                Wallet
+              <Link href="/account" className="text-wc-text-muted hover:text-wc-navy">
+                Account
               </Link>
             </div>
           </div>

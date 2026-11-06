@@ -78,8 +78,8 @@ export function ClaimFlow() {
         <PageTitle title={`${credits(done.amount)} are yours.`} lead="They're in your balance now, ready to spend in any app on the network." />
         <Tile>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
-            <Link href="/wallet" className={buttonVariants({ size: "lg" })}>
-              Open your wallet
+            <Link href="/account" className={buttonVariants({ size: "lg" })}>
+              Open your account
             </Link>
             <TxLink href={done.explorer} />
           </div>

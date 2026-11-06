@@ -36,7 +36,8 @@ test("connectUrl looks up the app once and links to the hosted page", async () =
   await credits.connectUrl({ credits: 50 });
   assert.equal(calls.filter((c) => c.url.endsWith("/v1/app")).length, 1, "app id is cached");
   assert.equal(credits.buyUrl({ credits: 500 }), "https://pay.test/buy?credits=500");
-  assert.equal(credits.walletUrl(), "https://pay.test/wallet");
+  assert.equal(credits.accountUrl(), "https://pay.test/account");
+  assert.equal(credits.walletUrl(), "https://pay.test/account", "the old name still works");
 });
 
 test("company calls hit the right routes", async () => {

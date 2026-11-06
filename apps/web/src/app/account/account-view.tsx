@@ -11,8 +11,8 @@ import { useMe } from "@/lib/me";
 import { Activity } from "./activity";
 import { Connections } from "./connections";
 
-/** The user's home: balance, connected apps and everything that happened. */
-export function WalletView() {
+/** The user's account: balance, connected apps and everything that happened. */
+export function AccountView() {
   const { me, status, expired, refresh } = useMe();
   const api = useApi();
   const [activity, setActivity] = useState<ActivityItem[]>();
@@ -57,7 +57,7 @@ export function WalletView() {
     return (
       <>
         <PageTitle title="One balance for every app." />
-        <SignInPanel title="Sign in to see your wallet." />
+        <SignInPanel title="Sign in to see your account." />
       </>
     );
   }

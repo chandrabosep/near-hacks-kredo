@@ -6,9 +6,13 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   // The developer docs under /docs are MDX pages.
   pageExtensions: ["ts", "tsx", "mdx"],
-  // The app directory became the ecosystem page.
+  // Renamed pages keep their old paths working.
   async redirects() {
-    return [{ source: "/apps", destination: "/ecosystem", permanent: true }];
+    return [
+      { source: "/apps", destination: "/ecosystem", permanent: true },
+      // The wallet page is now the account page. Older links and SDK versions still land.
+      { source: "/wallet", destination: "/account", permanent: true },
+    ];
   },
 };
 

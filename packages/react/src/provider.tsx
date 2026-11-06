@@ -199,7 +199,7 @@ export function CreditsProvider({
   );
 
   const openWallet = useCallback(() => {
-    window.open(`${pages}/wallet`, "_blank", "noopener");
+    window.open(`${pages}/account`, "_blank", "noopener");
   }, [pages]);
 
   const value = useMemo<Ctx>(() => ({ state, loading, error, connect, buy, openWallet, refresh }), [state, loading, error, connect, buy, openWallet, refresh]);

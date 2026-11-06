@@ -76,7 +76,7 @@ The React kit ([`@credits/react`](../react)) does this in a popup, and `credits.
 | `payout()` | Pays your unpaid earnings in USDT to your payout address |
 | `activity()`, `exportCsv()`, `gas()` | Reporting. Gas is paid by the network, never by you or your users |
 | `setWebhook(url)`, `webhookDeliveries()` | Signed event delivery |
-| `connectUrl()`, `buyUrl()`, `walletUrl()` | Links to the hosted pages |
+| `connectUrl()`, `buyUrl()`, `accountUrl()` | Links to the hosted pages |
 | `exchangeCode(code)`, `session(user)` | Connecting users, and state for the React kit |
 
 `CreditsNetwork` reads public data with no key: `health()`, `reserves()`, `stats()`, `directory()`.

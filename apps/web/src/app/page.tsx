@@ -26,7 +26,7 @@ const FEATURES = [
 ];
 
 const PLACES = [
-  { href: "/wallet", title: "Wallet", sub: "Balance, apps & activity" },
+  { href: "/account", title: "Account", sub: "Balance, apps & activity" },
   { href: "/buy", title: "Buy", sub: "USDT in, credits out" },
   { href: "/reserves", title: "Reserves", sub: "Every credit, accounted for" },
 ];
@@ -54,8 +54,8 @@ export default function Home() {
                 Buy credits once, in any partner app, and spend the leftover in every other one. Every credit is backed by USDT on Whitechain.
               </p>
               <div className="mt-9 flex flex-col gap-4 sm:flex-row sm:gap-5">
-                <Link href="/wallet" className={buttonVariants({ size: "md" })}>
-                  Open your wallet
+                <Link href="/account" className={buttonVariants({ size: "md" })}>
+                  Open your account
                 </Link>
                 <a href="#build" className={buttonVariants({ size: "md", variant: "outline" })}>
                   Start building
@@ -192,8 +192,8 @@ export default function Home() {
               <h2 className="text-[40px] leading-[1.06] font-semibold sm:text-[56px]">Your next app already has a balance.</h2>
               <p className="mx-auto mt-6 max-w-xl text-[18px] leading-[1.625] text-wc-text-dark-2">Sign in with email. Buy once. Spend it anywhere on the network.</p>
               <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row sm:gap-5">
-                <Link href="/wallet" className={buttonVariants({ size: "lg" })}>
-                  Open your wallet
+                <Link href="/account" className={buttonVariants({ size: "lg" })}>
+                  Open your account
                 </Link>
                 <a href="#build" className={buttonVariants({ size: "lg", variant: "outline", className: "text-wc-blue" })}>
                   Start building

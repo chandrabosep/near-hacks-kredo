@@ -55,6 +55,6 @@ Send them to the buy page. They come back to `returnTo` when they're done:
 res.redirect(credits.buyUrl({ credits: 500, returnTo: "https://your.app/" }));
 ```
 
-`credits.walletUrl()` links to their wallet, where they can see their balance, change limits and disconnect apps.
+`credits.accountUrl()` links to their account, where they can see their balance, change limits and disconnect apps.
 
 The [React kit](/docs/react) does all of this in a popup instead of redirects.

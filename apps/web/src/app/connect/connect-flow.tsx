@@ -86,7 +86,7 @@ export function ConnectFlow() {
     <>
       <PageTitle
         title={`Connect ${name}.`}
-        lead={`${name} wants to spend from your Kredo balance. You choose the limit. You can lower or remove it any time in your wallet.`}
+        lead={`${name} wants to spend from your Kredo balance. You choose the limit. You can lower or remove it any time in your account.`}
       />
 
       {status === "signed-out" && <SignInPanel title={`Sign in to connect ${name}.`} />}
@@ -112,8 +112,8 @@ export function ConnectFlow() {
                       Back to {name}
                     </a>
                   ) : (
-                    <Link className={buttonVariants({ size: "lg" })} href="/wallet">
-                      Open your wallet
+                    <Link className={buttonVariants({ size: "lg" })} href="/account">
+                      Open your account
                     </Link>
                   )}
                   <TxLink href={done.explorer} />

@@ -164,9 +164,14 @@ export class Credits {
     return this.page("/buy", { credits: opts.credits === undefined ? undefined : String(opts.credits), returnTo: opts.returnTo });
   }
 
-  /** The user's wallet, where they see their balance and can disconnect any app. */
+  /** The user's account page, where they see their balance and can disconnect any app. */
+  accountUrl(): string {
+    return this.page("/account", {});
+  }
+
+  /** @deprecated Use accountUrl(). */
   walletUrl(): string {
-    return this.page("/wallet", {});
+    return this.accountUrl();
   }
 
   /**
