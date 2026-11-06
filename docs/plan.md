@@ -69,8 +69,8 @@ The mock USDT is for local Foundry tests only. It mirrors this surface so tests 
 
 - [x] Contracts deployed on Whitechain Sepolia (1874) and **verified** on the explorer
 - [x] At least one **USDT payment settled on Whitechain in the main flow**, with the explorer link in the README. Self-minted test tokens don't count.
-- [ ] README line: why this flow needs onchain stablecoin settlement on Whitechain, and what a normal payment rail couldn't do. (A rail can't stop us over-charging or over-issuing. The contract does.)
-- [ ] README covers setup, architecture and **current limitations**
+- [x] README line: why this flow needs onchain stablecoin settlement on Whitechain, and what a normal payment rail couldn't do. (A rail can't stop us over-charging or over-issuing. The contract does.)
+- [x] README covers setup, architecture and **current limitations**
 - [ ] 2 to 4 minute video showing **each party**: customer, merchant, and the relayer's gas view
 - [ ] Whitechain feedback doc (RPC limits, faucet, explorer verification, anything that bit us)
 
@@ -156,7 +156,7 @@ Never commit secrets, local data or build output. Commit example env files inste
 **Dev scripts**
 - [x] local dev script (anvil → deploy → backend)
 - [x] Whitechain deploy and start scripts
-- [ ] README: setup and the SDK usage page
+- [x] README: setup and the SDK usage page
 
 Tag `m0-core` when everything above runs locally.
 
