@@ -207,7 +207,7 @@ function FullBuy() {
               <Point icon={<Sparkles className="size-4" />} title="Spend anywhere">
                 Use them in{" "}
                 <Link href="/ecosystem" className="font-medium text-wc-blue hover:underline">
-                  any app in the ecosystem
+                  any app on the network
                 </Link>
                 .
               </Point>

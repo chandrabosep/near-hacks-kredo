@@ -74,7 +74,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   if (ready && !authenticated) {
     return (
       <>
-        <PageTitle title="Take credits in your app." lead="Register your app, set prices in credits, and withdraw what your users spend in USDT on Whitechain." />
+        <PageTitle title="Bring your app to the network." lead="Register your app, set your prices, and withdraw what your users spend in USDT on Whitechain." />
         <SignInPanel title="Sign in to manage your apps." lead="Use your work email. Earnings are paid in USDT to your own wallet, or to any address you choose when you register an app." />
       </>
     );
@@ -103,7 +103,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   if (company === null) {
     return (
       <>
-        <PageTitle title="Set up your company." lead="Tell users who they're paying. This shows in the ecosystem and on the connect page. You can change it any time." />
+        <PageTitle title="Set up your company." lead="Tell users who they're paying. This shows on the network page and the connect page. You can change it any time." />
         <Tile className="lg:px-16">
           <CompanyForm onSaved={(c) => (setCompany(c), void reload())} />
         </Tile>

@@ -41,15 +41,15 @@ function useLive() {
 
 const Skeleton = ({ w = "w-24" }: { w?: string }) => <span className={`inline-block h-7 ${w} animate-pulse rounded-control bg-wc-surface-2`} />;
 
-/** The ecosystem preview: apps that take credits today, an open seat for the next one, and live network numbers. */
+/** The network preview: apps on the Kredo network today, an open seat for the next one, and live network numbers. */
 export function EcosystemPreview() {
   const { stats } = useLive();
   const { apps } = useDirectory();
   const shown = apps ? [...apps].sort((a, b) => b.usage.charges - a.usage.charges).slice(0, 5) : undefined;
   const numbers: [string, string | undefined][] = [
-    ["Apps in the ecosystem", stats && String(stats.apps)],
-    ["People with credits", stats && String(stats.users)],
-    ["Credits spent across apps", stats && credits(stats.spent, { unit: false })],
+    ["Apps on the network", stats && String(stats.apps)],
+    ["Funded users", stats && String(stats.users)],
+    ["Credits settled across apps", stats && credits(stats.spent, { unit: false })],
   ];
 
   return (
@@ -61,7 +61,7 @@ export function EcosystemPreview() {
                 <BrandLogo src={app.logoUrl} name={app.name} />
                 <div className="min-w-0">
                   <p className="truncate text-[15px] font-semibold text-wc-text-1">{app.name}</p>
-                  <p className="truncate text-[13px] text-wc-text-muted">{(app.category && CATEGORIES[app.category]) ?? "Live in the ecosystem"}</p>
+                  <p className="truncate text-[13px] text-wc-text-muted">{(app.category && CATEGORIES[app.category]) ?? "Live on the network"}</p>
                 </div>
               </div>
             ))
@@ -80,7 +80,7 @@ export function EcosystemPreview() {
             <p className="text-[13px] text-wc-text-muted">List it in minutes</p>
           </div>
         </Link>
-        {/* Open seats keep the grid whole while the ecosystem is small. */}
+        {/* Open seats keep the grid whole while the network is small. */}
         {Array.from({ length: shown ? 5 - shown.length : 0 }, (_, i) => (
           <div key={i} aria-hidden className="flex flex-col justify-center gap-4 bg-wc-surface p-5 sm:p-6">
             <span className="block size-11 rounded-[12px] border border-dashed border-wc-border-light" />

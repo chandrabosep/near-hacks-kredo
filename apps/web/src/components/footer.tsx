@@ -14,13 +14,13 @@ export function Footer() {
         <div className="relative h-36 overflow-hidden border-b border-wc-border-dark-muted sm:h-[296px]">
           <DitherField focus={{ x: 0.5, y: 0.5 }} radius={0.75} invert colors={["#122A5E", "#3385FF", "#0044FF", "#DCF218"]} ink="#9FB2CC" />
           <div className="relative z-10 flex h-full items-center justify-center">
-            <p className="text-[28px] font-semibold tracking-[-0.01em] text-white sm:text-[40px]">One balance. Every app.</p>
+            <p className="text-[28px] font-semibold tracking-[-0.01em] text-white sm:text-[40px]">Built for the AI economy.</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-10 px-6 py-14 sm:px-8 md:grid-cols-4 lg:px-16">
           <div className="col-span-2 md:col-span-1">
             <p className="text-[22px] leading-none font-bold tracking-[-0.04em] text-white">kredo</p>
-            <p className="mt-2 text-[15px] leading-6">Credits backed 1:1 by USDT on Whitechain.</p>
+            <p className="mt-2 text-[15px] leading-6">The billing network for the AI economy.</p>
           </div>
           {COLUMNS.map((col) => (
             <div key={col.title}>

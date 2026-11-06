@@ -3,8 +3,8 @@ import { Page } from "@/components/shell";
 import { Ecosystem } from "./ecosystem";
 
 export const metadata: Metadata = {
-  title: "Ecosystem",
-  description: "Every app that takes Kredo credits. One balance works in all of them.",
+  title: "Network",
+  description: "Every app on the Kredo network. One balance works in all of them.",
 };
 
 export default function EcosystemPage() {

@@ -18,7 +18,7 @@ type Stats = { apps: number; users: number; spent: Amount; paidOut: Amount };
 
 const NEW_FOR_MS = 7 * 86_400_000;
 
-/** The app ecosystem: everything that takes Kredo credits, searchable and grouped by category. */
+/** The network: every app on Kredo, searchable and grouped by category. */
 export function Ecosystem() {
   const { apps, error } = useDirectory();
   const [stats, setStats] = useState<Stats>();
@@ -140,9 +140,9 @@ function Hero({ apps, stats }: { apps: DirectoryApp[]; stats?: Stats }) {
             <span className="size-1.5 rounded-full bg-wc-mint-2" />
             {apps.length ? `${apps.length} ${apps.length === 1 ? "app" : "apps"} live on Whitechain` : "Live on Whitechain"}
           </p>
-          <h1 className="type-hero mt-6 max-w-2xl font-semibold text-balance text-wc-text-1">One balance. Every app in the ecosystem.</h1>
+          <h1 className="type-hero mt-6 max-w-2xl font-semibold text-balance text-wc-text-1">Every app on the network.</h1>
           <p className="mt-5 max-w-2xl text-[17px] leading-[1.625] text-wc-text-muted">
-            Buy credits once and spend them in every app below. Each app can only spend what you approve for it, and every charge settles on Whitechain.
+            One balance works in every app below. Each app can spend only what you approve for it, and every charge settles on Whitechain.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/buy" className={buttonVariants({ size: "lg" })}>
@@ -156,8 +156,8 @@ function Hero({ apps, stats }: { apps: DirectoryApp[]; stats?: Stats }) {
         {/* Live network numbers, top right. */}
         <div className="grid grid-cols-2 self-start overflow-hidden rounded-[16px] border border-wc-border-light bg-wc-surface lg:w-[420px]">
           <Metric label="Apps" value={stats ? String(stats.apps) : undefined} />
-          <Metric label="People with credits" value={stats ? String(stats.users) : undefined} />
-          <Metric label="Credits spent in apps" value={stats ? fmtCredits(stats.spent, { unit: false }) : undefined} />
+          <Metric label="Funded users" value={stats ? String(stats.users) : undefined} />
+          <Metric label="Spent across apps" value={stats ? fmtCredits(stats.spent, { unit: false }) : undefined} />
           <Metric label="Paid out to apps" value={stats ? usd(stats.paidOut) : undefined} />
         </div>
       </div>
@@ -202,8 +202,8 @@ function SearchBox({ value, onChange, results }: { value: string; onChange: (v: 
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && (onChange(""), e.currentTarget.blur())}
-          placeholder="Search the ecosystem"
-          aria-label="Search the ecosystem"
+          placeholder="Search the network"
+          aria-label="Search the network"
           className="h-full text-[15px] text-wc-text-1 md:text-[15px] placeholder:text-wc-icon-muted [&::-webkit-search-cancel-button]:hidden"
         />
         <InputGroupAddon align="inline-end">
@@ -322,7 +322,7 @@ function BuildBand() {
         <p className="text-[13px] font-medium text-wc-text-dark-3">For builders</p>
         <h2 className="type-section mt-3 max-w-xl font-semibold text-white">Your app could be here.</h2>
         <p className="mt-4 max-w-lg text-[16px] leading-7">
-          Take Kredo credits in about 20 lines. Users who already hold credits can pay you on day one, and you&apos;re paid in USDT on Whitechain.
+          Join the network in about 20 lines. Users who already hold a balance can pay you on day one, and you&apos;re paid in USDT on Whitechain.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/dashboard" className={buttonVariants({ size: "lg" })}>

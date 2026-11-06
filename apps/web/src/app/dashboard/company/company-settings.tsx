@@ -8,14 +8,14 @@ import { CompanyForm } from "../company-form";
 import { useDashboard } from "../context";
 import { DashHeader, DashSection, Panel } from "../ui";
 
-/** The company profile users see in the ecosystem and on the connect page. */
+/** The company profile users see on the network page and the connect page. */
 export function CompanySettings() {
   const { company, setCompany, reload, apps } = useDashboard();
   const [saved, setSaved] = useState(false);
 
   return (
     <>
-      <DashHeader title="Company" lead="Shown to users in the ecosystem and on the connect page, so they know who they're paying." />
+      <DashHeader title="Company" lead="Shown to users on the network page and the connect page, so they know who they're paying." />
 
       <section className="border-b border-wc-border-light px-6 py-8 sm:px-8 lg:px-12 lg:py-10">
         <div className="flex items-center gap-4 rounded-[16px] border border-wc-border-light bg-wc-surface p-6">

@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Juice Pitch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Onest:wght@300;400;500;600;700&display=swap">
+<style>
+  /* A 1600x900 stage scaled to the window. Paper slides framed by hairlines, navy slides for the turns. */
+  :root {
+    --ink: #07081e;
+    --navy: #080a28;
+    --text-2: #4a5567;
+    --muted: #5e6073;
+    --mute: #97a2b6;
+    --blue: #0066ff;
+    --blue-deep: #0044ff;
+    --line: #e6e6ec;
+    --surface: #ffffff;
+    --bg: #f8faf9;
+    --surface-2: #e3e8ef;
+    --lime: #dcf218;
+    --mint: #68ecbc;
+    --dark: #000933;
+    --dark-bg: #000722;
+    --dark-line: #122a5e;
+    --dark-line-2: #1e3d80;
+    --dark-text: #9fb2cc;
+    --dark-text-3: #6a7f9c;
+    --navy-mute: #5a6b93;
+    --font: "Onest", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--dark-bg); font-family: var(--font); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; }
+
+  .stage { position: absolute; left: 50%; top: 50%; width: 1600px; height: 900px; transform: translate(-50%, -50%) scale(var(--s, 1)); overflow: hidden; background: var(--surface); user-select: none; }
+
+  /* Chrome: wordmark, counter, progress, name switch. Colors follow the active slide. */
+  .frame { position: absolute; inset: 0 64px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); pointer-events: none; z-index: 5; transition: border-color 0.5s; }
+  .chrome { position: absolute; inset: 0; z-index: 10; pointer-events: none; color: var(--navy); transition: color 0.5s; }
+  .chrome .top { position: absolute; top: 40px; left: 120px; right: 120px; display: flex; align-items: center; justify-content: space-between; }
+  .count { font-family: var(--mono); font-size: 15px; color: var(--mute); letter-spacing: 0.04em; }
+  .count b { font-weight: 500; color: inherit; }
+  .chrome .bottom { position: absolute; bottom: 36px; left: 120px; right: 120px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; color: var(--mute); }
+  .namebtn { opacity: 0; transition: opacity 0.3s, border-color 0.2s, color 0.2s; pointer-events: auto; background: none; border: 1px solid transparent; border-radius: 999px; padding: 6px 12px; margin-left: -12px; color: var(--mute); cursor: pointer; }
+  .namebtn:hover, .namebtn:focus-visible, .namebtn.flash { opacity: 1; border-color: currentColor; color: inherit; outline: none; }
+  .timer { font-family: var(--mono); font-size: 15px; }
+  .timer.over { color: #ed7536; }
+  .progress { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--blue); transition: width 0.6s var(--ease); }
+  .stage[data-tone="dark"] .frame { border-color: var(--dark-line); }
+  .stage[data-tone="dark"] .chrome { color: #fff; }
+  .stage[data-tone="dark"] .count, .stage[data-tone="dark"] .chrome .bottom, .stage[data-tone="dark"] .namebtn { color: var(--dark-text-3); }
+  .stage[data-tone="dark"] .namebtn:hover { color: #fff; }
+
+  .lockup { display: inline-flex; align-items: center; gap: 12px; }
+  .lockup svg { width: 36px; height: 36px; flex: none; }
+  .wordmark { font-size: 26px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; text-transform: lowercase; }
+  .stage[data-tone="dark"] { --tile: #132a6e; }
+  .chrome .brandmark { transition: opacity 0.4s; }
+  .stage[data-solo] .chrome .brandmark { opacity: 0; }
+
+  /* Slides */
+  .slide { position: absolute; inset: 0; padding: 136px 120px 104px; display: flex; flex-direction: column; opacity: 0; visibility: hidden; transition: opacity 0.45s var(--ease), visibility 0s linear 0.45s; }
+  .slide.active { opacity: 1; visibility: visible; transition: opacity 0.45s var(--ease); }
+  .slide.dark { background: var(--dark); color: #fff; }
+  .slide > .fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .slide > .content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: center; height: 100%; }
+
+  .slide [data-a] { opacity: 0; }
+  .slide.active [data-a] { animation: rise 0.8s var(--ease) both; animation-delay: calc(var(--d, 0) * 110ms + 100ms); }
+  @keyframes rise { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+
+  h1, h2, p { margin: 0; }
+  h1 { font-size: 132px; line-height: 0.98; font-weight: 600; letter-spacing: -0.035em; }
+  h2 { font-size: 68px; line-height: 1.04; font-weight: 600; letter-spacing: -0.03em; text-wrap: balance; }
+  .lead { font-size: 28px; line-height: 1.5; color: var(--muted); max-width: 30ch; }
+  .dark .lead { color: var(--dark-text); }
+  .chip { display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 16px; font-size: 17px; font-weight: 500; color: var(--text-2); }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: #60e9b1; }
+
+  /* 1 Title */
+  .s-title .fx { -webkit-mask-image: linear-gradient(to right, transparent 34%, #000 72%); mask-image: linear-gradient(to right, transparent 34%, #000 72%); }
+  .s-title .wash { position: absolute; inset: 0; background: radial-gradient(85% 85% at 100% 100%, #dfe5ec 0%, transparent 70%); }
+  .s-title .content { justify-content: center; gap: 0; }
+  .s-title h1 { margin-top: 36px; }
+  .s-title .lead { margin-top: 36px; max-width: 36ch; }
+  .s-title .lockup svg { width: 52px; height: 52px; }
+  .s-title .wordmark { font-size: 40px; }
+
+  /* 2 Problem */
+  .wallets { margin-top: 56px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .wallet { background: var(--surface); padding: 28px 24px; display: flex; flex-direction: column; gap: 20px; }
+  .glyph { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-size: 22px; font-weight: 600; color: var(--navy); background: var(--bg); border: 1px solid var(--line); }
+  .wallet .name { font-size: 20px; font-weight: 600; }
+  .wallet .bal { font-size: 40px; font-weight: 300; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .wallet .stuck { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--mute); }
+  .wallet .stuck::before { content: ""; width: 14px; height: 14px; border-radius: 4px; border: 1.5px dashed var(--mute); }
+  .stranded { margin-top: 48px; font-size: 34px; line-height: 1.3; color: var(--text-2); }
+  .stranded .num { color: var(--blue); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .pair { margin-top: 48px; display: grid; grid-template-columns: 1fr 1fr; gap: 48px; font-size: 24px; line-height: 1.5; color: var(--muted); }
+  .pair b { color: var(--ink); font-weight: 600; }
+
+  /* 3 Insight */
+  .s-insight .content { justify-content: center; }
+  .pre { font-size: 40px; line-height: 1.3; color: var(--dark-text); }
+  .big-blue { margin-top: 20px; font-size: 92px; line-height: 1.02; font-weight: 600; letter-spacing: -0.035em; color: #fff; max-width: 15ch; }
+  .big-blue em { font-style: normal; color: #5c8dff; }
+  .cats { margin-top: 64px; display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--dark-line-2); }
+  .cat { padding: 26px 28px; border-left: 1px solid var(--dark-line-2); }
+  .cat:first-child { border-left: 0; }
+  .cat p { font-size: 15px; color: var(--dark-text-3); font-family: var(--mono); letter-spacing: 0.02em; }
+  .cat h3 { margin: 10px 0 0; font-size: 26px; font-weight: 600; }
+  .cat span { display: block; margin-top: 6px; font-size: 19px; color: var(--dark-text); }
+
+  /* 4 Flow */
+  .flow { margin-top: 64px; display: grid; grid-template-columns: 1fr 96px 1fr 96px 1fr; align-items: stretch; }
+  .app { border: 1px solid var(--line); background: var(--surface); padding: 32px; display: flex; flex-direction: column; gap: 24px; opacity: 0.35; transform: scale(0.98); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease), border-color 0.6s; }
+  .app.on { opacity: 1; transform: none; border-color: var(--surface-2); box-shadow: 0 24px 48px -28px rgba(0, 9, 51, 0.28); }
+  .app-head { display: flex; align-items: center; gap: 14px; font-size: 22px; font-weight: 600; }
+  .app .glyph { width: 48px; height: 48px; }
+  .balance { display: flex; align-items: baseline; justify-content: space-between; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 18px 0; }
+  .balance span { font-size: 17px; color: var(--muted); }
+  .balance b { font-size: 52px; font-weight: 300; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .app .cap { font-size: 20px; line-height: 1.45; color: var(--text-2); }
+  .app .tag { align-self: flex-start; font-size: 15px; font-weight: 600; padding: 5px 12px; border-radius: 999px; background: rgba(0, 102, 255, 0.08); color: var(--blue); }
+  .app .tag.mint { background: #a4f4d7; color: var(--navy); }
+  .wire { position: relative; align-self: center; height: 2px; margin: 0 12px; background: var(--line); overflow: hidden; }
+  .wire::after { content: ""; position: absolute; inset: 0; background: var(--blue); transform: scaleX(0); transform-origin: left; transition: transform 0.7s var(--ease); }
+  .wire.on::after { transform: scaleX(1); }
+  .settle { margin-top: 40px; display: flex; align-items: center; gap: 16px; font-size: 26px; color: var(--text-2); opacity: 0; transform: translateY(12px); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
+  .settle.on { opacity: 1; transform: none; }
+  .settle .usdt { width: 36px; height: 36px; border-radius: 50%; background: #26a17b; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 20px; }
+
+  /* 5 Trust */
+  .rules { margin-top: 56px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .rule { background: var(--surface); padding: 40px 36px; }
+  .rule svg { width: 40px; height: 40px; color: var(--blue); }
+  .rule h3 { margin: 28px 0 0; font-size: 30px; font-weight: 600; letter-spacing: -0.01em; }
+  .rule p { margin-top: 12px; font-size: 21px; line-height: 1.5; color: var(--muted); }
+  .invariant { margin-top: 40px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 28px; border: 1px solid var(--line); background: var(--bg); }
+  .invariant code { font-family: var(--mono); font-size: 21px; color: var(--ink); }
+  .ok { display: inline-flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 500; color: var(--text-2); white-space: nowrap; }
+  .ok::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 0 0 rgba(104, 236, 188, 0.6); animation: ping 2s infinite; }
+  @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(104, 236, 188, 0.6); } 80%, 100% { box-shadow: 0 0 0 12px rgba(104, 236, 188, 0); } }
+
+  /* 6 Builders */
+  .split { display: grid; grid-template-columns: 1fr 1.15fr; gap: 72px; align-items: center; height: 100%; }
+  .split .lead { margin-top: 28px; }
+  .hook { margin-top: 44px; font-size: 30px; font-weight: 600; line-height: 1.3; }
+  .hook span { color: var(--lime); }
+  .term { border: 1px solid var(--dark-line-2); border-radius: 12px; background: #00061f; overflow: hidden; box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.7); }
+  .term .bar { display: flex; align-items: center; gap: 8px; padding: 14px 20px; border-bottom: 1px solid var(--dark-line); }
+  .term .bar i { width: 12px; height: 12px; border-radius: 50%; background: var(--dark-line-2); }
+  .term .bar span { margin-left: 12px; font-family: var(--mono); font-size: 14px; color: var(--navy-mute); }
+  .term pre { margin: 0; padding: 28px; font-family: var(--mono); font-size: 18px; line-height: 1.75; color: var(--dark-text); white-space: pre; }
+  .term .l { display: block; opacity: 0; transform: translateX(-8px); }
+  .active .term .l { animation: type 0.4s var(--ease) both; animation-delay: calc(var(--i) * 140ms + 500ms); }
+  @keyframes type { to { opacity: 1; transform: none; } }
+  .term .p { color: var(--lime); }
+  .term .w { color: #fff; }
+  .term .c { color: var(--navy-mute); }
+  .term .cursor { display: inline-block; width: 9px; height: 19px; background: var(--lime); vertical-align: -3px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* 7 Model */
+  .model { display: grid; grid-template-columns: 1fr 760px; gap: 24px; align-items: center; height: 100%; }
+  .fee { margin-top: 48px; display: flex; align-items: baseline; gap: 20px; }
+  .fee b { font-size: 140px; font-weight: 300; letter-spacing: -0.04em; line-height: 1; color: var(--blue); }
+  .fee span { font-size: 24px; line-height: 1.35; color: var(--muted); max-width: 13ch; }
+  .facts { margin: 40px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+  .facts li { padding: 16px 0; border-bottom: 1px solid var(--line); font-size: 22px; color: var(--text-2); }
+  .wheel { width: 760px; height: 560px; overflow: visible; }
+  .wheel text { font-family: var(--font); font-size: 22px; fill: var(--ink); font-weight: 500; }
+  .wheel .center-name { font-size: 40px; font-weight: 700; letter-spacing: -0.04em; }
+  .wheel .center-sub { font-size: 18px; fill: var(--muted); font-weight: 400; }
+  .wheel .ring { fill: none; stroke: var(--surface-2); stroke-width: 2; }
+  .wheel .arc { fill: none; stroke: var(--blue); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 1194; stroke-dashoffset: 1194; }
+  .active .wheel .arc { animation: draw 1.6s var(--ease) 0.5s forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  /* 8 Proof */
+  .stats { margin-top: 56px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .stat { background: var(--surface); padding: 36px 32px; }
+  .stat b { display: block; font-size: 84px; line-height: 1; font-weight: 300; letter-spacing: -0.03em; }
+  .stat span { display: block; margin-top: 16px; font-size: 20px; line-height: 1.4; color: var(--muted); }
+  .txs { margin-top: 48px; display: flex; flex-wrap: wrap; gap: 14px; }
+  .tx { display: inline-flex; align-items: center; gap: 12px; padding: 12px 20px; border: 1px solid var(--line); border-radius: 999px; font-size: 20px; font-weight: 500; }
+  .tx svg { width: 20px; height: 20px; color: #1fbf86; }
+  .footnote { margin-top: 40px; font-size: 19px; color: var(--muted); }
+  .footnote code { font-family: var(--mono); font-size: 17px; color: var(--ink); }
+
+  /* 9 Next */
+  .next { margin-top: 64px; display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--dark-line-2); }
+  .next > div { padding: 40px 36px; border-left: 1px solid var(--dark-line-2); display: flex; flex-direction: column; gap: 14px; }
+  .next > div:first-child { border-left: 0; }
+  .next h3 { margin: 12px 0 0; font-size: 32px; font-weight: 600; letter-spacing: -0.01em; }
+  .next p { font-size: 22px; line-height: 1.5; color: var(--dark-text); }
+  .badge { align-self: flex-start; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; }
+  .badge.live { background: var(--mint); color: var(--navy); }
+  .badge.soon { border: 1px solid var(--dark-line-2); color: var(--dark-text); }
+  .why-now { margin-top: 56px; font-size: 26px; line-height: 1.45; color: var(--dark-text); max-width: 52ch; }
+  .why-now b { color: #fff; font-weight: 600; }
+
+  /* 10 Close */
+  .s-close .content { align-items: center; justify-content: center; text-align: center; }
+  .s-close .lockup svg { width: 96px; height: 96px; }
+  .s-close .wordmark { font-size: 120px; }
+  .s-close .lockup { gap: 28px; }
+  .s-close .tagline { margin-top: 40px; font-size: 44px; font-weight: 500; letter-spacing: -0.02em; color: #fff; }
+  .s-close .cta { margin-top: 48px; display: inline-flex; align-items: center; gap: 12px; padding: 18px 32px; border-radius: 14px; background: var(--lime); color: var(--dark); font-size: 22px; font-weight: 600; }
+  .s-close .url { margin-top: 24px; font-family: var(--mono); font-size: 18px; color: var(--dark-text-3); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slide.active [data-a], .active .term .l { animation: none; opacity: 1; transform: none; }
+    .active .wheel .arc { animation: none; stroke-dashoffset: 0; }
+    .ok::before, .term .cursor { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mark" viewBox="0 0 32 32">
+    <rect width="32" height="32" rx="9" style="fill: var(--tile, #080A28)" />
+    <path d="M16 16 9.2 9.2M16 16l7.4-5M16 16l1 8.4" stroke="#fff" stroke-opacity=".45" stroke-width="1.8" stroke-linecap="round" />
+    <circle cx="16" cy="16" r="3.6" fill="#fff" />
+    <circle cx="9.2" cy="9.2" r="2.6" fill="#5C82FF" />
+    <circle cx="23.4" cy="11" r="2.6" fill="#68ECBC" />
+    <circle cx="17" cy="24.4" r="2.6" fill="#DCF218" />
+  </symbol>
+  <symbol id="check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" /><path d="m8 12.5 2.8 2.8L16.5 9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></symbol>
+</svg>
+
+<div class="stage" id="stage" data-tone="light">
+  <div class="frame"></div>
+
+  <!-- 1. Title -->
+  <section class="slide s-title" data-tone="light" data-solo>
+    <div class="wash"></div>
+    <canvas class="fx" data-fx="dither"></canvas>
+    <div class="content">
+      <div class="lockup" data-a style="--d:0"><svg aria-hidden="true"><use href="#mark" /></svg><span class="wordmark brand">Juice</span></div>
+      <h1 data-a style="--d:1">One balance.<br>Every AI app.</h1>
+      <p class="lead" data-a style="--d:2">Buy credits once in any app in the ecosystem. Spend what is left in all the others.</p>
+    </div>
+  </section>
+
+  <!-- 2. Problem -->
+  <section class="slide" data-tone="light" data-run="problem">
+    <div class="content">
+      <h2 data-a style="--d:0">Every AI app sells its own credits.</h2>
+      <div class="wallets">
+        <div class="wallet" data-a style="--d:1"><span class="glyph">V</span><span class="name">Video</span><span class="bal">$2.40</span><span class="stuck">Unused</span></div>
+        <div class="wallet" data-a style="--d:1.5"><span class="glyph">C</span><span class="name">Chat</span><span class="bal">$0.70</span><span class="stuck">Unused</span></div>
+        <div class="wallet" data-a style="--d:2"><span class="glyph">3D</span><span class="name">3D</span><span class="bal">$3.10</span><span class="stuck">Unused</span></div>
+        <div class="wallet" data-a style="--d:2.5"><span class="glyph">A</span><span class="name">Voice</span><span class="bal">$1.20</span><span class="stuck">Unused</span></div>
+        <div class="wallet" data-a style="--d:3"><span class="glyph">I</span><span class="name">Images</span><span class="bal">$4.50</span><span class="stuck">Unused</span></div>
+        <div class="wallet" data-a style="--d:3.5"><span class="glyph">&lt;/&gt;</span><span class="name">Code</span><span class="bal">$0.90</span><span class="stuck">Unused</span></div>
+      </div>
+      <p class="stranded" data-a style="--d:4"><span class="num" id="stranded">$0.00</span> stuck across six apps. Another card form for the seventh.</p>
+      <div class="pair" data-a style="--d:5">
+        <p><b>People</b> juggle a dozen balances and leave money behind in every one.</p>
+        <p><b>Apps</b> start every signup at zero, behind a card form.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Insight -->
+  <section class="slide dark s-insight" data-tone="dark">
+    <canvas class="fx" data-fx="plus"></canvas>
+    <div class="content">
+      <p class="pre" data-a style="--d:0">A gift card works in one store.</p>
+      <p class="big-blue" data-a style="--d:1">We made credits that work in <em>every AI app.</em></p>
+      <div class="cats" data-a style="--d:3">
+        <div class="cat"><p>The rails</p><h3>Open-loop credit network</h3><span>Visa for AI credits</span></div>
+        <div class="cat"><p>For people</p><h3>Universal AI wallet</h3><span>One balance, a limit per app</span></div>
+        <div class="cat"><p>For builders</p><h3>Coalition ecosystem</h3><span>ClassPass for AI apps</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. How it works -->
+  <section class="slide" data-tone="light" data-run="flow">
+    <div class="content">
+      <h2 data-a style="--d:0">Buy once. Spend anywhere.</h2>
+      <div class="flow">
+        <div class="app" id="f1">
+          <div class="app-head"><span class="glyph">V</span>Video app</div>
+          <div class="balance"><span>Balance</span><b id="fb1">$5.00</b></div>
+          <p class="cap">Top up $5. Spend $3 on renders.</p>
+          <span class="tag">Signed in with email</span>
+        </div>
+        <div class="wire" id="w1"></div>
+        <div class="app" id="f2">
+          <div class="app-head"><span class="glyph">C</span>Chat app</div>
+          <div class="balance"><span>Balance</span><b>$2.00</b></div>
+          <p class="cap">Connect once. The $2 is already there.</p>
+          <span class="tag mint">No new card</span>
+        </div>
+        <div class="wire" id="w2"></div>
+        <div class="app" id="f3">
+          <div class="app-head"><span class="glyph">3D</span>3D app</div>
+          <div class="balance"><span>Balance</span><b>$2.00</b></div>
+          <p class="cap">Same balance. A limit you set for each app.</p>
+          <span class="tag mint">No new sign-up</span>
+        </div>
+      </div>
+      <p class="settle" id="settle"><span class="usdt">₮</span>Each app is paid in USDT for exactly what its users spent.</p>
+    </div>
+  </section>
+
+  <!-- 5. Trust -->
+  <section class="slide" data-tone="light">
+    <div class="content">
+      <h2 data-a style="--d:0">Rules no one can break. Not even us.</h2>
+      <div class="rules">
+        <div class="rule" data-a style="--d:1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
+          <h3>Limits you sign.</h3>
+          <p>Every app gets a spending cap you approve. The contract rejects anything above it.</p>
+        </div>
+        <div class="rule" data-a style="--d:1.6">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14M5 2h14M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /></svg>
+          <h3>Holds come back.</h3>
+          <p>Long jobs reserve credits. If a job fails or an app vanishes, they return to you.</p>
+        </div>
+        <div class="rule" data-a style="--d:2.2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z" /></svg>
+          <h3>Backed 1:1 by USDT.</h3>
+          <p>Credits exist only when USDT arrives in the vault. There is no admin mint.</p>
+        </div>
+      </div>
+      <div class="invariant" data-a style="--d:3.4">
+        <code>vault USDT = balances + held + claims + earnings + fees</code>
+        <span class="ok">Checked onchain, live</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Builders -->
+  <section class="slide dark" data-tone="dark">
+    <canvas class="fx" data-fx="plus" style="opacity:.55"></canvas>
+    <div class="content">
+      <div class="split">
+        <div>
+          <h2 data-a style="--d:0">Usage billing in 20 lines.</h2>
+          <p class="lead" data-a style="--d:1">Charge per use, or hold and capture for long jobs. Keys, test mode, a dashboard and USDT payouts included.</p>
+          <p class="hook" data-a style="--d:2">Come for the billing.<br><span>Stay for the network.</span></p>
+        </div>
+        <div class="term" data-a style="--d:1.5">
+          <div class="bar"><i></i><i></i><i></i><span>server.ts</span></div>
+<pre><span class="l" style="--i:0"><span class="p">$</span> <span class="w">npm i @credits/sdk</span></span><span class="l" style="--i:1"><span class="p">◆</span> <span class="w">ready</span></span><span class="l" style="--i:2"> </span><span class="l" style="--i:3">const credits = new Credits({ apiKey })</span><span class="l" style="--i:4"> </span><span class="l c" style="--i:5">// One-off actions: charge right away.</span><span class="l" style="--i:6">await credits.charge({ user, action: "chat.message" })</span><span class="l" style="--i:7"> </span><span class="l c" style="--i:8">// Long jobs: hold, then capture or release.</span><span class="l" style="--i:9">const hold = await credits.hold({ user, action: "render" })</span><span class="l" style="--i:10">await credits.capture(hold.holdId)</span><span class="l" style="--i:11"> </span><span class="l" style="--i:12"><span class="p">$</span> <span class="cursor"></span></span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. Model -->
+  <section class="slide" data-tone="light">
+    <div class="content">
+      <div class="model">
+        <div>
+          <h2 data-a style="--d:0">We earn on every charge.</h2>
+          <div class="fee" data-a style="--d:1"><b>5%</b><span>network fee, from the app's share</span></div>
+          <ul class="facts" data-a style="--d:2">
+            <li>People pay the listed price.</li>
+            <li>Apps keep the rest, paid in USDT.</li>
+            <li>The fee covers every transaction's gas.</li>
+          </ul>
+        </div>
+        <svg class="wheel" viewBox="0 0 760 560" data-a style="--d:1.5" aria-label="Flywheel">
+          <circle class="ring" cx="380" cy="280" r="190" />
+          <path class="arc" d="M380 90a190 190 0 1 1-.01 0" />
+          <circle cx="380" cy="90" r="10" fill="#0066ff" />
+          <circle cx="570" cy="280" r="10" fill="#68ECBC" />
+          <circle cx="380" cy="470" r="10" fill="#DCF218" stroke="#c8dd15" />
+          <circle cx="190" cy="280" r="10" fill="#5C82FF" />
+          <circle r="7" fill="#080a28"><animateMotion dur="7s" repeatCount="indefinite" path="M380 90a190 190 0 1 1-.01 0" /></circle>
+          <text x="380" y="58" text-anchor="middle">More apps join</text>
+          <text x="596" y="272" text-anchor="start">Every balance</text>
+          <text x="596" y="300" text-anchor="start">is worth more</text>
+          <text x="380" y="516" text-anchor="middle">More people top up</text>
+          <text x="164" y="272" text-anchor="end">Apps get users</text>
+          <text x="164" y="300" text-anchor="end">who already pay</text>
+          <text class="center-name brand-lower" x="380" y="282" text-anchor="middle">juice</text>
+          <text class="center-sub" x="380" y="314" text-anchor="middle">ecosystem</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. Proof -->
+  <section class="slide" data-tone="light">
+    <div class="content">
+      <h2 data-a style="--d:0">Live on Whitechain today.</h2>
+      <div class="stats">
+        <div class="stat" data-a style="--d:1"><b>1:1</b><span>Every credit backed by USDT, checked onchain</span></div>
+        <div class="stat" data-a style="--d:1.5"><b>0</b><span>Crypto steps for people. Email in, gas paid by us</span></div>
+        <div class="stat" data-a style="--d:2"><b>~20</b><span>Lines for an app to start charging</span></div>
+        <div class="stat" data-a style="--d:2.5"><b>2</b><span>Ways to join: bill in our credits, or keep your own</span></div>
+      </div>
+      <div class="txs" data-a style="--d:3.2">
+        <span class="tx"><svg><use href="#check" /></svg>USDT deposit</span>
+        <span class="tx"><svg><use href="#check" /></svg>Charge by API</span>
+        <span class="tx"><svg><use href="#check" /></svg>Charge by SDK</span>
+        <span class="tx"><svg><use href="#check" /></svg>Own-credit swap</span>
+        <span class="tx"><svg><use href="#check" /></svg>Payout to the app</span>
+      </div>
+      <p class="footnote" data-a style="--d:4">Settled on Whitechain Sepolia against a verified vault: <code>0xaaA1…664A</code></p>
+    </div>
+  </section>
+
+  <!-- 9. Next -->
+  <section class="slide dark" data-tone="dark">
+    <canvas class="fx" data-fx="plus" style="opacity:.45"></canvas>
+    <div class="content">
+      <h2 data-a style="--d:0">Built for the next billion.</h2>
+      <div class="next">
+        <div data-a style="--d:1"><span class="badge soon">Next</span><h3>Top up like a recharge.</h3><p>Small amounts with local payment methods, spent across every app.</p></div>
+        <div data-a style="--d:1.6"><span class="badge live">Live</span><h3>Big apps, light mode.</h3><p>Keep your own credits and pricing. Accept ours as a top-up.</p></div>
+        <div data-a style="--d:2.2"><span class="badge soon">Next</span><h3>Agents with allowances.</h3><p>AI agents spend from your balance, inside limits you sign.</p></div>
+      </div>
+      <p class="why-now" data-a style="--d:3.2">Most of the next billion already pay in <b>small prepaid top-ups</b>. AI is still sold as <b>one card, one subscription, one app</b>. That gap is the opening.</p>
+    </div>
+  </section>
+
+  <!-- 10. Close -->
+  <section class="slide dark s-close" data-tone="dark" data-solo>
+    <canvas class="fx" data-fx="dither-dark"></canvas>
+    <div class="content">
+      <div class="lockup" data-a style="--d:0"><svg aria-hidden="true"><use href="#mark" /></svg><span class="wordmark brand">Juice</span></div>
+      <p class="tagline" data-a style="--d:1">One balance. Every AI app.</p>
+      <span class="cta" data-a style="--d:2">Join the ecosystem</span>
+      <p class="url" data-a style="--d:3">github.com/chandrabosep/ethglobal-mumbai</p>
+    </div>
+  </section>
+
+  <div class="chrome">
+    <div class="top">
+      <span class="lockup brandmark"><svg aria-hidden="true" style="width:30px;height:30px"><use href="#mark" /></svg><span class="wordmark brand" style="font-size:22px">Juice</span></span>
+      <span class="count" id="count"><b>01</b> / 10</span>
+    </div>
+    <div class="bottom">
+      <button class="namebtn" id="namebtn" type="button" title="Switch name (N)">Name: Juice</button>
+      <span class="timer" id="timer" hidden>0:00 / 3:00</span>
+    </div>
+    <div class="progress" id="progress"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const stage = document.getElementById("stage");
+  const slides = [...stage.querySelectorAll(".slide")];
+  const NAMES = ["Juice", "Ekko", "Prana", "Kredo"];
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let current = -1;
+  let timers = [];
+  let scale = 1;
+
+  /* Fit the 1600x900 stage to the window. */
+  const fit = () => {
+    scale = Math.min(innerWidth / 1600, innerHeight / 900);
+    stage.style.setProperty("--s", scale);
+  };
+  addEventListener("resize", fit);
+  fit();
+
+  /* Name switch: every brand mention follows it. */
+  let nameIndex = Math.max(0, NAMES.indexOf(new URLSearchParams(location.search).get("name") || ""));
+  const setName = (i) => {
+    nameIndex = (i + NAMES.length) % NAMES.length;
+    const name = NAMES[nameIndex];
+    document.querySelectorAll(".brand").forEach((el) => (el.textContent = name));
+    document.querySelectorAll(".brand-lower").forEach((el) => (el.textContent = name.toLowerCase()));
+    document.getElementById("namebtn").textContent = `Name: ${name}`;
+    document.title = `${name} Pitch`;
+  };
+  setName(nameIndex);
+  document.getElementById("namebtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    setName(nameIndex + 1);
+  });
+
+  /* Canvas fields: a twinkling plus grid, with leaf dots brightening toward a focus point. */
+  const LEAF = new Path2D("M179.816 166.62C161.445 184.611 131.956 184.495 113.731 166.27C95.505 148.044 95.3878 118.554 113.379 100.184L179.816 166.62Z");
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  const clamp01 = (v) => Math.min(1, Math.max(0, v));
+  const smooth = (v) => { const t = clamp01(v); return t * t * (3 - 2 * t); };
+  const hash = (x, y) => Math.abs(43758.5453 * Math.sin(12.9898 * x + 78.233 * y + 37.719)) % 1;
+  const twinkle = (c, r, t) => 0.5 + 0.24 * Math.sin(0.42 * c + 0.31 * r + 0.7 * t) + 0.2 * Math.sin(0.21 * c - 0.45 * r - 0.55 * t + 1.7) + 0.14 * (hash(c, r) - 0.5);
+  const rgbOf = (hex) => { const n = parseInt(hex.slice(1), 16); return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`; };
+  const PRESETS = {
+    dither: { leaves: true, focus: [1, 1], radius: 0.85, invert: false, colors: ["#DFE5EC", "#5C82FF", "#0044FF", "#DCF218"], ink: "#030712" },
+    "dither-dark": { leaves: true, focus: [0.5, 0.5], radius: 0.75, invert: true, colors: ["#122A5E", "#3385FF", "#0044FF", "#DCF218"], ink: "#9FB2CC" },
+    plus: { leaves: false, ink: "#6A7F9C" },
+  };
+
+  const fields = new Map();
+  const makeField = (canvas) => {
+    const o = PRESETS[canvas.dataset.fx];
+    const ctx = canvas.getContext("2d");
+    const rgb = rgbOf(o.ink);
+    const gap = 26;
+    let raf = 0, last = 0, start = 0, state = new Float32Array(0), w = 0, h = 0;
+    const size = () => {
+      w = canvas.offsetWidth; h = canvas.offsetHeight;
+      const k = Math.min(2, (devicePixelRatio || 1) * scale);
+      canvas.width = Math.round(w * k); canvas.height = Math.round(h * k);
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+    };
+    const draw = (now) => {
+      ctx.clearRect(0, 0, w, h);
+      const t = now / 1000;
+      const reveal = reduced ? 1 : smooth((now - start) / 1200);
+      const cols = Math.ceil(w / gap) + 1, rows = Math.ceil(h / gap) + 1;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const v = clamp01(twinkle(c, r, t));
+        const f = 1.2 * (0.4 + 1.1 * v);
+        ctx.strokeStyle = `rgba(${rgb},${(0.035 + 0.18 * v) * reveal})`;
+        ctx.lineWidth = Math.max(0.7, 0.55 * f);
+        const x = c * gap, y = r * gap, a = 1.7 * f;
+        ctx.beginPath(); ctx.moveTo(x - a, y); ctx.lineTo(x + a, y); ctx.moveTo(x, y - a); ctx.lineTo(x, y + a); ctx.stroke();
+      }
+      if (!o.leaves) return;
+      if (state.length !== cols * rows) state = new Float32Array(cols * rows);
+      const fx = o.focus[0] * w, fy = o.focus[1] * h, span = o.radius * Math.max(w, h);
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const x = c * gap + gap / 2, y = r * gap + gap / 2;
+        const d = Math.hypot(x - fx, y - fy) / span;
+        const f = o.invert ? Math.max(0, 1.3 * d - 0.15) : Math.max(0, 1.22 - 1.3 * d);
+        if (f <= 0.02) continue;
+        const i = r * cols + c;
+        const target = (f + 0.1 * Math.sin(9 * d - 0.5 * t)) * reveal;
+        state[i] += (target - state[i]) * (reduced ? 1 : 0.14);
+        const lv = Math.min(4, 4 * state[i] + (BAYER[(r & 3) * 4 + (c & 3)] / 16 - 0.5) * 1.6);
+        if (lv <= 0.12) continue;
+        ctx.fillStyle = o.colors[Math.max(1, Math.min(4, Math.round(lv))) - 1];
+        const s = (gap * (0.22 + 0.135 * lv)) / 84.4;
+        ctx.save(); ctx.translate(x, y); ctx.rotate((((7 * c + 13 * r) % 4) * Math.PI) / 2); ctx.scale(s, s); ctx.translate(-137.6, -142.4); ctx.fill(LEAF); ctx.restore();
+      }
+    };
+    const loop = (now) => { raf = requestAnimationFrame(loop); if (now - last < 33) return; last = now; draw(now); };
+    return {
+      start() { size(); start = performance.now(); state = new Float32Array(0); if (reduced) draw(start); else raf = requestAnimationFrame(loop); },
+      stop() { cancelAnimationFrame(raf); },
+      resize() { size(); if (reduced) draw(performance.now()); },
+    };
+  };
+  stage.querySelectorAll("canvas[data-fx]").forEach((c) => fields.set(c, makeField(c)));
+  addEventListener("resize", () => slides[current]?.querySelectorAll("canvas[data-fx]").forEach((c) => fields.get(c).resize()));
+
+  /* Per-slide sequences. */
+  const later = (ms, fn) => timers.push(setTimeout(fn, reduced ? 0 : ms));
+  const countTo = (el, from, to, ms) => {
+    if (reduced) { el.textContent = `$${to.toFixed(2)}`; return; }
+    const t0 = performance.now();
+    const step = (now) => {
+      const p = smooth((now - t0) / ms);
+      el.textContent = `$${(from + (to - from) * p).toFixed(2)}`;
+      if (p < 1) timers.push(requestAnimationFrame(step) * -1);
+    };
+    requestAnimationFrame(step);
+  };
+  const RUN = {
+    problem(s) {
+      const el = s.querySelector("#stranded");
+      el.textContent = "$0.00";
+      later(700, () => countTo(el, 0, 12.8, 1400));
+    },
+    flow(s) {
+      const $ = (id) => s.querySelector(id);
+      ["#f1", "#f2", "#f3", "#w1", "#w2", "#settle"].forEach((id) => $(id).classList.remove("on"));
+      $("#fb1").textContent = "$5.00";
+      later(500, () => $("#f1").classList.add("on"));
+      later(1300, () => countTo($("#fb1"), 5, 2, 1000));
+      later(2400, () => $("#w1").classList.add("on"));
+      later(2900, () => $("#f2").classList.add("on"));
+      later(3700, () => $("#w2").classList.add("on"));
+      later(4200, () => $("#f3").classList.add("on"));
+      later(5000, () => $("#settle").classList.add("on"));
+    },
+  };
+
+  const go = (n) => {
+    n = Math.max(0, Math.min(slides.length - 1, n));
+    if (n === current) return;
+    const prev = slides[current];
+    if (prev) {
+      prev.classList.remove("active");
+      prev.querySelectorAll("canvas[data-fx]").forEach((c) => fields.get(c).stop());
+    }
+    timers.forEach((t) => (t < 0 ? cancelAnimationFrame(-t) : clearTimeout(t)));
+    timers = [];
+    current = n;
+    const s = slides[n];
+    s.classList.add("active");
+    stage.dataset.tone = s.dataset.tone;
+    stage.toggleAttribute("data-solo", s.hasAttribute("data-solo"));
+    s.querySelectorAll("canvas[data-fx]").forEach((c) => fields.get(c).start());
+    RUN[s.dataset.run]?.(s);
+    document.getElementById("count").innerHTML = `<b>${String(n + 1).padStart(2, "0")}</b> / ${slides.length}`;
+    document.getElementById("progress").style.width = `${((n + 1) / slides.length) * 100}%`;
+    history.replaceState(null, "", `${location.pathname}${location.search}#${n + 1}`);
+  };
+
+  /* Timer: press T. Turns orange past 3:00. */
+  const timerEl = document.getElementById("timer");
+  let t0 = 0, tick = 0;
+  const toggleTimer = () => {
+    if (timerEl.hidden) {
+      timerEl.hidden = false; t0 = Date.now();
+      const draw = () => {
+        const sec = Math.floor((Date.now() - t0) / 1000);
+        timerEl.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")} / 3:00`;
+        timerEl.classList.toggle("over", sec > 180);
+      };
+      draw(); tick = setInterval(draw, 500);
+    } else { timerEl.hidden = true; clearInterval(tick); }
+  };
+
+  addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key;
+    if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].includes(k)) { e.preventDefault(); go(current + 1); }
+    else if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(k)) { e.preventDefault(); go(current - 1); }
+    else if (k === "Home") go(0);
+    else if (k === "End") go(slides.length - 1);
+    else if (k === "f" || k === "F") { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.().catch(() => {}); }
+    else if (k === "n" || k === "N") {
+      setName(nameIndex + 1);
+      const b = document.getElementById("namebtn");
+      b.classList.add("flash");
+      clearTimeout(b._t);
+      b._t = setTimeout(() => b.classList.remove("flash"), 1500);
+    }
+    else if (k === "t" || k === "T") toggleTimer();
+  });
+  stage.addEventListener("click", (e) => { if (!e.target.closest("button")) go(current + (e.clientX < innerWidth / 4 ? -1 : 1)); });
+  let touchX = null;
+  addEventListener("touchstart", (e) => (touchX = e.touches[0].clientX), { passive: true });
+  addEventListener("touchend", (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 40) go(current + (dx < 0 ? 1 : -1));
+    touchX = null;
+  });
+
+  go(Math.max(0, (parseInt(location.hash.slice(1), 10) || 1) - 1));
+})();
+</script>
+</body>
+</html>

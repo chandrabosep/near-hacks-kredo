@@ -46,7 +46,7 @@ export function Connections({ connections, apps, onChange }: { connections: Conn
           <p className="mt-1 text-[14px] text-wc-text-muted">When an app asks to connect, you choose its limit and it shows up here.</p>
         </div>
         <Link href="/ecosystem" className={buttonVariants({ variant: "outline" })}>
-          Explore the ecosystem
+          Explore the network
         </Link>
       </div>
     );

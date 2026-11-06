@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <Link href="/ecosystem" className={cn(buttonVariants({ variant: "outline" }), "h-10 shrink-0")}>
-            View in ecosystem
+            View on the network
             <ArrowUpRight className="size-4" />
           </Link>
         </div>

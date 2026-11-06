@@ -75,7 +75,7 @@ export function NewApp() {
           <div className="grid max-w-2xl gap-6 sm:grid-cols-2">
             <Field className="sm:col-span-2" label="App name" placeholder="Your app" maxLength={60} value={form.name} onChange={(e) => set("name")(e.target.value)} />
             <div className="sm:col-span-2">
-              <TextareaField label="What it does" placeholder="One or two sentences for the ecosystem page." maxLength={280} value={form.description} onChange={(e) => set("description")(e.target.value)} />
+              <TextareaField label="What it does" placeholder="One or two sentences for the network page." maxLength={280} value={form.description} onChange={(e) => set("description")(e.target.value)} />
             </div>
             <SelectField label="Category" value={form.category} onChange={set("category")} options={CATEGORIES} hint="Defaults to your company's." />
             <Field label="Website" placeholder={company.website ?? "https://"} inputMode="url" value={form.website} onChange={(e) => set("website")(e.target.value)} />

@@ -1,6 +1,6 @@
 # Kredo
 
-Buy credits once, in any partner app, and spend the leftover in every other one. Each company is paid in USDT for what its users spend. Credits are backed 1:1 by USDT held in the `CreditVault` contract on Whitechain.
+Kredo is a shared value network for applications. Users carry one balance across every app on the network, and each app is paid in USDT for what its users spend. Every balance is backed 1:1 by USDT held in the `CreditVault` contract on Whitechain.
 
 - **Users** sign in with email. No wallet to install, no seed phrase, no gas. One balance works in every app.
 - **Companies** add about 20 lines to their server, charge in credits, and withdraw USDT on Whitechain.

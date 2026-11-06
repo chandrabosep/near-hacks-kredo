@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, useApi } from "@/lib/api";
 import { CATEGORIES, type Company } from "@/lib/profile";
 
-/** Creates or edits the company profile. Users see it in the ecosystem and on the connect page. */
+/** Creates or edits the company profile. Users see it on the network page and the connect page. */
 export function CompanyForm({ company, onSaved, onCancel }: { company?: Company; onSaved: (c: Company) => void; onCancel?: () => void }) {
   const api = useApi();
   const [form, setForm] = useState({
@@ -45,7 +45,7 @@ export function CompanyForm({ company, onSaved, onCancel }: { company?: Company;
         inputMode="url"
         value={form.logoUrl}
         onChange={(e) => set("logoUrl")(e.target.value)}
-        hint="A square image works best. Shown in the ecosystem and on the connect page."
+        hint="A square image works best. Shown on the network page and the connect page."
       />
       {error && (
         <div className="sm:col-span-2">

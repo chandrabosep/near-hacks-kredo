@@ -1,4 +1,4 @@
-import { ArrowRight, Landmark, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowRight, Banknote, Gauge, KeyRound, Landmark, Layers, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { DitherField, PlusGrid } from "@/components/dots";
 import { Footer } from "@/components/footer";
@@ -7,26 +7,46 @@ import { Terminal } from "@/components/landing/terminal";
 import { Header } from "@/components/shell";
 import { buttonVariants } from "@/components/ui/button";
 
-const RULES = [
+const PLATFORM = [
   {
-    icon: Wallet,
-    title: "One balance.",
-    body: "Sign in with email. No wallet, seed phrase or gas. Your credits follow you into every app.",
+    icon: Gauge,
+    title: "Usage billing.",
+    body: "Charge per action, or hold and capture for long jobs. Your prices, your units, your margins.",
+    link: { href: "/docs/charging", label: "How charging works" },
+  },
+  {
+    icon: Banknote,
+    title: "Settlement in USDT.",
+    body: "Every charge splits into your earnings and the network fee onchain. Withdraw whenever you like. The network pays the gas.",
+    link: { href: "/docs/payouts", label: "How payouts work" },
   },
   {
     icon: ShieldCheck,
-    title: "Limits you sign.",
-    body: "Each app gets a spending limit you approve. The vault contract enforces it, so no one can charge past it.",
+    title: "Limits users sign.",
+    body: "Each user approves a spending limit for your app, and the contract enforces it. No overcharges, no disputes.",
+    link: { href: "/docs/connect", label: "How connect works" },
+  },
+  {
+    icon: Layers,
+    title: "Light mode.",
+    body: "Already sell your own credits? Keep them. Accept the network balance as a top-up at a rate you set.",
+    link: { href: "/docs/sdk", label: "Read the SDK" },
+  },
+  {
+    icon: KeyRound,
+    title: "Keys, test mode, webhooks.",
+    body: "Live and test keys, a sandbox with nothing onchain, and signed webhooks for every event.",
+    link: { href: "/docs/webhooks", label: "See the webhooks" },
   },
   {
     icon: Landmark,
-    title: "Backed 1:1 by USDT.",
-    body: "Credits exist only when USDT arrives in the vault. Apps are paid in USDT for exactly what their users spent.",
+    title: "Provable reserves.",
+    body: "Every balance on the network is backed 1:1 by USDT in the vault, and anyone can check it live.",
     link: { href: "/reserves", label: "See the reserves" },
   },
 ];
 
-const STEPS = ["Register your app and price it in credits.", "Users connect with one approval.", "Charge per use and get paid in USDT."];
+const STEPS = ["Register your app and price each action.", "Users connect once and approve a limit.", "Charge per use and withdraw USDT."];
 
 export default function Home() {
   return (
@@ -41,37 +61,36 @@ export default function Home() {
             <div className="relative z-10 px-6 py-16 motion-safe:animate-rise sm:px-8 md:px-14 lg:px-16">
               <p className="inline-flex items-center gap-2 rounded-[20px] border border-wc-border-light bg-wc-surface px-3 py-1 text-[13px] font-medium text-wc-text-2">
                 <span className="size-1.5 rounded-full bg-wc-mint-2" />
-                An open credit ecosystem on Whitechain
+                For AI companies
               </p>
-              <h1 className="type-hero mt-6 max-w-xl font-semibold text-balance text-wc-text-1">One balance. Every AI app.</h1>
+              <h1 className="type-hero mt-6 max-w-2xl font-semibold text-balance text-wc-text-1">The billing network for the AI economy.</h1>
               <p className="mt-6 max-w-lg text-[18px] leading-[1.625] text-wc-text-muted">
-                Buy credits once in any app in the ecosystem and spend what is left in all the others.
+                One integration for usage billing, USDT payouts and a shared pool of paying users.
               </p>
               <div className="mt-9 flex flex-col gap-4 sm:flex-row sm:gap-5">
-                <Link href="/account" className={buttonVariants({ size: "md" })}>
-                  Open your account
+                <Link href="/dashboard" className={buttonVariants({ size: "md" })}>
+                  List your app
                 </Link>
                 <a href="#build" className={buttonVariants({ size: "md", variant: "outline" })}>
-                  Start building
+                  See the integration
                 </a>
               </div>
             </div>
           </section>
 
-          {/* Ecosystem */}
+          {/* Network */}
           <section className="grid border-t border-wc-border-light lg:grid-cols-[1fr_1.15fr]">
             <div className="relative overflow-hidden px-6 pt-section-t pb-section-t sm:px-8 lg:px-16">
               <PlusGrid />
               <div className="relative z-10">
-                <p className="text-[20px] leading-[30px] text-black sm:text-[24px] sm:leading-9">Every app sells its own credits.</p>
-                <h2 className="mt-4 max-w-lg text-[32px] leading-[1.15] tracking-[-0.01em] text-wc-blue sm:text-[40px] sm:leading-[52px]">
-                  We are building an ecosystem where they work everywhere.
+                <h2 className="max-w-lg text-[32px] leading-[1.15] tracking-[-0.01em] text-wc-blue sm:text-[40px] sm:leading-[52px]">
+                  Kredo pools AI companies into one network.
                 </h2>
                 <p className="mt-6 max-w-md text-[17px] leading-[1.625] text-wc-text-muted">
-                  Every app that joins makes every balance more useful. People arrive with credits ready to spend, and each app is paid for exactly what its users spent.
+                  Apps on the network share billing, settlement and a pool of funded users. Each app that joins brings paying users to every other one, and each is paid for exactly what its users spend.
                 </p>
                 <Link href="/ecosystem" className="group mt-8 inline-flex items-center gap-1.5 text-[15px] font-medium text-wc-blue hover:underline">
-                  Explore the ecosystem
+                  Explore the network
                   <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
               </div>
@@ -81,22 +100,23 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Rules */}
+          {/* Platform */}
           <section className="border-t border-wc-border-light">
             <div className="px-6 pt-section-t sm:px-8 lg:px-16">
-              <h2 className="type-section max-w-2xl font-semibold text-black">Three rules hold it together.</h2>
+              <h2 className="type-section max-w-2xl font-semibold text-black">The whole billing stack, run for you.</h2>
+              <p className="mt-5 max-w-xl text-[17px] leading-[1.625] text-wc-text-muted">
+                No card processor, no ledger to build, no payout schedule to chase. The rules that matter live in a contract, not in our database.
+              </p>
             </div>
-            <div className="mt-12 grid grid-cols-1 gap-px border-t border-wc-border-light bg-wc-border-light md:grid-cols-3">
-              {RULES.map((r) => (
+            <div className="mt-12 grid grid-cols-1 gap-px border-t border-wc-border-light bg-wc-border-light md:grid-cols-2 lg:grid-cols-3">
+              {PLATFORM.map((r) => (
                 <div key={r.title} className="flex flex-col bg-wc-surface px-6 py-10 sm:px-8 lg:px-12 lg:py-12">
                   <r.icon className="size-7 text-wc-blue" strokeWidth={1.5} />
                   <h3 className="mt-6 text-[20px] leading-[30px] font-semibold text-black">{r.title}</h3>
                   <p className="mt-2 text-[16px] leading-[26px] text-wc-text-muted">{r.body}</p>
-                  {r.link && (
-                    <Link href={r.link.href} className="mt-4 text-[15px] font-medium text-wc-blue hover:underline">
-                      {r.link.label}
-                    </Link>
-                  )}
+                  <Link href={r.link.href} className="mt-4 text-[15px] font-medium text-wc-blue hover:underline">
+                    {r.link.label}
+                  </Link>
                 </div>
               ))}
             </div>
@@ -106,8 +126,10 @@ export default function Home() {
           <section id="build" className="scroll-mt-16 border-t border-wc-border-light lg:scroll-mt-[76px]">
             <div className="grid gap-12 px-6 pt-section-t pb-section-t sm:px-8 lg:grid-cols-[1fr_1.2fr] lg:px-16">
               <div>
-                <h2 className="type-section max-w-xl font-semibold text-black">Join in about 20 lines.</h2>
-                <p className="mt-5 max-w-md text-[17px] leading-[1.625] text-wc-text-muted">Keep your own pricing. Your users bring the balance.</p>
+                <h2 className="type-section max-w-xl font-semibold text-black">20 lines, and you're live.</h2>
+                <p className="mt-5 max-w-md text-[17px] leading-[1.625] text-wc-text-muted">
+                  Come for usage billing. Stay for the users the network sends you.
+                </p>
                 <ol className="mt-10">
                   {STEPS.map((s, i) => (
                     <li key={s} className="-mt-px flex items-stretch">
@@ -130,14 +152,16 @@ export default function Home() {
           <section className="relative overflow-hidden border-t border-wc-border-dark-muted bg-wc-surface-dark px-6 py-24 text-center text-wc-surface sm:py-32">
             <PlusGrid ink="#6A7F9C" className="opacity-60 lg:opacity-100" />
             <div className="relative z-10 mx-auto max-w-3xl">
-              <h2 className="text-[40px] leading-[1.06] font-semibold text-balance sm:text-[56px]">The ecosystem grows with every app.</h2>
-              <p className="mx-auto mt-6 max-w-xl text-[18px] leading-[1.625] text-wc-text-dark-2">Sign in with email and buy once, or list your app and meet users who already have credits.</p>
+              <h2 className="text-[40px] leading-[1.06] font-semibold text-balance sm:text-[56px]">Every app that joins makes the network stronger.</h2>
+              <p className="mx-auto mt-6 max-w-xl text-[18px] leading-[1.625] text-wc-text-dark-2">
+                Register your app, get keys and charge in test mode today. Go live on Whitechain when you are ready.
+              </p>
               <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row sm:gap-5">
-                <Link href="/account" className={buttonVariants({ size: "lg" })}>
-                  Open your account
-                </Link>
-                <Link href="/dashboard" className={buttonVariants({ size: "lg", variant: "outline", className: "text-wc-blue" })}>
+                <Link href="/dashboard" className={buttonVariants({ size: "lg" })}>
                   List your app
+                </Link>
+                <Link href="/docs" className={buttonVariants({ size: "lg", variant: "outline", className: "text-wc-blue" })}>
+                  Read the docs
                 </Link>
               </div>
             </div>

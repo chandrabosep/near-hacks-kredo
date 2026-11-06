@@ -44,12 +44,12 @@ export function AppProfileForm({ base, info, onSaved }: { base: string; info: Ap
     <div className="grid max-w-3xl gap-6 sm:grid-cols-2">
       <div className="flex items-center gap-4 sm:col-span-2">
         <BrandLogo src={form.logoUrl || info.logoUrl} name={form.name || info.name} className="size-14" />
-        <p className="text-[14px] leading-6 text-wc-text-muted">This is how {form.name || "your app"} appears in the ecosystem and on the connect page.</p>
+        <p className="text-[14px] leading-6 text-wc-text-muted">This is how {form.name || "your app"} appears on the network page and the connect page.</p>
       </div>
       <Field label="App name" value={form.name} onChange={(e) => set("name")(e.target.value)} />
       <SelectField label="Category" value={form.category} onChange={set("category")} options={CATEGORIES} />
       <div className="sm:col-span-2">
-        <TextareaField label="What it does" placeholder="One or two sentences for the ecosystem page." maxLength={280} value={form.description} onChange={(e) => set("description")(e.target.value)} />
+        <TextareaField label="What it does" placeholder="One or two sentences for the network page." maxLength={280} value={form.description} onChange={(e) => set("description")(e.target.value)} />
       </div>
       <Field label="Website" placeholder={info.company?.website ?? "https://"} inputMode="url" value={form.website} onChange={(e) => set("website")(e.target.value)} />
       <Field label="Logo URL" placeholder="Your company's logo" inputMode="url" value={form.logoUrl} onChange={(e) => set("logoUrl")(e.target.value)} />
