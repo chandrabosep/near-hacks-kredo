@@ -212,7 +212,7 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 ### Step 3: Backend on Whitechain, gas economics and anti-drain
 - [x] Run the backend against Whitechain; a curl charge appears on the explorer and in the database (tag `m2-charge-end-to-end`)
 - [x] Relayer retries
-- [ ] Ops panel (hidden route): relayer WBT balance, txs today, WBT spent today, days of runway
+- [x] Ops panel (hidden route): relayer WBT balance, txs today, WBT spent today, days of runway
 - [x] Daily WBT budget with auto-pause, per-tx gas ceiling
 - [x] Per-IP limits on signup and claim; minimum amounts on charge and send
 - [x] README "Relayer security" section, updated with the real numbers
@@ -245,5 +245,5 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 
 ### Step 7: Reserves page and app directory
 - [x] Reserves page: the vault's USDT next to total credits outstanding, live from the chain
-- [ ] App directory: every app with its prices
+- [x] App directory: every app with its prices
 - [ ] (Optional) ENS names for apps, with prices in their records
