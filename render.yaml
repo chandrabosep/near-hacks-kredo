@@ -1,0 +1,50 @@
+# Render Blueprint: the API (with a disk for its data file) and the hosted pages.
+# Secrets marked sync: false are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: kredo-api
+    runtime: node
+    # Starter or above: free services sleep (stopping the indexer) and have no disk.
+    plan: starter
+    region: singapore
+    buildCommand: npm ci --workspace @credits/api && npm run build -w @credits/api
+    startCommand: npm start -w @credits/api
+    healthCheckPath: /v1/health
+    disk:
+      name: kredo-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: CHAIN_ID
+        value: "1874"
+      - key: DATA_DIR
+        value: /var/data
+      - key: OPERATOR_KEY
+        sync: false
+      - key: PRIVY_APP_ID
+        sync: false
+      - key: PRIVY_APP_SECRET
+        sync: false
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: WEB_ORIGINS
+        value: https://kredo-web.onrender.com
+
+  - type: web
+    name: kredo-web
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci --workspace @credits/web && npm run build -w @credits/web
+    startCommand: npm start -w @credits/web
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_PRIVY_APP_ID
+        sync: false
+      - key: NEXT_PUBLIC_API_URL
+        value: https://kredo-api.onrender.com
+      - key: NEXT_PUBLIC_CHAIN_ID
+        value: "1874"
