@@ -1,70 +1,53 @@
-export const metadata = { title: "Charging" };
+export const metadata = { title: "Charge" };
 
-# Charging
+# Charge
 
-Two ways to take credits: charge right away, or hold first and charge what the work actually cost.
+Take credits right away, or hold them first for long jobs.
 
 ## Charge
 
-For anything quick. Charge by action, using your price list, or by an amount:
-
 ```ts
-await credits.charge({ user, action: "chat.message", ref: messageId });
-await credits.charge({ user, action: "video.render", quantity: 12, ref: jobId }); // 12 seconds
-await credits.charge({ user, credits: 5, ref: orderId });
+await credits.charge({ user, credits: 5 });
 ```
 
-The charge settles on Whitechain before the call returns, and the result includes the transaction.
-
-## Hold and capture
-
-For long or uncertain work, hold the most it could cost. The price is locked when you hold.
+Or charge an action from your price list, which you set in the dashboard:
 
 ```ts
-const hold = await credits.hold({ user, action: "video.render", quantity: 12, ref: jobId });
+await credits.charge({ user, action: "chat.message" });
+await credits.charge({ user, action: "video.render", quantity: 12 }); // 12 seconds
+```
+
+The charge settles on Whitechain before the call returns.
+
+## Hold, then charge
+
+For long or uncertain work, hold the most it could cost. Then capture what it actually cost, or release it if the work fails.
+
+```ts
+const hold = await credits.hold({ user, credits: 100 });
+
 try {
-  const seconds = await render(job);
-  await credits.capture(hold.holdId, { credits: seconds * 6 }); // the rest goes back
+  const cost = await render(job);
+  await credits.capture(hold.holdId, { credits: cost }); // the rest goes back
 } catch {
   await credits.release(hold.holdId); // the user keeps everything
 }
 ```
 
-- `capture(holdId)` with no amount charges the whole hold.
-- You can't capture more than you held.
-- Holds expire after an hour unless you pass `ttlSeconds`. Expired holds are released automatically.
+Holds release on their own after an hour.
 
-## Refunds
-
-Give credits back, up to what the user spent with your app:
+## Refund
 
 ```ts
-await credits.refund({ user, credits: 5, ref: `refund-${orderId}` });
+await credits.refund({ user, credits: 5 });
 ```
 
-Refunds come out of your unpaid earnings. You can also refund any charge from the dashboard's activity table.
+You can refund up to what the user spent with your app. You can also refund any charge from the dashboard.
 
-## Refs and retries
+## No double charges
 
-Every write takes a `ref`: your own id for the operation, such as a message or order id. The same ref always returns the first result, so retrying after a timeout can never charge twice. If you leave it out, the SDK makes one.
-
-The SDK retries network failures and rate limits for you, with the same ref.
-
-## Quotes
-
-Show a price before charging:
+Pass your own `ref`, such as a message or order id. The same ref always returns the first result, so a retry can never charge twice.
 
 ```ts
-const q = await credits.quote({ action: "video.render", quantity: 12 });
-// { label: "12 seconds", price, networkFee, youEarn }, each as { credits, usd, units }
-```
-
-## Light mode
-
-If you keep your own credits, set how many of ours buy one of yours, then convert when a user buys:
-
-```ts
-await credits.setExchangeRate(2); // 2 of our credits per 1 of yours
-const c = await credits.convert({ user, credits: 20, ref: orderId });
-// c.appCredits === "10": add 10 of your own credits to the user
+await credits.charge({ user, credits: 5, ref: orderId });
 ```

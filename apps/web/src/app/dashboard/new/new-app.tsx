@@ -57,7 +57,7 @@ export function NewApp() {
             <Link href={`/dashboard/apps/${made.id}/prices`} className={cn(buttonVariants({ size: "lg" }), "h-11")}>
               Set your prices
             </Link>
-            <Link href="/docs/quickstart" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "h-11")}>
+            <Link href="/docs" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "h-11")}>
               Read the quickstart
             </Link>
           </div>

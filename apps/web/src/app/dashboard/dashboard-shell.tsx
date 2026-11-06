@@ -174,7 +174,7 @@ function Sidebar({ company, apps }: { company: Company; apps: MyApp[] }) {
           </div>
         </div>
 
-        <Link href="/docs/quickstart" className="mt-auto flex items-center gap-3 rounded-[12px] border border-wc-border-light bg-wc-surface p-3 text-[13px] text-wc-text-2 transition-colors hover:border-wc-border">
+        <Link href="/docs" className="mt-auto flex items-center gap-3 rounded-[12px] border border-wc-border-light bg-wc-surface p-3 text-[13px] text-wc-text-2 transition-colors hover:border-wc-border">
           <BookOpen className="size-4 shrink-0 text-wc-blue" />
           <span>
             <span className="block font-medium text-wc-text-1">Integration guide</span>

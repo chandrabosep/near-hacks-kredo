@@ -1,31 +1,63 @@
-export const metadata = { title: "Introduction" };
+import { Flow } from "./flow";
 
-# Kredo docs
+export const metadata = { title: "Quickstart" };
 
-One credit balance that works in every partner app, backed 1:1 by USDT on Whitechain. Your users buy credits once. You charge them in a few lines of code and withdraw what they spend in USDT.
+# Quickstart
 
-## What you get
+Kredo is one credit balance for every app. Users buy credits once and spend them anywhere. You charge them with one call and get paid in USDT.
 
-- **No payments to build.** Users buy and hold credits on our hosted pages. You never touch a card, a wallet or gas.
-- **Customers who already have credits.** Anyone who bought credits in another app can spend them in yours on day one.
-- **Settlement you can check.** Every charge, refund and payout is a transaction on Whitechain. The vault contract enforces each user's limit for your app, so nobody can overcharge them, not even us.
-- **USDT payouts.** Withdraw your earnings, after a 5% network fee, to any address you choose.
+<Flow />
 
-## The pieces
+## 1. Get an API key
 
-| Piece | What it is |
-|---|---|
-| [Dashboard](/dashboard) | Set up your company, register apps, create API keys, set prices, withdraw |
-| [Node SDK](/docs/sdk) | `@credits/sdk`, for your server: charge, hold, refund, payouts, webhooks |
-| [React kit](/docs/react) | `@credits/react`: connect and buy buttons, and a live balance |
-| Hosted pages | Connect, buy and account pages your users sign in to with email |
+Open the [dashboard](/dashboard), sign in with your email and register your app. You get an API key. Keep it on your server.
 
-## Prices
+```bash
+CREDITS_API_KEY=uc_live_...
+```
 
-1 credit is $0.01, so 1 USDT buys 100 credits. You set prices in credits, per action or per unit (for example 6 credits per second of video). Users always see the dollar value next to a price.
+## 2. Install the SDK
 
-## Where to start
+```bash
+npm install @credits/sdk
+```
 
-1. Read the [Quickstart](/docs/quickstart): from sign-up to a first charge in about ten minutes.
-2. Skim [How it works](/docs/concepts) for limits, holds and light mode.
-3. Build against [test mode](/docs/test-mode) first. Nothing goes onchain, and every test user starts with 1,000 credits.
+```ts
+import { Credits } from "@credits/sdk";
+
+const credits = new Credits({
+  apiKey: process.env.CREDITS_API_KEY!,
+  baseUrl: process.env.CREDITS_API_URL,
+  pagesUrl: process.env.CREDITS_PAGES_URL,
+});
+```
+
+## 3. Connect a user
+
+Send the user to our page to approve a spending limit. They come back with a code, which you swap for their address.
+
+```ts
+// Send them to approve a limit
+res.redirect(await credits.connectUrl({ credits: 200, returnTo: "https://your.app/callback" }));
+
+// On /callback
+const { user } = await credits.exchangeCode(req.query.code);
+```
+
+## 4. Charge
+
+```ts
+await credits.charge({ user, credits: 5 });
+```
+
+That's it. The charge settles on Whitechain before the call returns, and you withdraw your earnings in USDT from the dashboard.
+
+## Test mode
+
+Use a `uc_test_` key while you build. Nothing goes onchain, every test user starts with 1,000 credits, and the rules are the same as live.
+
+## Next
+
+- Building in React? Use the [React kit](/docs/react): drop-in buttons and a live balance.
+- Long jobs? [Hold, then charge](/docs/charging#hold-then-charge) what it actually cost.
+- Want to know why it's safe? Read [How it works](/docs/concepts).

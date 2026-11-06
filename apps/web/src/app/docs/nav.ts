@@ -5,28 +5,18 @@ export const DOCS_NAV: DocsGroup[] = [
   {
     title: "Start",
     pages: [
-      { href: "/docs", label: "Introduction" },
-      { href: "/docs/quickstart", label: "Quickstart" },
+      { href: "/docs", label: "Quickstart" },
       { href: "/docs/concepts", label: "How it works" },
     ],
   },
   {
-    title: "Your company",
+    title: "Guides",
     pages: [
-      { href: "/docs/dashboard", label: "Company and apps" },
-      { href: "/docs/api-keys", label: "API keys" },
-      { href: "/docs/test-mode", label: "Test mode" },
-    ],
-  },
-  {
-    title: "Build",
-    pages: [
-      { href: "/docs/connect", label: "Connecting users" },
-      { href: "/docs/charging", label: "Charging" },
+      { href: "/docs/connect", label: "Connect users" },
+      { href: "/docs/charging", label: "Charge" },
       { href: "/docs/react", label: "React kit" },
-      { href: "/docs/react/preview", label: "React kit preview" },
       { href: "/docs/webhooks", label: "Webhooks" },
-      { href: "/docs/payouts", label: "Payouts and reporting" },
+      { href: "/docs/payouts", label: "Get paid" },
     ],
   },
   {

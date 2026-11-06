@@ -1,6 +1,6 @@
 "use client";
 
-import { BuyCreditsButton, ConnectCreditsButton, CreditsBalance, CreditsProvider, useCredits } from "@credits/react";
+import { BuyCreditsButton, ConnectCreditsButton, CreditsBalance, CreditsProvider } from "@credits/react";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useDirectory } from "@/lib/public";
 import { cn } from "@/lib/utils";
@@ -23,11 +23,11 @@ export function KitPreview() {
   // A real app from the network, so the connect popup opens a working page.
   const app = apps?.[0];
   const q = new URLSearchParams({ as, ...(app && { app: app.id, name: app.name }) });
-  const endpoint = `/docs/react/preview/state?${q}`;
+  const endpoint = `/docs/react/state?${q}`;
   const lead = STATES.find((s) => s.value === as)!.lead;
 
   return (
-    <>
+    <div className="space-y-4">
       <div>
         <div role="radiogroup" aria-label="User state" className="inline-flex max-w-full flex-wrap gap-1 rounded-full border border-wc-border-light bg-wc-bg p-1">
           {STATES.map((s) => (
@@ -53,10 +53,7 @@ export function KitPreview() {
         <div className="h-96 animate-pulse rounded-[16px] bg-wc-surface-2" />
       ) : (
         <CreditsProvider key={endpoint} endpoint={endpoint} pagesUrl={origin} pollMs={0}>
-          <h2>In your app</h2>
-          <p>
-            The balance pill usually sits in your header. Click it once connected to open the menu.
-          </p>
+          {/* The balance pill in a stand-in app header, where it usually sits. */}
           <div className="rounded-[16px] border border-wc-border-light bg-wc-surface">
             <div className="flex h-16 items-center justify-between gap-4 border-b border-wc-border-light px-5">
               <span className="flex items-center gap-2.5 text-[15px] font-medium text-wc-text-1">
@@ -65,31 +62,27 @@ export function KitPreview() {
               </span>
               <CreditsBalance />
             </div>
-            <div className="h-80 rounded-b-[16px] bg-wc-bg" />
+            <div className="flex h-80 items-end rounded-b-[16px] bg-wc-bg p-5">
+              <p className="text-[13px] text-wc-icon-muted">
+                <span className="font-mono">{"<CreditsBalance />"}</span> in your header. Click it when connected.
+              </p>
+            </div>
           </div>
 
-          <h2>Components</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Stage name="CreditsBalance" code="<CreditsBalance />">
-              <CreditsBalance />
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <Stage code="<ConnectCreditsButton />">
+              <ConnectCreditsButton />
             </Stage>
-            <Stage name="ConnectCreditsButton" code="<ConnectCreditsButton credits={200} />">
-              <ConnectCreditsButton credits={200} />
+            <Stage code="<BuyCreditsButton />">
+              <BuyCreditsButton credits={500} label="Buy credits" />
             </Stage>
-            <Stage name="BuyCreditsButton" code="<BuyCreditsButton credits={500} />">
-              <BuyCreditsButton credits={500} />
-            </Stage>
-            <Stage name="BuyCreditsButton, outline" code={'<BuyCreditsButton variant="outline" label="Top up" />'}>
+            <Stage code={'<BuyCreditsButton variant="outline" />'}>
               <BuyCreditsButton variant="outline" label="Top up" />
             </Stage>
           </div>
-
-          <h2>useCredits()</h2>
-          <p>The state behind the components, for building your own UI.</p>
-          <RawState />
         </CreditsProvider>
       )}
-    </>
+    </div>
   );
 }
 
@@ -100,23 +93,11 @@ function useOrigin(): string | undefined {
   return useSyncExternalStore(noop, () => window.location.origin, () => undefined);
 }
 
-function Stage({ name, code, children }: { name: string; code: string; children: ReactNode }) {
+function Stage({ code, children }: { code: string; children: ReactNode }) {
   return (
     <div className="flex flex-col rounded-[16px] border border-wc-border-light bg-wc-surface">
-      <div className="flex h-36 items-center justify-center rounded-t-[16px] bg-wc-bg px-4">{children}</div>
-      <div className="border-t border-wc-border-light px-4 py-3">
-        <p className="text-[14px] font-medium text-wc-text-1">{name}</p>
-        <span className="mt-1 block truncate font-mono text-[12px] text-wc-icon-muted">{code}</span>
-      </div>
+      <div className="flex h-28 items-center justify-center rounded-t-[16px] bg-wc-bg px-4">{children}</div>
+      <span className="truncate border-t border-wc-border-light px-4 py-3 font-mono text-[12px] text-wc-icon-muted">{code}</span>
     </div>
-  );
-}
-
-function RawState() {
-  const { state, loading, error } = useCredits();
-  return (
-    <pre>
-      <code>{JSON.stringify({ loading, error, state }, null, 2)}</code>
-    </pre>
   );
 }

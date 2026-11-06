@@ -12,6 +12,12 @@ const nextConfig: NextConfig = {
       { source: "/apps", destination: "/ecosystem", permanent: true },
       // The wallet page is now the account page. Older links and SDK versions still land.
       { source: "/wallet", destination: "/account", permanent: true },
+      // The docs were folded into fewer pages.
+      { source: "/docs/quickstart", destination: "/docs", permanent: true },
+      { source: "/docs/api-keys", destination: "/docs#1-get-an-api-key", permanent: true },
+      { source: "/docs/test-mode", destination: "/docs#test-mode", permanent: true },
+      { source: "/docs/dashboard", destination: "/docs", permanent: true },
+      { source: "/docs/react/preview", destination: "/docs/react", permanent: true },
     ];
   },
 };

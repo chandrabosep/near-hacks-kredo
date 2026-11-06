@@ -2,65 +2,34 @@ export const metadata = { title: "Webhooks" };
 
 # Webhooks
 
-Get a signed POST when something happens in your app, instead of polling.
+Get a signed POST to your server when something happens, instead of polling.
 
-## Set an endpoint
+## Set it up
 
-In the dashboard, open your app's **Integration** section and save your endpoint URL. You get a signing secret, `whsec_...`, shown once. Or from your server:
+Save your endpoint URL in your app's **Integration** section in the [dashboard](/dashboard). You get a signing secret, `whsec_...`, shown once.
 
-```ts
-const { secret } = await credits.setWebhook("https://your.app/credits-webhook");
-// setWebhook(null) turns it off
-```
-
-## Events
-
-| Type | When |
-|---|---|
-| `charge.succeeded` | A charge settled |
-| `hold.created` | Credits were held |
-| `hold.captured` | A hold was charged, in full or in part |
-| `hold.released` | A hold was returned to the user |
-| `refund.succeeded` | You refunded a user |
-| `connection.approved` | A user approved a limit for your app |
-| `connection.revoked` | A user disconnected your app |
-| `payout.paid` | Your earnings were paid out in USDT |
-
-Each delivery is JSON:
-
-```json
-{
-  "id": "0x…:3",
-  "type": "charge.succeeded",
-  "createdAt": "2026-11-06T09:00:00.000Z",
-  "data": {
-    "user": "0x…",
-    "app": "0x…",
-    "amount": { "credits": "1", "usd": "0.01", "units": "10000" },
-    "fee": { "credits": "0.05", "usd": "0.0005", "units": "500" },
-    "ref": "msg_123",
-    "txHash": "0x…",
-    "explorer": "https://…"
-  }
-}
-```
-
-## Verify every delivery
-
-Each request carries `x-credits-signature: t=<timestamp>,v1=<signature>`, an HMAC-SHA256 of `timestamp.body` with your secret. `verifyWebhook` checks it and rejects anything older than five minutes:
+## Handle an event
 
 ```ts
 import { verifyWebhook } from "@credits/sdk";
 
 app.post("/credits-webhook", express.raw({ type: "application/json" }), (req, res) => {
   const event = verifyWebhook(req.body, req.header("x-credits-signature"), process.env.CREDITS_WEBHOOK_SECRET!);
-  if (event.type === "hold.released") markJobRefunded(event.data.holdId);
+  if (event.type === "charge.succeeded") console.log(event.data.amount.credits);
   res.sendStatus(200);
 });
 ```
 
-Read the raw body: parsing it as JSON first changes the bytes and breaks the signature.
+`verifyWebhook` checks the signature and throws on anything fake or older than five minutes. Pass the raw body, not parsed JSON.
 
-## Retries
+## Events
 
-Answer with any 2xx status. Anything else, or no answer, is retried with backoff. Each event is delivered once per app, keyed by its `id`, so handle repeats safely. `credits.webhookDeliveries()` lists recent deliveries and their status.
+| Event | When |
+|---|---|
+| `charge.succeeded` | A charge went through |
+| `hold.created`, `hold.captured`, `hold.released` | A hold was made, charged or returned |
+| `refund.succeeded` | You refunded a user |
+| `connection.approved`, `connection.revoked` | A user connected or disconnected your app |
+| `payout.paid` | Your earnings were paid out |
+
+Answer with any 2xx. Anything else is retried, so handle the same event `id` twice safely.

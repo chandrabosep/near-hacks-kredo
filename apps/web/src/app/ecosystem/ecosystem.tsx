@@ -328,7 +328,7 @@ function BuildBand() {
           <Link href="/dashboard" className={buttonVariants({ size: "lg" })}>
             Start building
           </Link>
-          <Link href="/docs/quickstart" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "border-white/20 bg-transparent text-white hover:bg-white/10")}>
+          <Link href="/docs" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "border-white/20 bg-transparent text-white hover:bg-white/10")}>
             Read the quickstart
           </Link>
         </div>

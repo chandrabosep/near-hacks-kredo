@@ -1,28 +1,25 @@
-export const metadata = { title: "Payouts and reporting" };
+export const metadata = { title: "Get paid" };
 
-# Payouts and reporting
+# Get paid
 
-## Earnings
-
-Each charge adds its amount, minus the 5% network fee, to your app's **unpaid earnings** in the vault. Refunds come out of them.
+Each charge adds 95% to your app's earnings. The network keeps 5% to pay for gas. Refunds come out of your earnings.
 
 ## Withdraw
 
-Click **Withdraw** on your app's page, or:
+Click **Withdraw** on your app's page in the [dashboard](/dashboard), or:
 
 ```ts
-const p = await credits.payout();
-// { usdt: "12.34", to: "0x…", txHash, explorer }
+await credits.payout();
+// { usdt: "12.34", to: "0x…", explorer }
 ```
 
-Your unpaid earnings are paid in USDT, on Whitechain, to the app's payout address. The network pays the gas.
+You get USDT on Whitechain, at your payout address. The network pays the gas.
 
-## Reporting
+## Reports
 
-| Call | Returns |
-|---|---|
-| `activity()` | Every charge, hold, capture, release, refund and payout, newest first, each with its transaction |
-| `exportCsv()` | The same as CSV, for your accountant. Also on the dashboard: **Export CSV** |
-| `gas()` | How many transactions your app caused and what they cost in WBT. Paid by the network, never by you |
+The dashboard shows your revenue, earnings, paying users and every transaction, with a one-click CSV export. From code:
 
-The dashboard shows revenue, earnings after fees and refunds, unpaid earnings, paying users and gas for each app.
+```ts
+await credits.activity(); // every charge, hold, refund and payout
+await credits.exportCsv(); // the same, as CSV
+```

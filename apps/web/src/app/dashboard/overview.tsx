@@ -36,7 +36,7 @@ export function Overview() {
     { done: !!(company.website && company.supportEmail), label: "Complete your company profile", href: "/dashboard/company" },
     { done: apps.length > 0, label: "Register your first app", href: "/dashboard/new" },
     { done: apps.some((a) => Object.keys(a.prices).length > 0), label: "Set your prices", href: apps[0] ? `/dashboard/apps/${apps[0].id}/prices` : "/dashboard/new" },
-    { done: all.some((s) => s.charges > 0), label: "Take your first charge", href: "/docs/quickstart" },
+    { done: all.some((s) => s.charges > 0), label: "Take your first charge", href: "/docs" },
   ];
   const left = steps.filter((s) => !s.done).length;
 

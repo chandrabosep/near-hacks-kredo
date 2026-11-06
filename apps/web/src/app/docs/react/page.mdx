@@ -1,8 +1,10 @@
+import { KitPreview } from "./kit-preview";
+
 export const metadata = { title: "React kit" };
 
 # React kit
 
-Drop-in buttons and a live balance for any React app. See them all, in every state, on the [preview page](/docs/react/preview).
+Drop-in buttons and a live balance for any React app. They open our pages in a popup, so the user never leaves your app.
 
 ```bash
 npm install @credits/react
@@ -11,26 +13,30 @@ npm install @credits/react
 ```tsx
 import { BuyCreditsButton, ConnectCreditsButton, CreditsBalance, CreditsProvider } from "@credits/react";
 
-<CreditsProvider endpoint="/api/credits" pagesUrl="https://PAGES_URL">
-  <CreditsBalance /> {/* live balance pill with a dropdown */}
-  <ConnectCreditsButton credits={200} /> {/* asks for a 200 credit limit */}
-  <BuyCreditsButton credits={500} /> {/* opens the buy page */}
+<CreditsProvider endpoint="/api/credits" pagesUrl={PAGES_URL}>
+  <CreditsBalance />
+  <ConnectCreditsButton />
+  <BuyCreditsButton />
 </CreditsProvider>
 ```
 
-The kit never holds a key or a token. It reads state from your own backend, and opens our hosted pages in a popup for anything that needs the user's signature.
+## Try it
+
+These are the real components. Pick a user to see what each one shows.
+
+<KitPreview />
 
 ## Your backend
 
-Two routes at `endpoint`, a few lines each with the [Node SDK](/docs/sdk):
+The kit never holds a key. It asks your server, at `endpoint`, two things:
 
 ```ts
-// What the kit shows for this visitor.
+// What to show this visitor
 app.get("/api/credits", async (req, res) => {
   res.json(await credits.session(req.session.creditsUser));
 });
 
-// Back from the connect popup: swap the one-time code for the user's address.
+// Back from the connect popup: swap the code for the user's address
 app.post("/api/credits", async (req, res) => {
   const { user } = await credits.exchangeCode(req.body.code);
   req.session.creditsUser = user;
@@ -38,15 +44,11 @@ app.post("/api/credits", async (req, res) => {
 });
 ```
 
-The connect page posts the code only to your page's own origin. If popups are blocked, the kit falls back to a full-page redirect and picks the code up from `?code=` when the user comes back.
-
 ## Your own UI
 
-`useCredits()` gives you the state and actions behind the components:
+`useCredits()` gives you the same state and actions:
 
 ```tsx
-const { state, connect, buy, openWallet, refresh } = useCredits();
-// state.user: { address, balance, connected, limit, spendable } or null
+const { state, connect, buy } = useCredits();
+// state.user: { balance, connected, limit, spendable }
 ```
-
-Styles are injected once and use `uc-*` class names, so you can override them.
