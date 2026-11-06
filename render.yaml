@@ -1,4 +1,4 @@
-# Render Blueprint: the API, its Postgres database and the hosted pages.
+# Render Blueprint: the API and its Postgres database. The hosted pages run on Vercel.
 # Secrets marked sync: false are entered in the Render dashboard, never committed.
 databases:
   - name: kredo-db
@@ -34,22 +34,7 @@ services:
         sync: false
       - key: ADMIN_TOKEN
         generateValue: true
+      # The Vercel URL of the hosted pages, comma separated if more than one.
       - key: WEB_ORIGINS
-        value: https://kredo-web.onrender.com
-
-  - type: web
-    name: kredo-web
-    runtime: node
-    plan: free
-    region: singapore
-    buildCommand: npm ci --workspace @credits/web && npm run build -w @credits/web
-    startCommand: npm start -w @credits/web
-    envVars:
-      - key: NODE_VERSION
-        value: "22"
-      - key: NEXT_PUBLIC_PRIVY_APP_ID
         sync: false
-      - key: NEXT_PUBLIC_API_URL
-        value: https://kredo-api.onrender.com
-      - key: NEXT_PUBLIC_CHAIN_ID
-        value: "1874"
+
