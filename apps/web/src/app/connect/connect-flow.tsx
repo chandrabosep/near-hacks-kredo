@@ -85,7 +85,6 @@ export function ConnectFlow() {
   return (
     <>
       <PageTitle
-        eyebrow="Connect"
         title={`Connect ${name}.`}
         lead={`${name} wants to spend from your Universal Credits balance. You choose the limit. You can lower or remove it any time in your wallet.`}
       />
@@ -214,7 +213,7 @@ function Loading({ inline }: { inline?: boolean }) {
 function Problem({ text }: { text: string }) {
   return (
     <>
-      <PageTitle eyebrow="Connect" title="This link isn't working." />
+      <PageTitle title="This link isn't working." />
       <Tile>
         <Notice tone="error">{text}</Notice>
       </Tile>

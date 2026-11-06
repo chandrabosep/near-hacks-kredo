@@ -9,7 +9,6 @@ export default function ReservesPage() {
   return (
     <Page>
       <PageTitle
-        eyebrow="Reserves"
         title="Every credit, accounted for."
         lead="Credits are created only when USDT arrives in the vault. There is no admin mint, and the USDT is never lent out. These numbers are read from the contract every 15 seconds."
       />

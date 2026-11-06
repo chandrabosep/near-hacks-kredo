@@ -67,15 +67,15 @@ export function ClaimFlow() {
     }
   }
 
-  if (key === undefined) return <PageTitle eyebrow="Claim" title="Opening your link." />;
+  if (key === undefined) return <PageTitle title="Opening your link." />;
   if (key === null) return <Broken text="This link is missing its key. Ask the sender to copy the whole link again." />;
   if (previewError) return <Broken text={previewError === "No such claim link" ? "This link doesn't exist on the network." : previewError} />;
-  if (!preview) return <PageTitle eyebrow="Claim" title="Opening your link." />;
+  if (!preview) return <PageTitle title="Opening your link." />;
 
   if (done) {
     return (
       <>
-        <PageTitle eyebrow="Claim" title={`${credits(done.amount)} are yours.`} lead="They're in your balance now, ready to spend in any app on the network." />
+        <PageTitle title={`${credits(done.amount)} are yours.`} lead="They're in your balance now, ready to spend in any app on the network." />
         <Tile>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
             <Link href="/wallet" className={buttonVariants({ size: "lg" })}>
@@ -96,7 +96,6 @@ export function ClaimFlow() {
   return (
     <>
       <PageTitle
-        eyebrow="Claim"
         title={`Someone sent you ${credits(preview.amount)}.`}
         lead={`Worth ${usd(preview.amount)}, spendable in every app on the network. Claim it before ${new Date(preview.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric" })}.`}
       />
@@ -132,7 +131,7 @@ export function ClaimFlow() {
 function Broken({ title = "This link isn't working.", text }: { title?: string; text: string }) {
   return (
     <>
-      <PageTitle eyebrow="Claim" title={title} />
+      <PageTitle title={title} />
       <Tile>
         <Notice tone="error">{text}</Notice>
       </Tile>

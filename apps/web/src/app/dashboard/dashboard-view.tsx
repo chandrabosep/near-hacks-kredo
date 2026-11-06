@@ -42,7 +42,7 @@ export function DashboardView() {
   if (ready && !authenticated) {
     return (
       <>
-        <PageTitle eyebrow="Dashboard" title="Take credits in your app." lead="Register your app, set prices in credits, and withdraw what your users spend in USDT on Whitechain." />
+        <PageTitle title="Take credits in your app." lead="Register your app, set prices in credits, and withdraw what your users spend in USDT on Whitechain." />
         <SignInPanel title="Sign in to manage your apps." lead="Use your work email. Earnings are paid in USDT to your own wallet, or to any address you choose when you register an app." />
       </>
     );
@@ -53,7 +53,7 @@ export function DashboardView() {
 
   return (
     <>
-      <PageTitle eyebrow="Dashboard" title="Your apps." lead="Each app gets its own API key, price list and earnings. The network pays the gas for every transaction." />
+      <PageTitle title="Your apps." lead="Each app gets its own API key, price list and earnings. The network pays the gas for every transaction." />
       {error && (
         <Tile>
           <Notice tone="error">{error}</Notice>

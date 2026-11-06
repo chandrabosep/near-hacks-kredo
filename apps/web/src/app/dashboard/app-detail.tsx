@@ -74,7 +74,7 @@ export function AppDetail({ app, onChange }: { app: MyApp; onChange: () => void 
 
   return (
     <>
-      <PageTitle eyebrow="Dashboard" title={`${app.name}.`} lead={<span className="font-mono text-[14px]">{app.id}</span>}>
+      <PageTitle title={`${app.name}.`} lead={<span className="font-mono text-[14px]">{app.id}</span>}>
         <Link href="/dashboard" className="text-[15px] font-medium text-wc-text-muted hover:text-wc-navy">
           ← All apps
         </Link>

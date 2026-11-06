@@ -66,7 +66,7 @@ export function OpsPanel() {
   if (!token) {
     return (
       <>
-        <PageTitle eyebrow="Ops" title="Relayer and indexer." />
+        <PageTitle title="Relayer and indexer." />
         <Tile>
           <form
             className="max-w-md space-y-5"
@@ -95,7 +95,7 @@ export function OpsPanel() {
 
   return (
     <>
-      <PageTitle eyebrow="Ops" title="Relayer and indexer." lead={ops ? `Relayer ${ops.relayer}` : undefined}>
+      <PageTitle title="Relayer and indexer." lead={ops ? `Relayer ${ops.relayer}` : undefined}>
         <Button
           variant="outline"
           onClick={() => {

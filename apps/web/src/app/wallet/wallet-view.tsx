@@ -58,7 +58,7 @@ export function WalletView() {
   if (status === "signed-out") {
     return (
       <>
-        <PageTitle eyebrow="Wallet" title="One balance for every app." />
+        <PageTitle title="One balance for every app." />
         <SignInPanel title="Sign in to see your wallet." />
       </>
     );
@@ -67,7 +67,7 @@ export function WalletView() {
   if (status !== "ready" || !me) {
     return (
       <>
-        <PageTitle eyebrow="Wallet" title="Your wallet." />
+        <PageTitle title="Your wallet." />
         <Tile>
           {status === "error" ? (
             <Notice tone="error">{expired ? "Your session expired. Sign out and sign in again." : "We couldn't load your account. Refresh the page to try again."}</Notice>
@@ -83,7 +83,7 @@ export function WalletView() {
 
   return (
     <>
-      <PageTitle eyebrow="Wallet" title="Your wallet." lead={me.email ?? undefined}>
+      <PageTitle title="Your wallet." lead={me.email ?? undefined}>
         <Link href="/buy" className={buttonVariants({ size: "lg" })}>
           Buy credits
         </Link>

@@ -64,7 +64,6 @@ export function BuyFlow() {
   return (
     <>
       <PageTitle
-        eyebrow="Buy"
         title="Buy credits once. Spend them anywhere."
         lead="1 credit is $0.01. Your credits work in every app on the network, and every one is backed by USDT held in the vault on Whitechain."
       />

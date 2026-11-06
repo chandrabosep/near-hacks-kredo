@@ -82,12 +82,11 @@ export function Page({ children }: { children: ReactNode }) {
 }
 
 /** Page title over a quiet plus grid. Headlines end with a period. */
-export function PageTitle({ eyebrow, title, lead, children }: { eyebrow?: string; title: string; lead?: ReactNode; children?: ReactNode }) {
+export function PageTitle({ title, lead, children }: { title: string; lead?: ReactNode; children?: ReactNode }) {
   return (
     <section className="relative overflow-hidden border-b border-wc-border-light">
       <div aria-hidden className="bg-plus pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,#000,transparent)]" />
       <div className="relative px-6 pt-section-t pb-12 motion-safe:animate-rise sm:px-8 lg:px-16">
-        {eyebrow && <p className="mb-5 text-[13px] leading-[19.5px] font-medium text-wc-text-muted">{eyebrow}</p>}
         <h1 className="type-hero max-w-3xl font-semibold text-balance text-wc-text-1">{title}</h1>
         {lead && <p className="mt-5 max-w-2xl text-[17px] leading-[1.625] text-wc-text-muted">{lead}</p>}
         {children && <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:gap-5">{children}</div>}

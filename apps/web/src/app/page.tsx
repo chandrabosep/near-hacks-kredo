@@ -113,8 +113,7 @@ export default function Home() {
           {/* Features */}
           <section className="border-t border-wc-border-light">
             <div className="px-6 pt-section-t sm:px-8 lg:px-16">
-              <p className="text-[13px] font-medium text-wc-text-muted">Product</p>
-              <h2 className="type-section mt-5 max-w-2xl font-semibold text-black">Built for real products.</h2>
+              <h2 className="type-section max-w-2xl font-semibold text-black">Built for real products.</h2>
             </div>
             <div className="mt-12 grid grid-cols-1 gap-px border-t border-wc-border-light bg-wc-border-light md:grid-cols-3">
               {FEATURES.map((f) => (
@@ -152,8 +151,7 @@ export default function Home() {
           <section id="build" className="scroll-mt-16 border-t border-wc-border-light lg:scroll-mt-[72px]">
             <div className="grid gap-12 px-6 pt-section-t pb-section-t sm:px-8 lg:grid-cols-[1fr_1.2fr] lg:px-16">
               <div>
-                <p className="text-[13px] font-medium text-wc-text-muted">Build</p>
-                <h2 className="type-section mt-5 max-w-xl font-semibold text-black">Add it in about 20 lines.</h2>
+                <h2 className="type-section max-w-xl font-semibold text-black">Add it in about 20 lines.</h2>
                 <p className="mt-5 max-w-xl text-[17px] leading-[1.625] text-wc-text-muted">
                   Your users keep one balance across every app. You keep your own pricing, and get paid in USDT.
                 </p>
@@ -177,8 +175,7 @@ export default function Home() {
           {/* Backed */}
           <section className="border-t border-wc-border-light">
             <div className="px-6 pt-section-t sm:px-8 lg:px-16">
-              <p className="text-[13px] font-medium text-wc-text-muted">Reserves</p>
-              <h2 className="type-section mt-5 max-w-2xl font-semibold text-black">Every credit is provably backed.</h2>
+              <h2 className="type-section max-w-2xl font-semibold text-black">Every credit is provably backed.</h2>
               <p className="mt-5 max-w-2xl text-[17px] leading-[1.625] text-wc-text-muted">
                 Credits are created only when USDT arrives in the vault. There is no admin mint. These numbers come straight from the contract.
               </p>
