@@ -244,6 +244,6 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 **Done when:** one user buys in the video app and spends the leftover in the chat and 3D apps. Tag `m4-three-apps`.
 
 ### Step 7: Reserves page and app directory
-- [ ] Reserves page: the vault's USDT next to total credits outstanding, live from the chain
+- [x] Reserves page: the vault's USDT next to total credits outstanding, live from the chain
 - [ ] App directory: every app with its prices
 - [ ] (Optional) ENS names for apps, with prices in their records
