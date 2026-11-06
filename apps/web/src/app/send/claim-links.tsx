@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, useAction, useApi } from "@/lib/api";
 import { credits, parseCredits, type Amount } from "@/lib/format";
 import type { MyClaim } from "@/lib/me";
-import { AmountField } from "./amount-field";
+import { AmountField } from "@/components/amount-field";
 
 /**
  * A claim link carries a fresh one-time key in its #fragment, which browsers never send to a

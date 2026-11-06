@@ -4,12 +4,31 @@ import { Field } from "@/components/shell";
 import { creditsToUsd, credits as fmtCredits, parseCredits, usd, type Amount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const QUICK = ["10", "50", "100"];
-
-/** Credits with the dollar value inside the field, and quick amounts under it. */
-export function AmountField({ value, onChange, balance, hint }: { value: string; onChange: (v: string) => void; balance: Amount; hint?: string }) {
+/**
+ * Credits with their dollar value inside the field, and quick amounts under it.
+ * `balance` caps the amount: credits you hold, or what your USDT can buy.
+ */
+export function AmountField({
+  value,
+  onChange,
+  balance,
+  hint,
+  quick = ["10", "50", "100"],
+  overText,
+  unit = "",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  balance: Amount;
+  hint?: string;
+  quick?: string[];
+  overText?: string;
+  /** Shown after the dollar value, like "USDT". */
+  unit?: string;
+}) {
   const parsed = parseCredits(value);
   const over = parsed !== undefined && Number(parsed) > Number(balance.credits);
+  const QUICK = quick;
   const max = balance.credits.replace(/\.?0+$/, "") || "0";
 
   return (
@@ -20,7 +39,7 @@ export function AmountField({ value, onChange, balance, hint }: { value: string;
         placeholder="0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        suffix={parsed ? usd(creditsToUsd(parsed)) : "$0.00"}
+        suffix={`${parsed ? usd(creditsToUsd(parsed)) : "$0.00"}${unit ? ` ${unit}` : ""}`}
         aria-invalid={over || undefined}
       />
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -43,7 +62,7 @@ export function AmountField({ value, onChange, balance, hint }: { value: string;
           );
         })}
         <span className={cn("ml-auto text-[13px]", over ? "text-wc-error" : "text-wc-icon-muted")}>
-          {over ? `You have ${fmtCredits(balance)}` : (hint ?? "")}
+          {over ? (overText ?? `You have ${fmtCredits(balance)}`) : (hint ?? "")}
         </span>
       </div>
     </div>

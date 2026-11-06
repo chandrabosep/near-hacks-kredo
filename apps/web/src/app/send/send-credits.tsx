@@ -5,7 +5,7 @@ import { Field, Notice, Spinner, TxLink } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { ApiError, useAction } from "@/lib/api";
 import { credits, parseCredits, type Amount } from "@/lib/format";
-import { AmountField } from "./amount-field";
+import { AmountField } from "@/components/amount-field";
 
 type Prepared = Awaited<ReturnType<ReturnType<typeof useAction>["prepare"]>>;
 
