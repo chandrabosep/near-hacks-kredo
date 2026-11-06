@@ -138,7 +138,7 @@ Never commit secrets, local data or build output. Commit example env files inste
 
 **Hosted pages**
 - [x] shared styles and helpers
-- [ ] connect page
+- [x] connect page
 - [ ] buy page
 - [ ] wallet page
 - [ ] claim page
