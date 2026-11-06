@@ -3,7 +3,7 @@
 import { ArrowUpRight, Compass, Send, ShieldCheck, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { CopyValue } from "@/components/copy";
+import { CopyButton, CopyValue } from "@/components/copy";
 import { Notice, SignInPanel, Tile } from "@/components/shell";
 import { buttonVariants } from "@/components/ui/button";
 import { useApi } from "@/lib/api";
@@ -12,7 +12,7 @@ import { credits, short, usd, type Amount } from "@/lib/format";
 import { useMe } from "@/lib/me";
 import { useDirectory } from "@/lib/public";
 import { cn } from "@/lib/utils";
-import { Activity } from "./activity";
+import { RecentActivity } from "./activity";
 import { Connections } from "./connections";
 
 const EXPLORER = "https://explorer.testnet.whitechain.io/address/";
@@ -26,7 +26,7 @@ export function AccountView() {
 
   const loadActivity = useCallback(async () => {
     try {
-      setActivity(await api<ActivityItem[]>("GET", "/v1/me/activity?limit=50"));
+      setActivity(await api<ActivityItem[]>("GET", "/v1/me/activity?limit=5"));
     } catch {
       setActivity((a) => a ?? []);
     }
@@ -35,7 +35,7 @@ export function AccountView() {
   useEffect(() => {
     if (status !== "ready") return;
     let live = true;
-    api<ActivityItem[]>("GET", "/v1/me/activity?limit=50").then(
+    api<ActivityItem[]>("GET", "/v1/me/activity?limit=5").then(
       (rows) => live && setActivity(rows),
       () => live && setActivity((a) => a ?? []),
     );
@@ -100,9 +100,14 @@ export function AccountView() {
           </section>
 
           <section className="border-t border-wc-border-light px-6 py-10 sm:px-8 lg:px-16 lg:py-14">
-            <Heading title="Activity" lead="Every credit that moved, straight from the chain." />
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <Heading title="Recent activity" lead="Your latest moves, straight from the chain." />
+              <Link href="/activity" className="inline-flex items-center gap-1 text-[15px] font-medium text-wc-blue hover:underline">
+                View all <ArrowUpRight className="size-4" />
+              </Link>
+            </div>
             <div className="mt-8">
-              <Activity items={activity} me={me.address} />
+              <RecentActivity items={activity} me={me.address} />
             </div>
           </section>
         </div>
@@ -143,7 +148,12 @@ function Hero({ email, address, balance, wallet }: { email?: string | null; addr
             <p className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[16px] text-wc-text-muted">
               {email && <span className="text-wc-text-2">{email}</span>}
               {email && address && <span className="text-wc-border">·</span>}
-              {address && <span className="font-mono text-[14px]">{short(address, 6)}</span>}
+              {address && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="font-mono text-[14px]">{short(address, 6)}</span>
+                  <CopyButton value={address} label="Copy address" />
+                </span>
+              )}
             </p>
           ) : (
             <p className="mt-5 text-[17px] leading-[1.625] text-wc-text-muted">One balance for every app on the network.</p>

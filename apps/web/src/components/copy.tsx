@@ -32,3 +32,31 @@ export function CopyValue({ value, label, className }: { value: string; label?: 
     </button>
   );
 }
+
+/** An icon-only copy button, for a value already shown next to it. */
+export function CopyButton({ value, label = "Copy", className }: { value: string; label?: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={copied ? "Copied" : label}
+      title={copied ? "Copied" : label}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1600);
+        } catch {
+          // Clipboard blocked: the value is still visible to select by hand.
+        }
+      }}
+      className={cn(
+        "inline-flex size-7 shrink-0 items-center justify-center rounded-[8px] text-wc-icon-muted transition-colors hover:bg-wc-surface-2 hover:text-wc-blue",
+        copied && "text-emerald-700 hover:text-emerald-700",
+        className,
+      )}
+    >
+      {copied ? <Check className="size-[14px]" /> : <Copy className="size-[14px]" />}
+    </button>
+  );
+}

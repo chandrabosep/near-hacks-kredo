@@ -15,8 +15,8 @@ import { cn } from "@/lib/utils";
 export function Logo({ className }: { className?: string }) {
   return (
     <Link href="/" className={cn("flex shrink-0 items-center gap-2.5 text-wc-navy", className)} aria-label="Kredo home">
-      <KredoMark className="size-9" />
-      <span className="text-[24px] leading-none font-bold tracking-[-0.04em]">kredo</span>
+      <KredoMark className="size-8" />
+      <span className="text-[22px] leading-none font-bold tracking-[-0.04em]">kredo</span>
     </Link>
   );
 }
@@ -46,13 +46,13 @@ function Account() {
   if (!ready) return <span className="h-10 w-20 animate-pulse rounded-control bg-wc-surface-2" />;
   if (!authenticated) {
     return (
-      <Button variant="ghost" size="lg" className="text-[17px] text-wc-text-2" onClick={() => login()}>
+      <Button variant="ghost" size="lg" className="text-[15px] text-wc-text-2" onClick={() => login()}>
         Sign in
       </Button>
     );
   }
   return (
-    <Button variant="ghost" size="lg" className="text-[17px] text-wc-text-2" title={user?.email?.address} onClick={() => logout()}>
+    <Button variant="ghost" size="lg" className="text-[15px] text-wc-text-2" title={user?.email?.address} onClick={() => logout()}>
       Sign out
     </Button>
   );
@@ -62,18 +62,18 @@ export function Header() {
   return (
     <header className="fixed inset-x-0 top-0 z-30">
       <div className="mx-auto max-w-[1400px] lg:px-8">
-        <div className="flex h-16 items-center gap-12 border-x border-b border-wc-surface-2 bg-wc-bg/70 px-6 backdrop-blur-[24px] backdrop-saturate-150 sm:px-8 lg:h-[76px]">
+        <div className="flex h-16 items-center gap-10 border-x border-b border-wc-surface-2 bg-wc-bg/70 px-6 backdrop-blur-[24px] backdrop-saturate-150 sm:px-8 lg:h-[76px]">
           <Logo />
-          <nav className="hidden items-center gap-9 md:flex">
+          <nav className="hidden items-center gap-8 md:flex">
             {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className="text-[17px] font-medium text-wc-text-2 transition-colors hover:text-wc-navy">
+              <Link key={n.href} href={n.href} className="text-[15px] font-medium text-wc-text-2 transition-colors hover:text-wc-navy">
                 {n.label}
               </Link>
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <Account />
-            <Link href="/dashboard" className={cn(buttonVariants({ size: "lg" }), "hidden h-12 px-6 text-[17px] sm:inline-flex")}>
+            <Link href="/dashboard" className={cn(buttonVariants({ size: "lg" }), "hidden h-11 px-5 text-[15px] sm:inline-flex")}>
               Start building
             </Link>
           </div>
