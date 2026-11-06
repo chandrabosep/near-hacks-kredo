@@ -15,7 +15,7 @@ import { SendCredits } from "./send";
 
 /** The user's home: balance, connected apps, sending, claim links and everything that happened. */
 export function WalletView() {
-  const { me, status, refresh } = useMe();
+  const { me, status, expired, refresh } = useMe();
   const api = useApi();
   const [activity, setActivity] = useState<ActivityItem[]>();
 
@@ -70,7 +70,7 @@ export function WalletView() {
         <PageTitle eyebrow="Wallet" title="Your wallet." />
         <Tile>
           {status === "error" ? (
-            <Notice tone="error">We couldn&apos;t load your account. Refresh the page to try again.</Notice>
+            <Notice tone="error">{expired ? "Your session expired. Sign out and sign in again." : "We couldn't load your account. Refresh the page to try again."}</Notice>
           ) : (
             <div className="h-12 w-64 animate-pulse rounded-control bg-wc-surface-2" />
           )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useIdentityToken, usePrivy } from "@privy-io/react-auth";
+import { useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
 import { useCallback, useEffect, useState } from "react";
 import { useApi } from "./api";
 import type { Amount } from "./format";
@@ -25,9 +25,11 @@ export type Me = {
 export function useMe() {
   const { ready, authenticated } = usePrivy();
   const { identityToken } = useIdentityToken();
+  const { refreshUser } = useUser();
   const api = useApi();
   const [me, setMe] = useState<Me>();
   const [error, setError] = useState<string>();
+  const [expired, setExpired] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!identityToken) return;
@@ -38,6 +40,19 @@ export function useMe() {
       setError((err as Error).message);
     }
   }, [api, identityToken]);
+
+  // Privy can restore a session without an identity token. Ask for one, and say so if it never comes.
+  useEffect(() => {
+    if (!ready || !authenticated || identityToken) return;
+    let live = true;
+    refreshUser().then(
+      () => live && setTimeout(() => live && setExpired(true), 5000),
+      () => live && setExpired(true),
+    );
+    return () => {
+      live = false;
+    };
+  }, [ready, authenticated, identityToken, refreshUser]);
 
   useEffect(() => {
     if (!identityToken) return;
@@ -52,7 +67,7 @@ export function useMe() {
   }, [api, identityToken]);
 
   const status: "loading" | "signed-out" | "ready" | "error" =
-    !ready ? "loading" : !authenticated ? "signed-out" : me ? "ready" : error ? "error" : "loading";
+    !ready ? "loading" : !authenticated ? "signed-out" : me ? "ready" : error || (expired && !identityToken) ? "error" : "loading";
 
-  return { me, status, error, refresh };
+  return { me, status, error, expired: expired && !identityToken, refresh };
 }

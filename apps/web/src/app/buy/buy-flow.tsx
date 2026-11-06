@@ -25,7 +25,7 @@ const PRESETS = ["100", "500", "1000"];
 export function BuyFlow() {
   const params = useSearchParams();
   const returnTo = safeReturnTo(params.get("returnTo"));
-  const { me, status, refresh } = useMe();
+  const { me, status, expired, refresh } = useMe();
   const { prepare, confirm } = useAction();
 
   const [amount, setAmount] = useState(params.get("credits") ?? "500");
@@ -77,7 +77,7 @@ export function BuyFlow() {
       )}
       {status === "error" && (
         <Tile>
-          <Notice tone="error">We couldn&apos;t load your account. Refresh the page to try again.</Notice>
+          <Notice tone="error">{expired ? "Your session expired. Sign out and sign in again." : "We couldn't load your account. Refresh the page to try again."}</Notice>
         </Tile>
       )}
 

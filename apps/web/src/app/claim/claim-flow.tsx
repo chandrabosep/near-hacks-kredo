@@ -37,7 +37,7 @@ export function ClaimFlow() {
     getPublic<Preview>(`/v1/claims/${account.address}`).then(setPreview, (e: Error) => setPreviewError(e.message));
   }, [account]);
 
-  const { me, status, refresh } = useMe();
+  const { me, status, expired, refresh } = useMe();
   const api = useApi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -108,7 +108,7 @@ export function ClaimFlow() {
       )}
       {status === "error" && (
         <Tile>
-          <Notice tone="error">We couldn&apos;t load your account. Refresh the page to try again.</Notice>
+          <Notice tone="error">{expired ? "Your session expired. Sign out and sign in again." : "We couldn't load your account. Refresh the page to try again."}</Notice>
         </Tile>
       )}
       {status === "ready" && me && (

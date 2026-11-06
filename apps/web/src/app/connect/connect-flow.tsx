@@ -28,7 +28,7 @@ export function ConnectFlow() {
 
   const { apps, error: dirError } = useDirectory();
   const app = apps?.find((a) => a.id.toLowerCase() === appId.toLowerCase());
-  const { me, status, refresh } = useMe();
+  const { me, status, expired, refresh } = useMe();
   const { prepare, confirm } = useAction();
   const api = useApi();
 
@@ -94,7 +94,7 @@ export function ConnectFlow() {
       {status === "loading" && <Loading inline />}
       {status === "error" && (
         <Tile>
-          <Notice tone="error">We couldn&apos;t load your account. Refresh the page to try again.</Notice>
+          <Notice tone="error">{expired ? "Your session expired. Sign out and sign in again." : "We couldn't load your account. Refresh the page to try again."}</Notice>
         </Tile>
       )}
 
