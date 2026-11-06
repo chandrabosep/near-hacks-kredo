@@ -1,6 +1,6 @@
 # @credits/react
 
-Drop-in buttons and a live balance for any React app that takes Universal Credits.
+Drop-in buttons and a live balance for any React app that takes Kredo credits.
 
 ```tsx
 import { CreditsProvider, CreditsBalance, ConnectCreditsButton, BuyCreditsButton } from "@credits/react";

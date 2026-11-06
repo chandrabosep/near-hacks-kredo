@@ -1,4 +1,4 @@
-# Universal Credits: Build Plan (ETHGlobal Mumbai)
+# Kredo: Build Plan (ETHGlobal Mumbai)
 
 **What we're building:** buy credits once, in any partner app, and spend the leftover in every other one. Each company is paid in USDT for what its users spend. The product story is in [overview.md](overview.md).
 

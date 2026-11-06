@@ -1,4 +1,4 @@
-# Universal Credits: Overview
+# Kredo: Overview
 
 **One line:** One balance for every AI app. Buy credits once, in any partner app, and spend the leftover in every other one. Every credit is provably backed.
 

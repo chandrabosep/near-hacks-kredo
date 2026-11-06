@@ -1,7 +1,7 @@
 {
   "name": "@credits/sdk",
   "version": "0.1.0",
-  "description": "Server kit for charging Universal Credits from a company backend",
+  "description": "Server kit for charging Kredo credits from a company backend",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

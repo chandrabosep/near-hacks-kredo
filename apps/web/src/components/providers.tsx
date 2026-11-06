@@ -31,7 +31,7 @@ export function Providers({ children }: { children: ReactNode }) {
         },
         defaultChain: chain,
         supportedChains: [chain],
-        appearance: { theme: "light", accentColor: "#0066FF", showWalletLoginFirst: false },
+        appearance: { theme: "light", accentColor: "#0066FF", showWalletLoginFirst: false, landingHeader: "Sign in to Kredo" },
       }}
     >
       {children}

@@ -9,18 +9,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-/** The brand mark: a notched square with the leaf inside. */
+/** The Kredo mark: a K whose upper arm sends off a credit, and the wordmark. */
 export function Logo({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cn("flex shrink-0 items-center gap-2.5 text-wc-navy", className)} aria-label="Universal Credits home">
-      <svg viewBox="0 0 35 35" className="size-9" aria-hidden>
-        <rect x="9" y="9" width="25" height="25" rx="7" fill="#0066FF" />
-        <path d="M9 2h15l6 6v15a7 7 0 0 1-7 7H8l-6-6V9a7 7 0 0 1 7-7Z" fill="#080A28" />
-        <rect x="9" y="9" width="14" height="14" rx="3" fill="#fff" />
-        <path d="M21 21a8 8 0 0 1-11.3-11.3L21 21Z" fill="#080A28" />
-      </svg>
-      <span className="text-[22px] leading-none font-bold tracking-[-0.04em]">universal credits</span>
+    <Link href="/" className={cn("flex shrink-0 items-center gap-2.5 text-wc-navy", className)} aria-label="Kredo home">
+      <KredoMark className="size-9" />
+      <span className="text-[24px] leading-none font-bold tracking-[-0.04em]">kredo</span>
     </Link>
+  );
+}
+
+export function KredoMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className} aria-hidden>
+      <rect width="32" height="32" rx="9" fill="#080A28" />
+      <rect x="8.5" y="7.5" width="4.5" height="17" rx="2.25" fill="#fff" />
+      <path d="M13.8 16.2 21.6 23.3" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" />
+      <path d="M13.8 15.4 17.6 12" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" />
+      <circle cx="21.6" cy="9.6" r="3.6" fill="#68ECBC" stroke="#080A28" strokeWidth="1.4" />
+    </svg>
   );
 }
 

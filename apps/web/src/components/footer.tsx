@@ -19,7 +19,7 @@ export function Footer() {
         </div>
         <div className="grid grid-cols-2 gap-10 px-6 py-14 sm:px-8 md:grid-cols-4 lg:px-16">
           <div className="col-span-2 md:col-span-1">
-            <p className="text-[22px] leading-none font-bold tracking-[-0.04em] text-white">universal credits</p>
+            <p className="text-[22px] leading-none font-bold tracking-[-0.04em] text-white">kredo</p>
             <p className="mt-2 text-[15px] leading-6">Credits backed 1:1 by USDT on Whitechain.</p>
           </div>
           {COLUMNS.map((col) => (

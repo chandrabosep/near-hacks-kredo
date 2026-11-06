@@ -1,4 +1,4 @@
-# Universal Credits
+# Kredo
 
 Buy credits once, in any partner app, and spend the leftover in every other one. Each company is paid in USDT for what its users spend. Credits are backed 1:1 by USDT held in the `CreditVault` contract on Whitechain.
 

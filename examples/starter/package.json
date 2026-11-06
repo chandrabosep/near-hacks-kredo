@@ -1,7 +1,7 @@
 {
   "name": "credits-starter",
   "private": true,
-  "description": "The smallest app that takes Universal Credits",
+  "description": "The smallest app that takes Kredo credits",
   "type": "module",
   "scripts": {
     "start": "tsx --env-file-if-exists=.env server.ts"

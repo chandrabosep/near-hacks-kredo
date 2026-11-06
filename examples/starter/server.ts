@@ -1,4 +1,4 @@
-// The smallest app that takes Universal Credits. Everything credits-related is marked // ◆.
+// The smallest app that takes Kredo credits. Everything credits-related is marked // ◆.
 import express from "express";
 import { Credits, CreditsError } from "@credits/sdk"; // ◆
 

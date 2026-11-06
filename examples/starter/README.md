@@ -1,6 +1,6 @@
 # Credits starter
 
-The smallest app that takes Universal Credits: a joke for 1 credit. One server file and one HTML page, no framework.
+The smallest app that takes Kredo credits: a joke for 1 credit. One server file and one HTML page, no framework.
 
 [server.ts](server.ts) is 40 lines, and only the 10 marked `// ◆` are about credits:
 

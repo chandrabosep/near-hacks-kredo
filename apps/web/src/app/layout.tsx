@@ -7,7 +7,7 @@ const onest = Onest({ variable: "--font-onest", subsets: ["latin"], weight: ["30
 const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], weight: ["400"] });
 
 export const metadata: Metadata = {
-  title: { default: "Universal Credits", template: "%s · Universal Credits" },
+  title: { default: "Kredo", template: "%s · Kredo" },
   description: "One balance for every AI app. Buy credits once, spend them anywhere. Every credit is backed by USDT on Whitechain.",
 };
 

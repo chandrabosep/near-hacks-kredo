@@ -1,6 +1,6 @@
 # @credits/sdk
 
-Charge Universal Credits from your server. Your users buy credits once and spend them in every app on the network. You're paid in USDT on Whitechain for what they spend with you.
+Charge Kredo credits from your server. Your users buy credits once and spend them in every app on the network. You're paid in USDT on Whitechain for what they spend with you.
 
 No dependencies. Node 18+.
 

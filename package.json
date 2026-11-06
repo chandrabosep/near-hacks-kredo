@@ -1,5 +1,5 @@
 {
-  "name": "universal-credits",
+  "name": "kredo",
   "private": true,
   "workspaces": [
     "apps/*",

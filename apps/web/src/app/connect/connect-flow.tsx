@@ -86,7 +86,7 @@ export function ConnectFlow() {
     <>
       <PageTitle
         title={`Connect ${name}.`}
-        lead={`${name} wants to spend from your Universal Credits balance. You choose the limit. You can lower or remove it any time in your wallet.`}
+        lead={`${name} wants to spend from your Kredo balance. You choose the limit. You can lower or remove it any time in your wallet.`}
       />
 
       {status === "signed-out" && <SignInPanel title={`Sign in to connect ${name}.`} />}
