@@ -154,8 +154,8 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [ ] hold on start, capture on success, release on failure
 
 **Dev scripts**
-- [ ] local dev script (anvil → deploy → backend) and video app script
-- [ ] Whitechain deploy and start scripts
+- [x] local dev script (anvil → deploy → backend)
+- [x] Whitechain deploy and start scripts
 - [ ] README: setup and the SDK usage page
 
 Tag `m0-core` when everything above runs locally.
@@ -219,7 +219,7 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 
 ### Step 4: SDK test mode and starter app
 - [x] Test mode: test API keys that work with fake credits
-- [ ] A bare starter app; count its lines for the "about 20 lines" claim
+- [x] A bare starter app; count its lines for the "about 20 lines" claim
 
 **Done when:** a brand-new app integrates using only the README. This is the Operate drop-in piece.
 

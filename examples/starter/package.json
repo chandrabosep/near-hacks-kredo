@@ -1,0 +1,16 @@
+{
+  "name": "credits-starter",
+  "private": true,
+  "description": "The smallest app that takes Universal Credits",
+  "type": "module",
+  "scripts": {
+    "start": "tsx --env-file-if-exists=.env server.ts"
+  },
+  "dependencies": {
+    "@credits/sdk": "file:../../packages/sdk",
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
+  }
+}
