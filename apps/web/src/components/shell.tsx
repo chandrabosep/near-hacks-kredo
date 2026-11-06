@@ -37,7 +37,7 @@ const NAV = [
   { href: "/wallet", label: "Wallet" },
   { href: "/buy", label: "Buy" },
   { href: "/send", label: "Send" },
-  { href: "/apps", label: "Apps" },
+  { href: "/ecosystem", label: "Ecosystem" },
   { href: "/reserves", label: "Reserves" },
   { href: "/docs", label: "Docs" },
 ];

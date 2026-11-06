@@ -6,7 +6,15 @@ import { useEffect, useState } from "react";
 import { env } from "./env";
 
 export type PriceEntry = { price: string } | { rate: string; unit: string };
-export type DirectoryApp = AppProfile & { id: string; name: string; prices: Record<string, PriceEntry>; exchangeRate: string | null };
+export type DirectoryApp = AppProfile & {
+  id: string;
+  name: string;
+  prices: Record<string, PriceEntry>;
+  exchangeRate: string | null;
+  /** From onchain events: charges and how many people paid. */
+  usage: { charges: number; payingUsers: number; lastChargeAt: string | null };
+  listedAt: string;
+};
 
 /** GET on a public route, no login needed. */
 export async function getPublic<T>(path: string): Promise<T> {

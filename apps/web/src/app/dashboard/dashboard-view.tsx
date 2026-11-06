@@ -66,7 +66,7 @@ export function DashboardView() {
   if (company === null) {
     return (
       <>
-        <PageTitle title="Set up your company." lead="Tell users who they're paying. This shows in the app directory and on the connect page. You can change it any time." />
+        <PageTitle title="Set up your company." lead="Tell users who they're paying. This shows in the ecosystem and on the connect page. You can change it any time." />
         {error && (
           <Tile>
             <Notice tone="error">{error}</Notice>
@@ -199,7 +199,7 @@ function CreateApp({ onCreated }: { onCreated: () => void }) {
       <p className="mt-2 text-[15px] leading-6 text-wc-text-muted">Registered onchain in a few seconds. Free: the network pays the gas.</p>
       <div className="mt-6 max-w-md space-y-5">
         <Field label="App name" placeholder="Your app" value={name} onChange={(e) => setName(e.target.value)} />
-        <TextareaField label="What it does" placeholder="One or two sentences for the app directory." maxLength={280} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <TextareaField label="What it does" placeholder="One or two sentences for the ecosystem page." maxLength={280} value={description} onChange={(e) => setDescription(e.target.value)} />
         <SelectField label="Category" value={category} onChange={setCategory} options={CATEGORIES} hint="Defaults to your company's." />
         <Field label="Payout address" placeholder="Your wallet, by default" value={payout} onChange={(e) => setPayout(e.target.value)} hint="Where your USDT earnings go on Whitechain." />
         {error && <Notice tone="error">{error}</Notice>}

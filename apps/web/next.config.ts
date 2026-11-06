@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   // The developer docs under /docs are MDX pages.
   pageExtensions: ["ts", "tsx", "mdx"],
+  // The app directory became the ecosystem page.
+  async redirects() {
+    return [{ source: "/apps", destination: "/ecosystem", permanent: true }];
+  },
 };
 
 // Plugins are named by string so Turbopack can load them.

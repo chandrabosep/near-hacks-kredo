@@ -86,6 +86,16 @@ export function publicRoutes(ctx: Context): Router {
 
   /** Every app that accepts credits, with its prices. */
   r.get("/directory", (_req, res) => {
+    // Usage per app, from onchain events: how many charges, and how many people paid.
+    const usage = new Map<string, { charges: number; users: Set<string>; lastAt: number }>();
+    for (const e of ctx.db.data.events) {
+      if ((e.event !== "Charged" && e.event !== "Captured") || !e.app) continue;
+      const u = usage.get(e.app.toLowerCase()) ?? { charges: 0, users: new Set<string>(), lastAt: 0 };
+      u.charges += 1;
+      if (e.user) u.users.add(e.user.toLowerCase());
+      u.lastAt = Math.max(u.lastAt, e.at);
+      usage.set(e.app.toLowerCase(), u);
+    }
     res.json(
       ctx.store.listApps().map((a) => ({
         id: a.id,
@@ -93,6 +103,11 @@ export function publicRoutes(ctx: Context): Router {
         prices: a.prices,
         exchangeRate: a.exchangeRate ?? null,
         ...appProfile(ctx, a),
+        usage: (() => {
+          const u = usage.get(a.id.toLowerCase());
+          return { charges: u?.charges ?? 0, payingUsers: u?.users.size ?? 0, lastChargeAt: u?.lastAt ? new Date(u.lastAt).toISOString() : null };
+        })(),
+        listedAt: new Date(a.createdAt).toISOString(),
       })),
     );
   });
