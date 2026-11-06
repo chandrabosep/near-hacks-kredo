@@ -61,12 +61,10 @@ export default function Home() {
             <div className="relative z-10 px-6 py-16 motion-safe:animate-rise sm:px-8 md:px-14 lg:px-16">
               <p className="inline-flex items-center gap-2 rounded-[20px] border border-wc-border-light bg-wc-surface px-3 py-1 text-[13px] font-medium text-wc-text-2">
                 <span className="size-1.5 rounded-full bg-wc-mint-2" />
-                For AI companies
+                Live on Whitechain
               </p>
-              <h1 className="type-hero mt-6 max-w-2xl font-semibold text-balance text-wc-text-1">The billing network for the AI economy.</h1>
-              <p className="mt-6 max-w-lg text-[18px] leading-[1.625] text-wc-text-muted">
-                One integration for usage billing, USDT payouts and a shared pool of paying users.
-              </p>
+              <h1 className="type-hero mt-6 max-w-2xl font-semibold text-balance text-wc-text-1">The Unified Payment Layer for the AI Ecosystem.</h1>
+              <p className="mt-5 text-[19px] font-medium tracking-[-0.01em] text-wc-blue sm:text-[21px]">One balance. One network. One interface.</p>
               <div className="mt-9 flex flex-col gap-4 sm:flex-row sm:gap-5">
                 <Link href="/dashboard" className={buttonVariants({ size: "md" })}>
                   List your app

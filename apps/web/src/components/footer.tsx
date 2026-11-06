@@ -20,7 +20,7 @@ export function Footer() {
         <div className="grid grid-cols-2 gap-10 px-6 py-14 sm:px-8 md:grid-cols-4 lg:px-16">
           <div className="col-span-2 md:col-span-1">
             <p className="text-[22px] leading-none font-bold tracking-[-0.04em] text-white">kredo</p>
-            <p className="mt-2 text-[15px] leading-6">The billing network for the AI economy.</p>
+            <p className="mt-2 text-[15px] leading-6">The Unified Payment Layer for the AI Ecosystem.</p>
           </div>
           {COLUMNS.map((col) => (
             <div key={col.title}>
