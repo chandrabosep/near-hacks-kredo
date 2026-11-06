@@ -1,10 +1,13 @@
 "use client";
 
-import { ShieldCheck } from "lucide-react";
+import { Check, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Field, Notice, PageTitle, SignInPanel, Spinner, Tile, Tiles, TxLink } from "@/components/shell";
+import { usePrivy } from "@privy-io/react-auth";
+import { BrandLogo } from "@/components/brand-logo";
+import { PopupCard, PopupFrame } from "@/components/popup-frame";
+import { Field, Notice, Page, PageTitle, SignInPanel, Spinner, Tile, Tiles, TxLink } from "@/components/shell";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ApiError, useAction, useApi } from "@/lib/api";
 import { credits, creditsToUsd, parseCredits, safeReturnTo, usd, type Amount } from "@/lib/format";
@@ -19,9 +22,13 @@ type Connected = { app: string; limit: Amount; code: string; explorer?: string }
  *
  * The user gives an app a spending limit. Nothing is spent here. The limit is signed by the
  * user and enforced by the vault contract, so the app can never charge more than this.
+ *
+ * Sent here by an app (it always passes returnTo), it's a compact card sized for a popup.
  */
 export function ConnectFlow() {
   const params = useSearchParams();
+  // The raw param, not safeReturnTo: it needs window, and the frame must match the server render.
+  const compact = params.has("returnTo");
   const appId = params.get("app") ?? "";
   const returnTo = safeReturnTo(params.get("returnTo"));
   const days = Number(params.get("days")) || undefined;
@@ -31,6 +38,7 @@ export function ConnectFlow() {
   const { me, status, expired, refresh } = useMe();
   const { prepare, confirm } = useAction();
   const api = useApi();
+  const { login } = usePrivy();
 
   const [limit, setLimit] = useState(params.get("credits") ?? "200");
   const [busy, setBusy] = useState(false);
@@ -38,9 +46,9 @@ export function ConnectFlow() {
   const [done, setDone] = useState<Connected>();
   const [closing, setClosing] = useState(false);
 
-  if (dirError) return <Problem text={`We couldn't reach the network: ${dirError}`} />;
-  if (!apps) return <Loading />;
-  if (!app) return <Problem text="This link doesn't point to an app on the network. Ask the app for a new one." />;
+  if (dirError) return <Problem compact={compact} text={`We couldn't reach the network: ${dirError}`} />;
+  if (!apps) return <Loading compact={compact} />;
+  if (!app) return <Problem compact={compact} text="This link doesn't point to an app on the network. Ask the app for a new one." />;
 
   const name = app.name;
   const existing = me?.connections.find((c) => c.app.toLowerCase() === app.id.toLowerCase());
@@ -82,8 +90,103 @@ export function ConnectFlow() {
   const back = returnTo && done && returnUrl(returnTo, { type: "credits:connected", code: done.code });
   const buyHref = `/buy?returnTo=${encodeURIComponent(typeof window === "undefined" ? "" : window.location.href)}`;
 
+  if (compact) {
+    const sessionError = expired ? "Your session expired. Sign out and sign in again." : "We couldn't load your account. Close this and try again.";
+    return (
+      <PopupFrame foot="Enforced by the vault contract on Whitechain · No gas or fees">
+        <div className="flex items-center gap-3">
+          <BrandLogo src={app.logoUrl} name={name} className="size-11 rounded-[12px]" />
+          <div className="min-w-0">
+            <h1 className="truncate text-[20px] font-semibold text-wc-text-1">Connect {name}</h1>
+            <p className="text-[14px] text-wc-text-muted">wants to spend from your Kredo balance</p>
+          </div>
+        </div>
+
+        <PopupCard>
+          {status === "signed-out" && (
+            <>
+              <p className="text-[15px] leading-6 text-wc-text-muted">Sign in with your email to connect {name}. No wallet to install, no gas.</p>
+              <Button size="lg" className="mt-4 h-11 w-full" onClick={() => login()}>
+                Continue with email
+              </Button>
+            </>
+          )}
+          {status === "loading" && <div className="h-40 animate-pulse rounded-[12px] bg-wc-surface-2" />}
+          {status === "error" && <Notice tone="error">{sessionError}</Notice>}
+
+          {status === "ready" && me && done && (
+            <div className="py-2 text-center">
+              <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-wc-mint-pastel text-wc-navy">
+                <Check className="size-5" />
+              </span>
+              <p className="mt-4 text-[17px] font-semibold text-wc-text-1">{name} is connected</p>
+              <p className="mt-1 text-[14px] text-wc-text-muted">It can spend up to {credits(done.limit)}.</p>
+              {closing ? (
+                <p className="mt-5 text-[14px] text-wc-icon-muted">Taking you back to {name}…</p>
+              ) : (
+                back && (
+                  <a className={buttonVariants({ size: "lg", className: "mt-5 h-11 w-full" })} href={back}>
+                    Back to {name}
+                  </a>
+                )
+              )}
+            </div>
+          )}
+
+          {status === "ready" && me && !done && (
+            <div className="space-y-4">
+              <Field
+                label="Spending limit"
+                inputMode="decimal"
+                value={limit}
+                onChange={(e) => setLimit(e.target.value)}
+                suffix={parsed ? `credits · ${usd(creditsToUsd(parsed))}` : "credits"}
+                hint={existing?.connected ? `Currently ${credits(existing.limit)}. This replaces it.` : `Your balance is ${credits(me.balance)}`}
+              />
+              <p className="flex gap-2 text-[13px] leading-5 text-wc-text-muted">
+                <ShieldCheck className="mt-px size-4 shrink-0 text-wc-blue" aria-hidden />
+                Only {name} can use it, and never more than this. Nothing is spent now.
+              </p>
+              {prices.length > 0 && (
+                <details className="group rounded-[12px] border border-wc-border-light bg-wc-bg text-[13px]">
+                  <summary className="cursor-pointer list-none px-4 py-2.5 font-medium text-wc-text-2 marker:hidden">What {name} charges</summary>
+                  <dl className="divide-y divide-wc-border-light border-t border-wc-border-light">
+                    {prices.slice(0, 6).map(([action, p]) => (
+                      <div key={action} className="flex items-center justify-between gap-4 px-4 py-2">
+                        <dt className="truncate font-mono text-[12px] text-wc-text-2">{action}</dt>
+                        <dd className="shrink-0 font-medium text-wc-text-1">{describePrice(p)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
+              )}
+              {error && <Notice tone="error">{error}</Notice>}
+              <div className="grid gap-2">
+                <Button size="lg" className="h-11 w-full" disabled={!parsed || busy} onClick={approve}>
+                  {busy && <Spinner />}
+                  {busy ? "Approving" : `Approve ${parsed ? credits(parsed) : ""}`}
+                </Button>
+                {existing?.connected && returnTo ? (
+                  <Button size="lg" variant="ghost" className="h-11" disabled={busy} onClick={continueAsIs}>
+                    Keep {credits(existing.limit)}
+                  </Button>
+                ) : (
+                  returnTo && (
+                    <a className={buttonVariants({ size: "lg", variant: "ghost", className: "h-11" })} href={appendParam(returnTo, "connected", "0")}>
+                      Not now
+                    </a>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+        </PopupCard>
+      </PopupFrame>
+    );
+  }
+
   return (
-    <>
+    <Page>
       <PageTitle
         title={`Connect ${name}.`}
         lead={`${name} wants to spend from your Kredo balance. You choose the limit. You can lower or remove it any time in your account.`}
@@ -188,7 +291,7 @@ export function ConnectFlow() {
           </Tile>
         </Tiles>
       )}
-    </>
+    </Page>
   );
 }
 
@@ -201,23 +304,43 @@ function Point({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Loading({ inline }: { inline?: boolean }) {
-  return (
+function Loading({ inline, compact }: { inline?: boolean; compact?: boolean }) {
+  if (compact) {
+    return (
+      <PopupFrame>
+        <div className="h-11 w-56 animate-pulse rounded-control bg-wc-surface-2" />
+        <div className="mt-5 h-64 animate-pulse rounded-[16px] bg-wc-surface-2" />
+      </PopupFrame>
+    );
+  }
+  const skeleton = (
     <div className={inline ? "px-6 py-14 sm:px-8 lg:px-16" : "px-6 pt-section-t sm:px-8 lg:px-16"}>
       <div className="h-10 w-72 animate-pulse rounded-control bg-wc-surface-2" />
       <div className="mt-5 h-5 w-96 max-w-full animate-pulse rounded-control bg-wc-surface-2" />
     </div>
   );
+  // Inline sits inside a page that already has its frame.
+  return inline ? skeleton : <Page>{skeleton}</Page>;
 }
 
-function Problem({ text }: { text: string }) {
+function Problem({ text, compact }: { text: string; compact?: boolean }) {
+  if (compact) {
+    return (
+      <PopupFrame>
+        <h1 className="text-[20px] font-semibold text-wc-text-1">This link isn&apos;t working</h1>
+        <PopupCard>
+          <Notice tone="error">{text}</Notice>
+        </PopupCard>
+      </PopupFrame>
+    );
+  }
   return (
-    <>
+    <Page>
       <PageTitle title="This link isn't working." />
       <Tile>
         <Notice tone="error">{text}</Notice>
       </Tile>
-    </>
+    </Page>
   );
 }
 

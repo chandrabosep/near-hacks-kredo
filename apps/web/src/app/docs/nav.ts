@@ -24,6 +24,7 @@ export const DOCS_NAV: DocsGroup[] = [
       { href: "/docs/connect", label: "Connecting users" },
       { href: "/docs/charging", label: "Charging" },
       { href: "/docs/react", label: "React kit" },
+      { href: "/docs/react/preview", label: "React kit preview" },
       { href: "/docs/webhooks", label: "Webhooks" },
       { href: "/docs/payouts", label: "Payouts and reporting" },
     ],

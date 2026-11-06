@@ -3,14 +3,16 @@
 import { Check, Coins, Fuel, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { usePrivy } from "@privy-io/react-auth";
 import { useEffect, useState } from "react";
 import { AmountField } from "@/components/amount-field";
 import { CopyValue } from "@/components/copy";
-import { Notice, SignInPanel, Spinner, Tile, TxLink } from "@/components/shell";
+import { PopupCard, PopupFrame } from "@/components/popup-frame";
+import { Notice, Page, SignInPanel, Spinner, Tile, TxLink } from "@/components/shell";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ApiError, useAction, useApi } from "@/lib/api";
 import { credits, creditsToUsd, parseCredits, safeReturnTo, usd, type Amount } from "@/lib/format";
-import { postToOpener, returnUrl } from "@/lib/handoff";
+import { isPopup, postToOpener, returnUrl } from "@/lib/handoff";
 import { useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
@@ -21,8 +23,23 @@ type Bought = { amount: Amount; explorer?: string };
  *
  * Turns test USDT in the user's wallet into credits, 1 USDT = 100 credits. The user signs a
  * USDT permit; our relayer deposits it into the vault and pays the gas.
+ *
+ * Sent here by an app (the React kit's buy and top up buttons, or the SDK's buyUrl), it's a
+ * compact checkout sized for a popup. Opened from our own site, it's the full page.
  */
 export function BuyFlow() {
+  const params = useSearchParams();
+  // Read the raw param, not safeReturnTo: it needs window, and the frame must match the server render.
+  if (params.has("returnTo")) return <Checkout />;
+  return (
+    <Page>
+      <FullBuy />
+    </Page>
+  );
+}
+
+/** Everything both layouts share: the account, the amount, and the buy itself. */
+function useBuy() {
   const params = useSearchParams();
   const returnTo = safeReturnTo(params.get("returnTo"));
   const { me, status, expired, refresh } = useMe();
@@ -32,6 +49,7 @@ export function BuyFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [done, setDone] = useState<Bought>();
+  const [closing, setClosing] = useState(false);
 
   const parsed = parseCredits(amount);
   const walletCredits = me ? Number(me.walletUsdt.credits) : 0;
@@ -53,7 +71,7 @@ export function BuyFlow() {
     try {
       const prepared = await prepare("buy", { credits: parsed });
       setDone(await confirm<Bought>("buy", prepared));
-      postToOpener(returnTo, { type: "credits:bought" });
+      setClosing(isPopup(params) && postToOpener(returnTo, { type: "credits:bought" }));
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : `Signing didn't finish: ${(err as Error).message}`);
@@ -61,6 +79,12 @@ export function BuyFlow() {
       setBusy(false);
     }
   }
+
+  return { returnTo, me, status, expired, refresh, amount, setAmount, parsed, hasUsdt, tooMuch, busy, error, done, setDone, closing, buy };
+}
+
+function FullBuy() {
+  const { returnTo, me, status, expired, refresh, amount, setAmount, parsed, hasUsdt, tooMuch, busy, error, done, setDone, buy } = useBuy();
 
   return (
     <>
@@ -193,6 +217,94 @@ export function BuyFlow() {
         </div>
       )}
     </>
+  );
+}
+
+/** The checkout an app opens: one card, sized for a 480px popup. */
+function Checkout() {
+  const { returnTo, me, status, expired, refresh, amount, setAmount, parsed, hasUsdt, tooMuch, busy, error, done, setDone, closing, buy } = useBuy();
+  const { login } = usePrivy();
+
+  return (
+    <PopupFrame foot="1 credit = $0.01 · No gas or fees · Backed 1:1 by USDT">
+      <h1 className="text-[22px] font-semibold text-wc-text-1">Buy credits</h1>
+      <p className="mt-1 text-[14px] text-wc-text-muted">
+        {me ? (
+          <>
+            Balance <span className="font-medium text-wc-text-1">{credits(me.balance)}</span> · {usd(me.balance)}
+          </>
+        ) : (
+          "One balance for every app on Kredo."
+        )}
+      </p>
+
+      <PopupCard>
+        {status === "signed-out" && (
+          <>
+            <p className="text-[15px] leading-6 text-wc-text-muted">Sign in with your email to buy credits. No wallet to install, no gas.</p>
+            <Button size="lg" className="mt-4 h-11 w-full" onClick={() => login()}>
+              Continue with email
+            </Button>
+          </>
+        )}
+        {status === "loading" && <div className="h-40 animate-pulse rounded-[12px] bg-wc-surface-2" />}
+        {status === "error" && <Notice tone="error">{expired ? "Your session expired. Sign out and sign in again." : "We couldn't load your account. Close this and try again."}</Notice>}
+
+        {status === "ready" && me && done && (
+          <div className="py-2 text-center">
+            <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-wc-mint-pastel text-wc-navy">
+              <Check className="size-5" />
+            </span>
+            <p className="mt-4 text-[17px] font-semibold text-wc-text-1">{credits(done.amount)} added</p>
+            <p className="mt-1 text-[14px] text-wc-text-muted">New balance {credits(me.balance)}</p>
+            {closing ? (
+              <p className="mt-5 text-[14px] text-wc-icon-muted">Taking you back to the app…</p>
+            ) : (
+              <div className="mt-5 grid gap-2">
+                {returnTo && (
+                  <a className={cn(buttonVariants({ size: "lg" }), "h-11")} href={returnUrl(returnTo, { type: "credits:bought" })}>
+                    Back to the app
+                  </a>
+                )}
+                <Button size="lg" variant="ghost" className="h-11" onClick={() => setDone(undefined)}>
+                  Buy more
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {status === "ready" && me && !done && hasUsdt && (
+          <div className="space-y-4">
+            <AmountField value={amount} onChange={setAmount} balance={me.walletUsdt} quick={["100", "500", "1000"]} unit="USDT" overText={`Your USDT covers ${credits(me.walletUsdt)}`} />
+            <div className="rounded-[12px] border border-wc-border-light bg-wc-bg">
+              <Row label="You pay" value={parsed ? `${usd(creditsToUsd(parsed))} USDT` : "Nothing yet"} />
+              <Row label="You get" value={parsed ? credits(parsed) : "No credits"} strong />
+            </div>
+            {error && <Notice tone="error">{error}</Notice>}
+            <Button size="lg" className="h-11 w-full" disabled={!parsed || tooMuch || busy} onClick={buy}>
+              {busy && <Spinner />}
+              {busy ? "Buying" : parsed ? `Buy ${credits(parsed)}` : "Buy credits"}
+            </Button>
+          </div>
+        )}
+
+        {status === "ready" && me && !done && !hasUsdt && (
+          <div>
+            {me.faucet?.available && <Faucet usdt={me.faucet.usdt} onDone={() => void refresh()} />}
+            <p className="text-[14px] leading-6 text-wc-text-muted">{me.faucet?.available ? "Or send" : "Send"} test USDT on Whitechain Sepolia to your wallet:</p>
+            <CopyValue value={me.address} className="mt-3" />
+            <p className="mt-4 flex items-center gap-2 text-[13px] text-wc-text-muted">
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-wc-blue opacity-60" />
+                <span className="relative inline-flex size-2 rounded-full bg-wc-blue" />
+              </span>
+              Waiting for USDT. This updates on its own.
+            </p>
+          </div>
+        )}
+      </PopupCard>
+    </PopupFrame>
   );
 }
 

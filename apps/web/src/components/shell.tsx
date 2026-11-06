@@ -41,7 +41,8 @@ const NAV = [
   { href: "/docs", label: "Docs" },
 ];
 
-function Account() {
+/** Sign in or sign out, from the header. */
+export function Account() {
   const { ready, authenticated, user, login, logout } = usePrivy();
   if (!ready) return <span className="h-10 w-20 animate-pulse rounded-control bg-wc-surface-2" />;
   if (!authenticated) {
