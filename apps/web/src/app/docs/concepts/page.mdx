@@ -1,0 +1,41 @@
+export const metadata = { title: "How it works" };
+
+# How it works
+
+What happens between your server, your users and the vault contract on Whitechain.
+
+## The vault
+
+Every credit is backed by USDT held in one contract, the vault, on Whitechain Sepolia (chain ID 1874). When a user buys credits, their USDT goes into the vault and they get 100 credits per USDT. The vault keeps every balance, every app's limit for every user, and every app's earnings. The [reserves page](/reserves) shows, live, that the vault's USDT covers everything it owes.
+
+## Users
+
+Users sign in with an email code. A wallet is made for them at sign-in, and only they can sign with it. They never need gas or a seed phrase: they sign messages, and the network's relayer sends the transactions and pays the gas.
+
+## Limits
+
+Before you can charge a user, they approve a **limit** for your app, for example 200 credits, optionally with an expiry. They sign it, and the vault enforces it. You can charge up to the limit, and they can lower or remove it in their wallet any time. When a charge would go over, it's declined with `OverLimit`.
+
+## Charges
+
+A charge moves credits from the user to your app's earnings, minus the network fee, in one transaction. Use it for anything quick: a message, an image, an API call.
+
+## Holds
+
+For long or uncertain work, **hold** the most it could cost, do the work, then **capture** what it actually cost. The rest goes back to the user. If the work fails, **release** the hold and the user keeps everything. Holds expire after an hour by default and are released automatically.
+
+## Light mode
+
+Already have your own credits or coins? Keep them. Set an **exchange rate**, such as 2 of our credits for 1 of yours, and call `convert()` when a user buys yours with ours. You're paid in USDT like any other app; what happens to your own credits after that is up to you.
+
+## Fees and payouts
+
+The network keeps 5% of each charge. That covers the gas for every transaction, yours and your users'. The rest is your **unpaid earnings**, which you withdraw in USDT to your payout address with one call or one click.
+
+## Refunds
+
+You can refund a user up to what they spent with your app. Refunds come out of your unpaid earnings.
+
+## Gas
+
+The network's relayer pays all gas in WBT. It works under a daily budget, a per-app budget and a per-transaction ceiling, and it simulates every call first, so a call that would fail is never sent. Your dashboard shows what your charges cost in gas.

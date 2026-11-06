@@ -1,0 +1,55 @@
+export const metadata = { title: "HTTP API" };
+
+# HTTP API
+
+The SDK wraps these. Use them directly from any language.
+
+Send JSON, and your key as `Authorization: Bearer uc_live_...`. Every write takes a `ref`; the same ref returns the first result. Errors come back as `{ "error": "...", "code": "..." }`, see [Errors](/docs/errors).
+
+## App routes
+
+Need your API key.
+
+| Method and path | What it does |
+|---|---|
+| `GET /v1/app` | Your app: payout, fee, prices, earnings, profile |
+| `GET /v1/prices`, `PUT /v1/prices` | Read or replace the price list |
+| `GET /v1/quote?action=&quantity=` | Price, fee and what you earn |
+| `GET /v1/users/:address` | A user's balance and limit for your app |
+| `POST /v1/connect/exchange` | `{ code }` to `{ user }` |
+| `POST /v1/charges` | `{ user, action \| credits, quantity?, ref }` |
+| `POST /v1/holds` | `{ user, action \| credits, quantity?, ref, ttlSeconds? }` |
+| `GET /v1/holds/:holdId` | A hold and its status |
+| `POST /v1/holds/:holdId/capture` | `{ credits? }` |
+| `POST /v1/holds/:holdId/release` | Returns the whole hold |
+| `POST /v1/refunds` | `{ user, credits, ref }` |
+| `PUT /v1/exchange-rate`, `POST /v1/convert` | Light mode |
+| `POST /v1/payout` | Pays unpaid earnings in USDT |
+| `GET /v1/activity`, `GET /v1/export.csv`, `GET /v1/gas` | Reporting |
+| `PUT /v1/webhook`, `GET /v1/webhook/deliveries` | Webhooks |
+| `POST /v1/sandbox/reset` | Test keys only: reset every test user |
+
+## Public routes
+
+No key needed.
+
+| Method and path | What it does |
+|---|---|
+| `GET /v1/health` | Chain, vault, relayer and indexer status |
+| `GET /v1/reserves` | The vault's USDT against everything it owes |
+| `GET /v1/stats` | Network totals |
+| `GET /v1/directory` | Every app, with prices and profile |
+| `GET /v1/claims/:claimKey` | What a claim link holds |
+
+## Dashboard routes
+
+Used by the dashboard, signed in with the company owner's email login rather than an API key. Every app route above also works under `/v1/me/apps/:id/...` for the owner.
+
+| Method and path | What it does |
+|---|---|
+| `GET /v1/me/company`, `PUT /v1/me/company` | Company profile |
+| `GET /v1/me/apps`, `POST /v1/me/apps` | List and register apps |
+| `PATCH /v1/me/apps/:id/profile` | App name, description, website, logo, category |
+| `GET /v1/me/apps/:id/keys`, `POST /v1/me/apps/:id/keys` | List and create API keys |
+| `DELETE /v1/me/apps/:id/keys/:keyId` | Revoke a key |
+| `GET /v1/me/apps/:id/stats` | Revenue, earnings, refunds, paying users, gas |

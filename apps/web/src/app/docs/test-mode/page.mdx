@@ -1,0 +1,37 @@
+export const metadata = { title: "Test mode" };
+
+# Test mode
+
+Build and test your whole integration without spending anything or touching the chain.
+
+## Use a test key
+
+Create a test key in your app's **API keys** section and use it in place of your live key. Everything else stays the same:
+
+```ts
+const credits = new Credits({ apiKey: process.env.CREDITS_TEST_KEY! }); // uc_test_...
+```
+
+## What you get
+
+- Every test user starts with **1,000 credits** and a **500 credit limit** for your app.
+- Limits, holds, captures, releases and refunds follow the vault's rules exactly, refusals included. An over-limit charge is declined with `OverLimit`, as it would be live.
+- Every response carries `test: true`.
+- Nothing is sent to Whitechain, and nothing costs gas.
+
+## Connecting a test user
+
+There's no hosted page in test mode. Make a code from any address and swap it as usual:
+
+```ts
+const { user } = await credits.exchangeCode(`cc_test_${someAddress}`);
+await credits.charge({ user, credits: 10 });
+```
+
+## Starting over
+
+`POST /v1/sandbox/reset` with your test key puts every test user back to the start.
+
+## What needs a live key
+
+Changing prices, the exchange rate or the webhook, payouts and reporting all need a live key. A test key gets `test_mode_unsupported` for those.

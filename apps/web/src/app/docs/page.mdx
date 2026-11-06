@@ -1,0 +1,31 @@
+export const metadata = { title: "Introduction" };
+
+# Kredo docs
+
+One credit balance that works in every partner app, backed 1:1 by USDT on Whitechain. Your users buy credits once. You charge them in a few lines of code and withdraw what they spend in USDT.
+
+## What you get
+
+- **No payments to build.** Users buy and hold credits on our hosted pages. You never touch a card, a wallet or gas.
+- **Customers who already have credits.** Anyone who bought credits in another app can spend them in yours on day one.
+- **Settlement you can check.** Every charge, refund and payout is a transaction on Whitechain. The vault contract enforces each user's limit for your app, so nobody can overcharge them, not even us.
+- **USDT payouts.** Withdraw your earnings, after a 5% network fee, to any address you choose.
+
+## The pieces
+
+| Piece | What it is |
+|---|---|
+| [Dashboard](/dashboard) | Set up your company, register apps, create API keys, set prices, withdraw |
+| [Node SDK](/docs/sdk) | `@credits/sdk`, for your server: charge, hold, refund, payouts, webhooks |
+| [React kit](/docs/react) | `@credits/react`: connect and buy buttons, and a live balance |
+| Hosted pages | Connect, buy and wallet pages your users sign in to with email |
+
+## Prices
+
+1 credit is $0.01, so 1 USDT buys 100 credits. You set prices in credits, per action or per unit (for example 6 credits per second of video). Users always see the dollar value next to a price.
+
+## Where to start
+
+1. Read the [Quickstart](/docs/quickstart): from sign-up to a first charge in about ten minutes.
+2. Skim [How it works](/docs/concepts) for limits, holds and light mode.
+3. Build against [test mode](/docs/test-mode) first. Nothing goes onchain, and every test user starts with 1,000 credits.

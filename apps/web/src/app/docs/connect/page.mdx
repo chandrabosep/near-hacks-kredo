@@ -1,0 +1,60 @@
+export const metadata = { title: "Connecting users" };
+
+# Connecting users
+
+Before you can charge someone, they approve a spending limit for your app. They do it once, on our hosted connect page.
+
+## The flow
+
+1. Your server makes a connect link and sends the user there.
+2. They sign in with an email code, see your company, your prices and their balance, choose a limit and approve it.
+3. They come back to your `returnTo` URL with a one-time `code`.
+4. Your server swaps the code for their address and keeps it in your session.
+
+```ts
+// 1. Send them to the connect page.
+app.get("/connect", async (req, res) => {
+  res.redirect(await credits.connectUrl({ credits: 200, returnTo: "https://your.app/credits/callback" }));
+});
+
+// 4. Swap the code for their address.
+app.get("/credits/callback", async (req, res) => {
+  const { user } = await credits.exchangeCode(String(req.query.code));
+  req.session.creditsUser = user;
+  res.redirect("/");
+});
+```
+
+## Rules for the code
+
+- It works **once**, only for **your app**, for **10 minutes**.
+- Always swap it on your server. Never take a user's address from the browser: anyone could send any address.
+
+## Options
+
+| Option | Meaning |
+|---|---|
+| `credits` | The limit to ask for. The user can change it before approving |
+| `returnTo` | Where to send them back, with `?code=` added |
+| `expiresInDays` | Make the approval expire. Charges after that are declined with `LimitExpired` |
+
+## Checking a user
+
+```ts
+const u = await credits.user(address);
+// { balance, connected, limit, limitExpiresAt, spendable }
+```
+
+`spendable` is what you can charge right now: the smaller of their balance and the limit left.
+
+## When they're out of credits
+
+Send them to the buy page. They come back to `returnTo` when they're done:
+
+```ts
+res.redirect(credits.buyUrl({ credits: 500, returnTo: "https://your.app/" }));
+```
+
+`credits.walletUrl()` links to their wallet, where they can see their balance, change limits and disconnect apps.
+
+The [React kit](/docs/react) does all of this in a popup instead of redirects.

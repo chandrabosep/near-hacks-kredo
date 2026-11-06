@@ -1,0 +1,28 @@
+export const metadata = { title: "Payouts and reporting" };
+
+# Payouts and reporting
+
+## Earnings
+
+Each charge adds its amount, minus the 5% network fee, to your app's **unpaid earnings** in the vault. Refunds come out of them.
+
+## Withdraw
+
+Click **Withdraw** on your app's page, or:
+
+```ts
+const p = await credits.payout();
+// { usdt: "12.34", to: "0x…", txHash, explorer }
+```
+
+Your unpaid earnings are paid in USDT, on Whitechain, to the app's payout address. The network pays the gas.
+
+## Reporting
+
+| Call | Returns |
+|---|---|
+| `activity()` | Every charge, hold, capture, release, refund and payout, newest first, each with its transaction |
+| `exportCsv()` | The same as CSV, for your accountant. Also on the dashboard: **Export CSV** |
+| `gas()` | How many transactions your app caused and what they cost in WBT. Paid by the network, never by you |
+
+The dashboard shows revenue, earnings after fees and refunds, unpaid earnings, paying users and gas for each app.

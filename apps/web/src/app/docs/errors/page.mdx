@@ -1,0 +1,69 @@
+export const metadata = { title: "Errors" };
+
+# Errors
+
+Every error has an HTTP status, a readable `error` message and a stable `code`. The SDK throws them as `CreditsError`.
+
+```ts
+import { CreditsError } from "@credits/sdk";
+
+try {
+  await credits.charge({ user, action: "chat.message", ref });
+} catch (err) {
+  if (err instanceof CreditsError && err.isDeclined) return redirect(credits.buyUrl({ returnTo }));
+  if (err instanceof CreditsError && err.isRetryable) return retryLater(ref); // same ref
+  throw err;
+}
+```
+
+## Declined: the user can't pay this
+
+`isDeclined` is true. Retrying won't help; send them to connect or buy, or change the request.
+
+| Code | Meaning |
+|---|---|
+| `OverLimit` | Over the limit they approved for your app. Ask them to raise it |
+| `InsufficientBalance` | Not enough credits. Send them to the buy page |
+| `LimitExpired` | Their approval for your app expired. Connect them again |
+| `OverMaxCharge` | Above your app's largest allowed single charge |
+| `AppInactive` | Your app is switched off |
+| `OverHeld` | Capturing more than was held |
+| `HoldExpired` | The hold expired. Release it and start a new one |
+| `OverSpent` | Refunding more than the user spent with your app |
+
+## Retryable: try again later, with the same ref
+
+`isRetryable` is true for statuses 429, 502 and 503, and when the network failed before any response.
+
+| Code | Status | Meaning |
+|---|---|---|
+| `rate_limited` | 429 | Too many requests. The SDK backs off and retries |
+| `DailyBudgetReached` | 503 | The network hit its daily gas budget |
+| `AppBudgetReached` | 503 | Your app hit its daily gas budget |
+| `RelayerLowBalance` | 503 | The network is low on gas. Only releases, revokes and payouts go through |
+| `relayer` | 502 | The transaction failed for another reason |
+
+## Your request
+
+| Code | Status | Meaning |
+|---|---|---|
+| `unauthenticated` | 401 | Missing, unknown or revoked API key |
+| `invalid_request` | 400 | A field is missing or wrong. `issues` lists each one |
+| `pricing` | 400 | Unknown action, or a quantity a per-action price doesn't take |
+| `below_minimum` | 400 | Below the smallest charge or send |
+| `test_mode_unsupported` | 400 | This needs a live key |
+| `not_found` | 404 | No such hold, key or app on your account |
+| `not_connected` | 409 | The user hasn't connected your app yet |
+| `no_company` | 409 | Set up your company before registering an app |
+| `too_many_apps`, `too_many_keys` | 409 | At the limit of five apps, or ten active keys per app |
+
+## Other vault rules
+
+Status 422, from the vault contract:
+
+| Code | Meaning |
+|---|---|
+| `HoldNotOpen` | The hold was already captured or released |
+| `InsufficientEarnings` | Not enough unpaid earnings to cover the refund |
+| `RefUsed` | That ref was already used for something else |
+| `EnforcedPause` | The network is paused for maintenance. Try again shortly |

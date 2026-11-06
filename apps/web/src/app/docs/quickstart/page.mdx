@@ -1,0 +1,86 @@
+export const metadata = { title: "Quickstart" };
+
+# Quickstart
+
+From sign-up to your first charge. You need Node 18 or later and a server you control.
+
+## 1. Set up your company
+
+Open the [dashboard](/dashboard) and sign in with your work email. Fill in your company profile: name, website, logo, category and a support email. Users see it in the app directory and on the connect page, so they know who they're paying.
+
+## 2. Register an app
+
+Click **Register app**, give it a name and a short description, and choose where earnings go (your own wallet by default). Registration happens onchain in a few seconds, and the network pays the gas.
+
+You get a live API key, `uc_live_...`, shown once. Copy it into your server's environment:
+
+```bash
+CREDITS_API_KEY=uc_live_...
+```
+
+Keep it on your server. Never put it in a browser or a mobile app.
+
+## 3. Install the SDK
+
+```bash
+npm install @credits/sdk
+```
+
+```ts
+import { Credits } from "@credits/sdk";
+
+export const credits = new Credits({
+  apiKey: process.env.CREDITS_API_KEY!,
+  baseUrl: process.env.CREDITS_API_URL, // the network's API
+  pagesUrl: process.env.CREDITS_PAGES_URL, // the hosted pages
+});
+```
+
+## 4. Set your prices
+
+```ts
+await credits.setPrices({
+  "chat.message": { price: 1 }, // 1 credit, $0.01
+  "image.generate": { price: 8 },
+  "video.render": { rate: 6, unit: "second" },
+});
+```
+
+You can also edit prices in the dashboard. It shows what each price costs the user and what you keep.
+
+## 5. Connect a user
+
+A user approves a spending limit for your app once. Send them to the connect page, and swap the code they come back with for their address:
+
+```ts
+// GET /connect
+res.redirect(await credits.connectUrl({ credits: 200, returnTo: "https://your.app/credits/callback" }));
+
+// GET /credits/callback?code=...
+const { user } = await credits.exchangeCode(String(req.query.code));
+req.session.creditsUser = user;
+```
+
+## 6. Charge
+
+Charge before you do the paid work. A declined user goes to the buy page:
+
+```ts
+import { CreditsError } from "@credits/sdk";
+
+try {
+  await credits.charge({ user: req.session.creditsUser, action: "chat.message", ref: messageId });
+} catch (err) {
+  if (err instanceof CreditsError && err.isDeclined) return res.redirect(credits.buyUrl({ returnTo }));
+  throw err;
+}
+```
+
+The charge settles on Whitechain before `charge()` returns. Passing your own `ref`, such as a message id, means a retry can never charge twice.
+
+## Next
+
+- Try everything with a [test key](/docs/test-mode) first.
+- Use the [React kit](/docs/react) for popups and a live balance instead of redirects.
+- For long jobs, [hold and capture](/docs/charging#hold-and-capture) instead of charging up front.
+- The repo's `examples/starter` is a complete app in 40 lines.

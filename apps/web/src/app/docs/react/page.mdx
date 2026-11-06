@@ -1,0 +1,52 @@
+export const metadata = { title: "React kit" };
+
+# React kit
+
+Drop-in buttons and a live balance for any React app.
+
+```bash
+npm install @credits/react
+```
+
+```tsx
+import { BuyCreditsButton, ConnectCreditsButton, CreditsBalance, CreditsProvider } from "@credits/react";
+
+<CreditsProvider endpoint="/api/credits" pagesUrl="https://PAGES_URL">
+  <CreditsBalance /> {/* live balance pill with a dropdown */}
+  <ConnectCreditsButton credits={200} /> {/* asks for a 200 credit limit */}
+  <BuyCreditsButton credits={500} /> {/* opens the buy page */}
+</CreditsProvider>
+```
+
+The kit never holds a key or a token. It reads state from your own backend, and opens our hosted pages in a popup for anything that needs the user's signature.
+
+## Your backend
+
+Two routes at `endpoint`, a few lines each with the [Node SDK](/docs/sdk):
+
+```ts
+// What the kit shows for this visitor.
+app.get("/api/credits", async (req, res) => {
+  res.json(await credits.session(req.session.creditsUser));
+});
+
+// Back from the connect popup: swap the one-time code for the user's address.
+app.post("/api/credits", async (req, res) => {
+  const { user } = await credits.exchangeCode(req.body.code);
+  req.session.creditsUser = user;
+  res.json(await credits.session(user));
+});
+```
+
+The connect page posts the code only to your page's own origin. If popups are blocked, the kit falls back to a full-page redirect and picks the code up from `?code=` when the user comes back.
+
+## Your own UI
+
+`useCredits()` gives you the state and actions behind the components:
+
+```tsx
+const { state, connect, buy, openWallet, refresh } = useCredits();
+// state.user: { address, balance, connected, limit, spendable } or null
+```
+
+Styles are injected once and use `uc-*` class names, so you can override them.

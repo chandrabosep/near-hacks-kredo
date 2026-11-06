@@ -1,0 +1,34 @@
+export const metadata = { title: "API keys" };
+
+# API keys
+
+Your server proves who it is with an API key. Make one per server or environment, so you can revoke one without touching the others.
+
+## Live and test keys
+
+| Prefix | Mode | Works against |
+|---|---|---|
+| `uc_live_` | Live | Real credits and real USDT, settled on Whitechain |
+| `uc_test_` | Test | Fake credits in a sandbox. Nothing goes onchain. See [test mode](/docs/test-mode) |
+
+Every new app starts with one of each. Create more from the app's **API keys** section: give the key a name, such as "Production server" or "CI", and choose live or test.
+
+## Keeping keys safe
+
+- A key is shown **once**, right after you create it. We store only a hash, so we can't show it again.
+- Keep keys in your server's environment or secret manager. Never send one to a browser, ship it in a mobile app or commit it to git.
+- The dashboard shows each key's prefix, when it was made and when it was last used (to the minute), so you can spot keys nobody uses any more.
+
+## Revoking a key
+
+Click **Revoke** next to a key. It stops working at once, and requests with it get `401 unauthenticated`. Revoked keys stay listed, greyed out, so you can see what happened and when.
+
+An app can have up to ten active keys at a time.
+
+## Sending a key
+
+```bash
+curl https://API_URL/v1/app -H "Authorization: Bearer uc_live_..."
+```
+
+The [SDK](/docs/sdk) does this for you: pass the key as `apiKey`.

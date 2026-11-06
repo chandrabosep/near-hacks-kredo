@@ -39,6 +39,7 @@ const NAV = [
   { href: "/send", label: "Send" },
   { href: "/apps", label: "Apps" },
   { href: "/reserves", label: "Reserves" },
+  { href: "/docs", label: "Docs" },
 ];
 
 function Account() {
