@@ -22,6 +22,7 @@ export function Ecosystem() {
   const [stats, setStats] = useState<Stats>();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
+  const [sort, setSort] = useState<"used" | "new">("used");
   /** Set once live data arrives, so prerendering never reads the clock. */
   const [now, setNow] = useState<number>();
 
@@ -37,12 +38,13 @@ export function Ecosystem() {
     () => [...(apps ?? [])].sort((a, b) => b.usage.charges - a.usage.charges || Date.parse(b.listedAt) - Date.parse(a.listedAt)),
     [apps],
   );
+  const ordered = sort === "used" ? ranked : [...ranked].sort((a, b) => Date.parse(b.listedAt) - Date.parse(a.listedAt));
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const a of ranked) if (a.category) c[a.category] = (c[a.category] ?? 0) + 1;
     return c;
   }, [ranked]);
-  const shown = ranked.filter((a) => {
+  const shown = ordered.filter((a) => {
     if (category !== "all" && a.category !== category) return false;
     const q = query.trim().toLowerCase();
     if (!q) return true;
@@ -54,22 +56,34 @@ export function Ecosystem() {
     <>
       <Hero apps={ranked} stats={stats} />
 
-      <div className="sticky top-16 z-20 border-b border-wc-border-light bg-wc-surface/90 px-6 py-3 backdrop-blur-md sm:px-8 lg:top-[76px] lg:px-16">
-        <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 py-1">
-            <Chip active={category === "all"} onClick={() => setCategory("all")} count={ranked.length}>
-              All apps
-            </Chip>
-            {Object.entries(CATEGORIES)
-              .filter(([k]) => counts[k])
-              .map(([k, label]) => (
-                <Chip key={k} active={category === k} onClick={() => setCategory(k)} count={counts[k]}>
-                  {label}
-                </Chip>
-              ))}
-          </div>
-          <SearchBox value={query} onChange={setQuery} results={query.trim() ? shown.length : undefined} />
+      {/* Filters, sort and search: one hairline row of cells, like the grid below. */}
+      <div className="sticky top-16 z-20 grid border-b border-wc-border-light bg-wc-surface/95 backdrop-blur-md lg:top-[76px] lg:grid-cols-[1fr_auto_360px]">
+        <nav aria-label="Categories" className="flex h-14 gap-7 overflow-x-auto px-6 sm:px-8 lg:px-16">
+          <Tab active={category === "all"} onClick={() => setCategory("all")} count={ranked.length}>
+            All
+          </Tab>
+          {Object.entries(CATEGORIES)
+            .filter(([k]) => counts[k])
+            .map(([k, label]) => (
+              <Tab key={k} active={category === k} onClick={() => setCategory(k)} count={counts[k]}>
+                {label}
+              </Tab>
+            ))}
+        </nav>
+        <div className="hidden h-14 items-center gap-1 border-l border-wc-border-light px-6 text-[14px] lg:flex">
+          <span className="mr-2 text-wc-icon-muted">Sort</span>
+          {(["used", "new"] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setSort(k)}
+              className={cn("rounded-[8px] px-2.5 py-1 font-medium transition-colors", sort === k ? "bg-wc-surface-2 text-wc-text-1" : "text-wc-text-muted hover:text-wc-navy")}
+            >
+              {k === "used" ? "Most used" : "Newest"}
+            </button>
+          ))}
         </div>
+        <SearchBox value={query} onChange={setQuery} results={query.trim() ? shown.length : undefined} />
       </div>
 
       {error && (
@@ -158,7 +172,7 @@ function Metric({ label, value }: { label: string; value?: string }) {
   );
 }
 
-/** Search that matches the chips: a soft pill, "/" to focus, a clear button and a result count. */
+/** Search as a cell of the toolbar: "/" to focus, Esc or the cross to clear, and a result count. */
 function SearchBox({ value, onChange, results }: { value: string; onChange: (v: string) => void; results?: number }) {
   const ref = useRef<HTMLInputElement>(null);
 
@@ -175,48 +189,50 @@ function SearchBox({ value, onChange, results }: { value: string; onChange: (v: 
   }, []);
 
   return (
-    <div className="flex items-center gap-3">
+    <label className="group relative flex h-14 items-center gap-3 border-t border-wc-border-light px-6 transition-colors focus-within:bg-wc-bg sm:px-8 lg:border-t-0 lg:border-l lg:px-6">
+      <Search className="size-[18px] shrink-0 text-wc-icon-muted transition-colors group-focus-within:text-wc-blue" />
+      <input
+        ref={ref}
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && (onChange(""), e.currentTarget.blur())}
+        placeholder="Search the ecosystem"
+        aria-label="Search the ecosystem"
+        className="min-w-0 flex-1 bg-transparent text-[15px] text-wc-text-1 outline-none placeholder:text-wc-icon-muted [&::-webkit-search-cancel-button]:hidden"
+      />
       {results !== undefined && (
-        <span className="hidden shrink-0 text-[13px] text-wc-text-muted sm:inline" aria-live="polite">
+        <span className="shrink-0 text-[13px] text-wc-text-muted" aria-live="polite">
           {results} {results === 1 ? "result" : "results"}
         </span>
       )}
-      <label className="group flex h-10 w-full items-center gap-2 rounded-[20px] border border-transparent bg-wc-surface-2/70 px-4 transition-colors focus-within:border-wc-blue focus-within:bg-wc-surface focus-within:ring-3 focus-within:ring-wc-blue/15 hover:bg-wc-surface-2 lg:w-80">
-        <Search className="size-4 shrink-0 text-wc-icon-muted group-focus-within:text-wc-blue" />
-        <input
-          ref={ref}
-          type="search"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => e.key === "Escape" && (onChange(""), e.currentTarget.blur())}
-          placeholder="Search apps, makers, actions"
-          aria-label="Search the ecosystem"
-          className="min-w-0 flex-1 bg-transparent text-[14px] text-wc-text-1 outline-none placeholder:text-wc-icon-muted [&::-webkit-search-cancel-button]:hidden"
-        />
-        {value ? (
-          <button type="button" aria-label="Clear search" onClick={() => onChange("")} className="flex size-5 shrink-0 items-center justify-center rounded-full bg-wc-icon-muted/20 text-wc-text-2 hover:bg-wc-icon-muted/30">
-            <X className="size-3" />
-          </button>
-        ) : (
-          <kbd className="hidden shrink-0 rounded-[6px] border border-wc-border bg-wc-surface px-1.5 font-mono text-[11px] leading-5 text-wc-icon-muted sm:inline">/</kbd>
-        )}
-      </label>
-    </div>
+      {value ? (
+        <button type="button" aria-label="Clear search" onClick={() => onChange("")} className="flex size-6 shrink-0 items-center justify-center rounded-full text-wc-icon-muted hover:bg-wc-surface-2 hover:text-wc-navy">
+          <X className="size-3.5" />
+        </button>
+      ) : (
+        <kbd className="hidden shrink-0 rounded-[6px] border border-wc-border-light px-1.5 font-mono text-[11px] leading-5 text-wc-icon-muted sm:inline">/</kbd>
+      )}
+      {/* The focused field gets the same blue edge as the active tab. */}
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-wc-blue opacity-0 transition-opacity group-focus-within:opacity-100" />
+    </label>
   );
 }
 
-function Chip({ active, onClick, count, children }: { active: boolean; onClick: () => void; count: number; children: React.ReactNode }) {
+function Tab({ active, onClick, count, children }: { active: boolean; onClick: () => void; count: number; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
-        "inline-flex h-10 shrink-0 items-center gap-2 rounded-[20px] border px-4 text-[14px] font-medium whitespace-nowrap transition-colors",
-        active ? "border-wc-navy bg-wc-navy text-white" : "border-wc-border-light bg-wc-surface text-wc-text-2 hover:border-wc-border hover:text-wc-navy",
+        "relative flex shrink-0 items-center gap-1.5 text-[15px] font-medium whitespace-nowrap transition-colors",
+        active ? "text-wc-text-1" : "text-wc-text-muted hover:text-wc-navy",
       )}
     >
       {children}
-      <span className={cn("text-[12px]", active ? "text-white/70" : "text-wc-icon-muted")}>{count}</span>
+      <span className={cn("font-mono text-[11px]", active ? "text-wc-blue" : "text-wc-icon-muted")}>{count}</span>
+      <span className={cn("absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-wc-blue transition-opacity", active ? "opacity-100" : "opacity-0")} />
     </button>
   );
 }
