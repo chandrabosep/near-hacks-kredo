@@ -2,6 +2,7 @@ import { ArrowRight, Banknote, Gauge, KeyRound, Landmark, Layers, ShieldCheck } 
 import Link from "next/link";
 import { DitherField, PlusGrid } from "@/components/dots";
 import { Footer } from "@/components/footer";
+import { Demos } from "@/components/landing/demos";
 import { EcosystemPreview } from "@/components/landing/live";
 import { Terminal } from "@/components/landing/terminal";
 import { Header } from "@/components/shell";
@@ -99,6 +100,9 @@ export default function Home() {
               <EcosystemPreview />
             </div>
           </section>
+
+          {/* Demo apps */}
+          <Demos />
 
           {/* Platform */}
           <section className="border-t border-wc-border-light">

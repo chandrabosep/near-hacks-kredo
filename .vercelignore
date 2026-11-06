@@ -1,0 +1,12 @@
+# Never upload secrets. Each Vercel project gets its env from the dashboard.
+.env
+**/.env
+**/.env.*
+!**/.env.example
+.env.render
+
+# Not needed by any Vercel build.
+contracts
+.logs
+**/.data
+**/.next

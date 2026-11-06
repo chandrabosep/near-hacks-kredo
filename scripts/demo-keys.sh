@@ -45,3 +45,4 @@ register() {
 
 echo "registering demo apps on $API"
 register parley Parley
+register lumen Lumen

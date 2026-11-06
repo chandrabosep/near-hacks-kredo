@@ -11,6 +11,8 @@ Kredo is a shared value network for applications. Users carry one balance across
 | | |
 |---|---|
 | Hosted pages | [kredo-omega.vercel.app](https://kredo-omega.vercel.app) |
+| Demo: Parley (AI chat) | [parley-chi-sepia.vercel.app](https://parley-chi-sepia.vercel.app) |
+| Demo: Lumen (AI images and video) | [lumen-gamma-rouge.vercel.app](https://lumen-gamma-rouge.vercel.app) |
 | API | [kredo-api.onrender.com/v1/health](https://kredo-api.onrender.com/v1/health) |
 | Docs | [kredo-omega.vercel.app/docs](https://kredo-omega.vercel.app/docs) |
 | Server SDK | [`kredo`](https://www.npmjs.com/package/kredo) on npm |
@@ -61,6 +63,7 @@ A normal payment rail can't stop the operator from over-charging a user or issui
 | [apps/api](apps/api) | REST API, relayer, log indexer and webhooks, on Postgres |
 | [apps/web](apps/web) | Hosted pages (Next.js): landing, connect, buy, account, send, claim, company dashboard, reserves, app directory, docs, ops |
 | [demos/parley](demos/parley) | Parley, a chat app that charges credits per message |
+| [demos/lumen](demos/lumen) | Lumen, an image and video studio that charges per image and holds credits while video renders |
 | [examples/starter](examples/starter) | The smallest integration: one server file, 10 lines about credits |
 | [packages/sdk](packages/sdk) | `kredo`, the server kit. See its [README](packages/sdk/README.md) |
 | [packages/react](packages/react) | `kredo-react`, buttons and a live balance. See its [README](packages/react/README.md) |

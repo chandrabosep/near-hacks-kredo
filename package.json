@@ -26,6 +26,7 @@
     "deploy:whitechain": "scripts/deploy-whitechain.sh",
     "start:whitechain": "scripts/start-whitechain.sh",
     "dev:parley": "npm run dev -w @demo/parley",
+    "dev:lumen": "npm run dev -w @demo/lumen",
     "demos:keys": "scripts/demo-keys.sh"
   }
 }
