@@ -22,10 +22,29 @@ import type { Address, Hash, Hex } from "viem";
 import type { PriceList } from "./pricing.js";
 import * as schema from "./schema.js";
 
+/** The business behind one or more apps. Shown to users in the directory and on the connect page. */
+export type CompanyRecord = {
+  id: string;
+  name: string;
+  logoUrl?: string;
+  website?: string;
+  category?: string;
+  supportEmail?: string;
+  /** The Privy user who set it up. */
+  owner: string;
+  createdAt: number;
+};
+
 export type AppRecord = {
   /** The app's id address onchain. Only an identifier: nobody holds its key. */
   id: Address;
   name: string;
+  companyId?: string;
+  /** Profile. Logo, website and category fall back to the company's. */
+  description?: string;
+  logoUrl?: string;
+  website?: string;
+  category?: string;
   payout: Address;
   feeBps: number;
   /** sha256 of the API key. The key itself is shown once, at creation. */
@@ -146,6 +165,7 @@ export type WebhookDelivery = {
 export type Data = {
   /** Hash of block 0. A local chain restarts with a new genesis, which makes the data stale. */
   genesis?: Hash;
+  companies: CompanyRecord[];
   apps: AppRecord[];
   holds: HoldRecord[];
   ops: OpRecord[];
@@ -187,7 +207,7 @@ type Row = Record<string, unknown>;
 // Both drivers share Drizzle's Postgres query builder.
 type Orm = PgDatabase<PgQueryResultHKT, typeof schema>;
 
-const empty = (): Data => ({ apps: [], holds: [], ops: [], users: [], claims: [], txs: [], events: [], deliveries: [] });
+const empty = (): Data => ({ companies: [], apps: [], holds: [], ops: [], users: [], claims: [], txs: [], events: [], deliveries: [] });
 
 const replacer = (_key: string, v: unknown) => (typeof v === "bigint" ? { $bigint: v.toString() } : v);
 const reviver = (_key: string, v: unknown) =>
@@ -217,6 +237,15 @@ type Spec = {
 };
 
 const SPECS: Record<Collection, Spec> = {
+  // Companies first: apps refer to them.
+  companies: {
+    table: schema.companies,
+    pk: schema.companies.id,
+    key: (r: CompanyRecord) => r.id,
+    toRow: (r: CompanyRecord) => withDates(r, ["createdAt"]),
+    fromRow: (row) => clean(row),
+    order: [asc(schema.companies.createdAt)],
+  },
   apps: {
     table: schema.apps,
     pk: schema.apps.id,

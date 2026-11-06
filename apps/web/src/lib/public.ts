@@ -1,10 +1,12 @@
 "use client";
 
+import type { AppProfile } from "./profile";
+
 import { useEffect, useState } from "react";
 import { env } from "./env";
 
 export type PriceEntry = { price: string } | { rate: string; unit: string };
-export type DirectoryApp = { id: string; name: string; prices: Record<string, PriceEntry>; exchangeRate: string | null };
+export type DirectoryApp = AppProfile & { id: string; name: string; prices: Record<string, PriceEntry>; exchangeRate: string | null };
 
 /** GET on a public route, no login needed. */
 export async function getPublic<T>(path: string): Promise<T> {

@@ -16,9 +16,29 @@ const time = (name: string) => timestamp(name, { withTimezone: true, mode: "date
 /** Unix seconds, as the vault uses for expiries. */
 const seconds = (name: string) => bigint(name, { mode: "number" });
 
+export const companies = pgTable(
+  "companies",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    logoUrl: text("logo_url"),
+    website: text("website"),
+    category: text("category"),
+    supportEmail: text("support_email"),
+    owner: text("owner").notNull(),
+    createdAt: time("created_at").notNull(),
+  },
+  (t) => [index("companies_owner_idx").on(t.owner)],
+);
+
 export const apps = pgTable("apps", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+  description: text("description"),
+  logoUrl: text("logo_url"),
+  website: text("website"),
+  category: text("category"),
   payout: text("payout").notNull(),
   feeBps: integer("fee_bps").notNull(),
   apiKeyHash: text("api_key_hash").notNull().unique(),

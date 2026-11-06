@@ -7,6 +7,8 @@ import { useId, type ReactNode } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 /** The Kredo mark: a K whose upper arm sends off a credit, and the wordmark. */
@@ -198,6 +200,59 @@ export function Field({
         <Input id={inputId} className={cn(fieldInput, suffix && "pr-44")} {...input} />
         {suffix && <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[15px] text-wc-text-muted">{suffix}</span>}
       </div>
+      {hint && <p className="mt-2 text-[13px] text-wc-icon-muted">{hint}</p>}
+    </div>
+  );
+}
+
+/** A shadcn Select with our label and sizes. An empty value means "not set". */
+export function SelectField({
+  label,
+  hint,
+  value,
+  onChange,
+  options,
+  placeholder = "Choose one",
+}: {
+  label: string;
+  hint?: ReactNode;
+  value: string;
+  onChange: (value: string) => void;
+  options: Record<string, string>;
+  placeholder?: string;
+}) {
+  const id = useId();
+  return (
+    <div>
+      <Label htmlFor={id} className="text-[13px] leading-[19.5px] font-medium text-wc-text-muted">
+        {label}
+      </Label>
+      <Select items={options} value={value || null} onValueChange={(v) => onChange((v as string | null) ?? "")}>
+        <SelectTrigger id={id} className={cn(fieldInput, "mt-2 w-full pr-4 data-[size=default]:h-12")}>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(options).map(([v, text]) => (
+            <SelectItem key={v} value={v} className="text-[15px]">
+              {text}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {hint && <p className="mt-2 text-[13px] text-wc-icon-muted">{hint}</p>}
+    </div>
+  );
+}
+
+/** A shadcn Textarea with our label and sizes. */
+export function TextareaField({ label, hint, ...props }: React.ComponentProps<"textarea"> & { label: string; hint?: ReactNode }) {
+  const id = useId();
+  return (
+    <div>
+      <Label htmlFor={id} className="text-[13px] leading-[19.5px] font-medium text-wc-text-muted">
+        {label}
+      </Label>
+      <Textarea id={id} className={cn(fieldInput, "mt-2 h-auto min-h-24 py-3")} {...props} />
       {hint && <p className="mt-2 text-[13px] text-wc-icon-muted">{hint}</p>}
     </div>
   );

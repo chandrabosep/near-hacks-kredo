@@ -11,7 +11,7 @@ import { appOf, HttpError, rateLimit, requireApiKey } from "../http.js";
 import { amountInputSchema, priceListSchema, resolveAmount } from "../pricing.js";
 import type { OpRecord } from "../store.js";
 import { amount, creditsToUnits, unitsToCreditsString, UNITS_PER_CREDIT } from "../units.js";
-import { activityFor, addressSchema, creditsSchema, forApp, newRef, onchainRef, refSchema, txInfo, vaultEvent } from "./shared.js";
+import { activityFor, addressSchema, appProfile, creditsSchema, forApp, newRef, onchainRef, refSchema, txInfo, vaultEvent } from "./shared.js";
 
 const chargeSchema = z.intersection(
   amountInputSchema,
@@ -75,6 +75,7 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
       webhookUrl: app.webhookUrl ?? null,
       apiKeyPrefix: app.apiKeyPrefix,
       testKeyPrefix: app.testKeyPrefix ?? null,
+      ...appProfile(ctx, app),
     });
   });
 

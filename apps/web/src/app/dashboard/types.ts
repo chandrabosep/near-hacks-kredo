@@ -1,7 +1,8 @@
 import type { Amount } from "@/lib/format";
+import type { AppProfile } from "@/lib/profile";
 import type { PriceEntry } from "@/lib/public";
 
-export type MyApp = {
+export type MyApp = AppProfile & {
   id: string;
   name: string;
   payout: string;

@@ -14,6 +14,7 @@ import { z } from "zod";
 import { creditVaultAbi } from "../abi/CreditVault.js";
 import { explorerTx } from "../chain.js";
 import type { Context } from "../context.js";
+import type { AppRecord } from "../store.js";
 import type { ActivityEvent } from "../db.js";
 
 export const addressSchema = z
@@ -71,4 +72,16 @@ export function vaultEvent<E extends ContractEventName<VaultAbi>>(
   const [log] = parseEventLogs({ abi: creditVaultAbi, logs: receipt.logs, eventName: eventName as ContractEventName<VaultAbi> });
   if (!log) throw new Error(`no ${eventName} event in ${receipt.transactionHash}`);
   return log.args as never;
+}
+
+/** What users see about an app: its own profile, falling back to its company's. */
+export function appProfile(ctx: Context, app: AppRecord) {
+  const company = ctx.store.companyById(app.companyId);
+  return {
+    description: app.description ?? null,
+    logoUrl: app.logoUrl ?? company?.logoUrl ?? null,
+    website: app.website ?? company?.website ?? null,
+    category: app.category ?? company?.category ?? null,
+    company: company ? { name: company.name, website: company.website ?? null, supportEmail: company.supportEmail ?? null } : null,
+  };
 }

@@ -1,7 +1,9 @@
 "use client";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { Fillers } from "@/components/fillers";
 import { Notice, Tile, Tiles } from "@/components/shell";
+import { CATEGORIES, hostOf } from "@/lib/profile";
 import { describePrice, useDirectory } from "@/lib/public";
 
 export function Directory() {
@@ -30,8 +32,21 @@ export function Directory() {
         const prices = Object.entries(app.prices);
         return (
           <Tile key={app.id} className="lg:px-12">
-            <p className="text-[18px] leading-[27px] font-semibold text-black">{app.name}</p>
-            <p className="mt-1 font-mono text-[12px] text-wc-icon-muted">{app.id}</p>
+            <div className="flex items-center gap-3">
+              <BrandLogo src={app.logoUrl} name={app.name} />
+              <div className="min-w-0">
+                <p className="truncate text-[18px] leading-[27px] font-semibold text-black">{app.name}</p>
+                <p className="truncate text-[13px] text-wc-text-muted">
+                  {[app.company?.name, app.category && CATEGORIES[app.category]].filter(Boolean).join(" · ") || <span className="font-mono text-[12px]">{app.id}</span>}
+                </p>
+              </div>
+            </div>
+            {app.description && <p className="mt-4 text-[15px] leading-6 text-wc-text-2">{app.description}</p>}
+            {app.website && (
+              <a href={app.website} target="_blank" rel="noreferrer" className="mt-3 inline-block text-[14px] font-medium text-wc-blue hover:underline">
+                {hostOf(app.website)}
+              </a>
+            )}
             {app.exchangeRate && (
               <p className="mt-4 inline-flex rounded-[20px] bg-wc-neutral-80 px-2 py-0.5 text-[14px] font-medium text-wc-text-2">
                 Light mode: {app.exchangeRate} credits buy 1 of theirs

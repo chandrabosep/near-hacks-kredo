@@ -2,14 +2,15 @@
 import type { Address } from "viem";
 import { creditVaultAbi } from "./abi/CreditVault.js";
 import type { Context } from "./context.js";
+import type { AppProfileInput } from "./profile.js";
 import type { AppRecord } from "./store.js";
 
 export async function registerApp(
   ctx: Context,
-  input: { name: string; payout: Address; feeBps?: number; maxCharge?: bigint; owner?: string },
+  input: { name: string; payout: Address; feeBps?: number; maxCharge?: bigint; owner?: string; companyId?: string; profile?: AppProfileInput },
 ): Promise<{ app: AppRecord; apiKey: string; hash: `0x${string}` }> {
   const feeBps = input.feeBps ?? ctx.config.networkFeeBps;
-  const { app, apiKey } = ctx.store.createApp({ name: input.name, payout: input.payout, feeBps, owner: input.owner });
+  const { app, apiKey } = ctx.store.createApp({ name: input.name, payout: input.payout, feeBps, owner: input.owner, companyId: input.companyId, profile: input.profile });
   try {
     const { hash } = await ctx.relayer.write(
       {

@@ -5,7 +5,7 @@ import { explorerAddress } from "../chain.js";
 import type { Context } from "../context.js";
 import { HttpError } from "../http.js";
 import { amount } from "../units.js";
-import { addressSchema } from "./shared.js";
+import { addressSchema, appProfile } from "./shared.js";
 
 export function publicRoutes(ctx: Context): Router {
   const r = Router();
@@ -92,6 +92,7 @@ export function publicRoutes(ctx: Context): Router {
         name: a.name,
         prices: a.prices,
         exchangeRate: a.exchangeRate ?? null,
+        ...appProfile(ctx, a),
       })),
     );
   });

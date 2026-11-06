@@ -1,11 +1,12 @@
 /** Typed accessors over the JSON database. */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getAddress, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import type { ActivityEvent, AppRecord, ClaimRecord, Db, HoldRecord, OpRecord, UserRecord, WebhookDelivery } from "./db.js";
+import type { ActivityEvent, AppRecord, ClaimRecord, CompanyRecord, Db, HoldRecord, OpRecord, UserRecord, WebhookDelivery } from "./db.js";
 import type { PriceList } from "./pricing.js";
+import type { AppProfileInput, CompanyInput } from "./profile.js";
 
-export type { ActivityEvent, AppRecord, ClaimRecord, HoldRecord, OpRecord, UserRecord, WebhookDelivery };
+export type { ActivityEvent, AppRecord, ClaimRecord, CompanyRecord, HoldRecord, OpRecord, UserRecord, WebhookDelivery };
 
 const API_KEY_PREFIX = "uc_live_";
 const TEST_KEY_PREFIX = "uc_test_";
@@ -24,11 +25,35 @@ const same = (a: string | undefined, b: string | undefined) =>
 export function createStore(db: Db) {
   const { data } = db;
 
+  /** Sets the given fields; undefined clears an optional one. */
+  const assign = <T extends object>(target: T, fields: Partial<T>) => {
+    for (const [k, v] of Object.entries(fields)) (target as Record<string, unknown>)[k] = v;
+  };
+
   return {
+    // ---------------------------------------------------------------- companies
+
+    companyOwnedBy: (owner: string) => data.companies.find((c) => c.owner === owner),
+
+    companyById: (id: string | undefined) => (id ? data.companies.find((c) => c.id === id) : undefined),
+
+    /** Creates or updates the owner's company. Apps they registered before join it. */
+    saveCompany(owner: string, input: CompanyInput): CompanyRecord {
+      let company = data.companies.find((c) => c.owner === owner);
+      if (company) assign(company, input);
+      else {
+        company = { id: randomUUID(), owner, createdAt: Date.now(), ...input };
+        data.companies.push(company);
+      }
+      for (const app of data.apps) if (app.owner === owner && !app.companyId) app.companyId = company.id;
+      db.save();
+      return company;
+    },
+
     // ---------------------------------------------------------------- apps
 
     /** Creates an app record. Returns the API key once; only its hash is stored. */
-    createApp(input: { name: string; payout: Address; feeBps: number; owner?: string }): { app: AppRecord; apiKey: string } {
+    createApp(input: { name: string; payout: Address; feeBps: number; owner?: string; companyId?: string; profile?: AppProfileInput }): { app: AppRecord; apiKey: string } {
       const apiKey = newApiKey();
       const app: AppRecord = {
         // A fresh address that only identifies the app onchain. Its key is thrown away.
@@ -40,6 +65,11 @@ export function createStore(db: Db) {
         apiKeyPrefix: apiKey.slice(0, API_KEY_PREFIX.length + 6),
         prices: {},
         owner: input.owner,
+        companyId: input.companyId,
+        description: input.profile?.description,
+        logoUrl: input.profile?.logoUrl,
+        website: input.profile?.website,
+        category: input.profile?.category,
         createdAt: Date.now(),
       };
       data.apps.push(app);
@@ -85,6 +115,14 @@ export function createStore(db: Db) {
     },
 
     listApps: () => data.apps,
+
+    /** Updates the app's public profile. A missing name keeps the current one. */
+    updateAppProfile(app: AppRecord, input: AppProfileInput) {
+      const { name, ...rest } = input;
+      assign(app, rest);
+      if (name) app.name = name;
+      db.save();
+    },
 
     setPrices(app: AppRecord, prices: PriceList) {
       app.prices = prices;

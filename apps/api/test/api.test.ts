@@ -443,8 +443,29 @@ describe("api", { skip }, () => {
 
   // ---------------------------------------------------------------- company dashboard
 
+  test("a company profile comes first, and is checked", async () => {
+    assert.equal((await call("GET", "/v1/me/company", { user: "bob" })).status, 404);
+    const early = await call("POST", "/v1/me/apps", { user: "bob", body: { name: "Too Soon" } });
+    assert.equal(early.status, 409);
+    assert.equal(early.body.code, "no_company");
+
+    const bad = await call("PUT", "/v1/me/company", { user: "bob", body: { name: "Bob Labs", website: "not a url", category: "cars" } });
+    assert.equal(bad.status, 400);
+
+    const saved = await call("PUT", "/v1/me/company", {
+      user: "bob",
+      body: { name: "Bob Labs", website: "https://bob.example", logoUrl: "https://bob.example/logo.png", category: "ai", supportEmail: "Help@Bob.example" },
+    });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.equal(saved.body.supportEmail, "help@bob.example");
+
+    const edited = await call("PUT", "/v1/me/company", { user: "bob", body: { name: "Bob Labs", website: "https://bob.example", logoUrl: "", category: "ai" } });
+    assert.equal(edited.body.logoUrl, null, "a blank field clears it");
+    await call("PUT", "/v1/me/company", { user: "bob", body: { name: "Bob Labs", website: "https://bob.example", logoUrl: "https://bob.example/logo.png", category: "ai", supportEmail: "help@bob.example" } });
+  });
+
   test("a signed-in owner registers an app and manages it without an API key", async () => {
-    const made = await call("POST", "/v1/me/apps", { user: "bob", body: { name: "Bob's Chat" } });
+    const made = await call("POST", "/v1/me/apps", { user: "bob", body: { name: "Bob's Chat", description: "Ask anything." } });
     assert.equal(made.status, 201, JSON.stringify(made.body));
     assert.match(made.body.apiKey, /^uc_live_/);
     assert.equal(made.body.payout, bob.address, "payout defaults to the owner's wallet");
@@ -464,6 +485,18 @@ describe("api", { skip }, () => {
     const stats = await call("GET", `/v1/me/apps/${id}/stats`, { user: "bob" });
     assert.equal(stats.body.charges, 0);
     assert.equal(stats.body.revenue.units, "0");
+
+    // The profile falls back to the company's, and shows in the public directory.
+    assert.equal(info.body.logoUrl, "https://bob.example/logo.png");
+    assert.equal(info.body.company.name, "Bob Labs");
+    const profile = await call("PATCH", `/v1/me/apps/${id}/profile`, { user: "bob", body: { category: "productivity", website: "https://chat.bob.example" } });
+    assert.equal(profile.status, 200, JSON.stringify(profile.body));
+    const listed = (await call("GET", "/v1/directory")).body.find((a: Json) => a.id === id);
+    assert.equal(listed.description, "Ask anything.");
+    assert.equal(listed.category, "productivity");
+    assert.equal(listed.website, "https://chat.bob.example");
+    assert.equal(listed.company.supportEmail, "help@bob.example");
+    assert.equal((await call("PATCH", `/v1/me/apps/${id}/profile`, { user: "alice", body: { name: "Mine now" } })).status, 404);
   });
 
   test("rotating the key turns the old one off", async () => {

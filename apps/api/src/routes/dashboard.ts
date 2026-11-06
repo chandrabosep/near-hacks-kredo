@@ -6,15 +6,17 @@
 import { Router, type RequestHandler } from "express";
 import { z } from "zod";
 import type { Context } from "../context.js";
+import type { CompanyRecord } from "../store.js";
 import { HttpError, requireUser, userOf } from "../http.js";
+import { appProfileSchema, companySchema } from "../profile.js";
 import { registerApp } from "../register.js";
 import { amount } from "../units.js";
 import { appRoutes } from "./app.js";
-import { addressSchema, txInfo } from "./shared.js";
+import { addressSchema, appProfile, txInfo } from "./shared.js";
 
 const MAX_APPS_PER_OWNER = 5;
 
-const createSchema = z.object({
+const createSchema = appProfileSchema.extend({
   name: z.string().trim().min(2).max(60),
   /** Where earnings are paid. Defaults to the owner's own wallet. */
   payout: addressSchema.optional(),
@@ -24,13 +26,29 @@ export function dashboardRoutes(ctx: Context): Router {
   const r = Router();
   const { store, config } = ctx;
 
-  r.use("/me/apps", requireUser(ctx.verifier, store, config.signupsPerIpPerHour));
+  const signedIn = requireUser(ctx.verifier, store, config.signupsPerIpPerHour);
+  r.use("/me/apps", signedIn);
+  r.use("/me/company", signedIn);
 
   const owner = (res: Parameters<typeof userOf>[0]) => userOf(res).privyId;
+
+  /** The signed-in owner's company profile. */
+  r.get("/me/company", (_req, res) => {
+    const company = store.companyOwnedBy(owner(res));
+    if (!company) throw new HttpError(404, "Set up your company first", "no_company");
+    res.json(companyJson(company));
+  });
+
+  /** Creates or updates the company profile. Users see it in the directory and on the connect page. */
+  r.put("/me/company", (req, res) => {
+    res.json(companyJson(store.saveCompany(owner(res), companySchema.parse(req.body))));
+  });
 
   /** Registers an app onchain. The network pays the gas. The API key is shown only here. */
   r.post("/me/apps", async (req, res) => {
     const body = createSchema.parse(req.body);
+    const company = store.companyOwnedBy(owner(res));
+    if (!company) throw new HttpError(409, "Set up your company first", "no_company");
     if (store.appsOwnedBy(owner(res)).length >= MAX_APPS_PER_OWNER) {
       throw new HttpError(409, `You can register up to ${MAX_APPS_PER_OWNER} apps`, "too_many_apps");
     }
@@ -38,6 +56,8 @@ export function dashboardRoutes(ctx: Context): Router {
       name: body.name,
       payout: body.payout ?? userOf(res).address,
       owner: owner(res),
+      companyId: company.id,
+      profile: { description: body.description, logoUrl: body.logoUrl, website: body.website, category: body.category },
     });
     res.status(201).json({ id: app.id, name: app.name, payout: app.payout, feeBps: app.feeBps, apiKey, testKey: store.issueTestKey(app), ...txInfo(ctx, hash) });
   });
@@ -56,6 +76,7 @@ export function dashboardRoutes(ctx: Context): Router {
         unpaidEarnings: amount(earnings[i]),
         prices: a.prices,
         createdAt: new Date(a.createdAt).toISOString(),
+        ...appProfile(ctx, a),
       })),
     );
   });
@@ -66,6 +87,13 @@ export function dashboardRoutes(ctx: Context): Router {
     res.locals.app = app;
     next();
   };
+
+  /** Updates the app's name, description, logo, website or category. */
+  r.patch("/me/apps/:id/profile", ownApp, (req, res) => {
+    const app = res.locals.app;
+    store.updateAppProfile(app, appProfileSchema.parse(req.body));
+    res.json({ id: app.id, name: app.name, ...appProfile(ctx, app) });
+  });
 
   /** A new API key. The old one stops working at once. */
   r.post("/me/apps/:id/key", ownApp, (_req, res) => {
@@ -118,4 +146,16 @@ export function dashboardRoutes(ctx: Context): Router {
   r.use("/me/apps/:id", ownApp, appRoutes(ctx, alreadyChecked));
 
   return r;
+}
+
+function companyJson(c: CompanyRecord) {
+  return {
+    id: c.id,
+    name: c.name,
+    logoUrl: c.logoUrl ?? null,
+    website: c.website ?? null,
+    category: c.category ?? null,
+    supportEmail: c.supportEmail ?? null,
+    createdAt: new Date(c.createdAt).toISOString(),
+  };
 }

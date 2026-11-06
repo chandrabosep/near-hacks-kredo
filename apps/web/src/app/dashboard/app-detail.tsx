@@ -10,6 +10,7 @@ import type { ActivityItem } from "@/lib/activity";
 import { ago, credits, short, usd } from "@/lib/format";
 import { useIdentityToken } from "@privy-io/react-auth";
 import { env } from "@/lib/env";
+import { AppProfileForm } from "./app-profile";
 import { Integration } from "./integration";
 import { PricesEditor } from "./prices-editor";
 import type { AppInfo, AppStats, MyApp } from "./types";
@@ -129,6 +130,23 @@ export function AppDetail({ app, onChange }: { app: MyApp; onChange: () => void 
       </section>
 
       {info && <Integration base={base} info={info} onChange={refresh} />}
+
+      {info && (
+        <section className="border-t border-wc-border-light px-6 py-10 sm:px-8 lg:px-16 lg:py-14">
+          <h2 className="text-heading-xl text-wc-text-1">Profile.</h2>
+          <p className="mt-2 max-w-2xl text-[15px] leading-6 text-wc-text-muted">Empty fields use your company&apos;s logo, website and category.</p>
+          <div className="mt-8">
+            <AppProfileForm
+              base={base}
+              info={info}
+              onSaved={() => {
+                refresh();
+                onChange();
+              }}
+            />
+          </div>
+        </section>
+      )}
 
       <section className="border-t border-wc-border-light px-6 py-10 sm:px-8 lg:px-16 lg:py-14">
         <div className="flex flex-wrap items-end justify-between gap-4">
