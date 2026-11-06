@@ -1,10 +1,13 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Plus } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Amount } from "@/lib/format";
 import { credits, usd } from "@/lib/format";
-import { getPublic } from "@/lib/public";
+import { BrandLogo } from "@/components/brand-logo";
+import { CATEGORIES } from "@/lib/profile";
+import { getPublic, useDirectory } from "@/lib/public";
 
 type Reserves = {
   backed: boolean;
@@ -38,25 +41,61 @@ function useLive() {
 
 const Skeleton = ({ w = "w-24" }: { w?: string }) => <span className={`inline-block h-7 ${w} animate-pulse rounded-control bg-wc-surface-2`} />;
 
-/** The glass panel pinned to the bottom of the hero. */
-export function HeroPanel() {
-  const { reserves, stats } = useLive();
+/** The ecosystem preview: apps that take credits today, an open seat for the next one, and live network numbers. */
+export function EcosystemPreview() {
+  const { stats } = useLive();
+  const { apps } = useDirectory();
+  const shown = apps ? [...apps].sort((a, b) => b.usage.charges - a.usage.charges).slice(0, 5) : undefined;
+  const numbers: [string, string | undefined][] = [
+    ["Apps in the ecosystem", stats && String(stats.apps)],
+    ["People with credits", stats && String(stats.users)],
+    ["Credits spent across apps", stats && credits(stats.spent, { unit: false })],
+  ];
+
   return (
-    <div className="glass-surface flex flex-col gap-6 border p-6 md:p-8 lg:p-10">
-      <div>
-        <p className="text-[15px] font-semibold text-wc-ink-2">Live on Whitechain.</p>
-        <p className="mt-1 text-[15px] font-medium text-wc-navy">Read from the vault contract, not our database.</p>
+    <div className="flex h-full flex-col">
+      <div className="grid flex-1 grid-cols-2 gap-px bg-wc-border-light sm:grid-cols-3">
+        {shown
+          ? shown.map((app) => (
+              <div key={app.id} className="flex flex-col justify-center gap-4 bg-wc-surface p-5 sm:p-6">
+                <BrandLogo src={app.logoUrl} name={app.name} />
+                <div className="min-w-0">
+                  <p className="truncate text-[15px] font-semibold text-wc-text-1">{app.name}</p>
+                  <p className="truncate text-[13px] text-wc-text-muted">{(app.category && CATEGORIES[app.category]) ?? "Live in the ecosystem"}</p>
+                </div>
+              </div>
+            ))
+          : [0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex flex-col justify-center bg-wc-surface p-5 sm:p-6">
+                <span className="block size-11 animate-pulse rounded-[12px] bg-wc-surface-2" />
+                <span className="mt-4 block h-4 w-20 animate-pulse rounded bg-wc-surface-2" />
+              </div>
+            ))}
+        <Link href="/dashboard" className="group flex flex-col justify-center gap-4 bg-wc-surface p-5 transition-colors hover:bg-wc-bg sm:p-6">
+          <span className="flex size-11 items-center justify-center rounded-[12px] border border-dashed border-wc-border text-wc-icon-muted transition-colors group-hover:border-wc-blue group-hover:text-wc-blue">
+            <Plus className="size-5" />
+          </span>
+          <div>
+            <p className="text-[15px] font-semibold text-wc-blue">Your app</p>
+            <p className="text-[13px] text-wc-text-muted">List it in minutes</p>
+          </div>
+        </Link>
+        {/* Open seats keep the grid whole while the ecosystem is small. */}
+        {Array.from({ length: shown ? 5 - shown.length : 0 }, (_, i) => (
+          <div key={i} aria-hidden className="flex flex-col justify-center gap-4 bg-wc-surface p-5 sm:p-6">
+            <span className="block size-11 rounded-[12px] border border-dashed border-wc-border-light" />
+            <p className="text-[13px] text-wc-icon-muted">Open seat</p>
+          </div>
+        ))}
       </div>
-      <div className="grid grid-cols-2 gap-6">
-        <div>
-          <p className="text-[24px] text-wc-ink-2">{reserves ? usd(reserves.usdtInVault) : <Skeleton />}</p>
-          <p className="text-[15px] font-medium text-wc-navy">USDT in the vault</p>
-        </div>
-        <div>
-          <p className="text-[24px] text-wc-ink-2">{stats ? credits(stats.spent, { unit: false }) : <Skeleton w="w-16" />}</p>
-          <p className="text-[15px] font-medium text-wc-navy">Credits spent</p>
-        </div>
-      </div>
+      <dl className="grid grid-cols-3 gap-px border-t border-wc-border-light bg-wc-border-light">
+        {numbers.map(([label, value]) => (
+          <div key={label} className="flex flex-col-reverse gap-1.5 bg-wc-surface p-5 sm:p-6">
+            <dt className="text-[13px] leading-5 text-wc-text-muted">{label}</dt>
+            <dd className="text-[24px] leading-none font-light text-wc-text-1 sm:text-[28px]">{value ?? <Skeleton w="w-12" />}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
