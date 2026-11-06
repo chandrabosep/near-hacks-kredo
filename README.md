@@ -87,9 +87,10 @@ Tests: `npm run contracts:test`, `npm run test:api`, `npm run test:sdk`.
 
 ## Deploy
 
-[render.yaml](render.yaml) is a Render Blueprint for both services. In Render, choose **New, Blueprint** and pick this repo.
+[render.yaml](render.yaml) is a Render Blueprint for the API, its database and the web app. In Render, choose **New, Blueprint** and pick this repo.
 
-- **kredo-api** runs on the Starter plan with a 1 GB disk at `/var/data` for the data file. Free services sleep, which would stop the indexer.
+- **kredo-db** is Render Postgres. The API runs its migrations on start.
+- **kredo-api** runs on the Starter plan. Free services sleep, which would stop the indexer.
 - **kredo-web** runs on the free plan. It stores nothing.
 - Enter the secrets when asked: `OPERATOR_KEY`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET` and `NEXT_PUBLIC_PRIVY_APP_ID`. `ADMIN_TOKEN` is generated.
 - Add the web URL to the allowed origins in the Privy dashboard. If Render gives different URLs, update `WEB_ORIGINS` and `NEXT_PUBLIC_API_URL` to match.
