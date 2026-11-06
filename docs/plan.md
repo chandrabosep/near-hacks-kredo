@@ -236,12 +236,13 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 **Done when:** a company can register, set prices, see a charge arrive and withdraw USDT. Tag `m3-dashboard-payouts`.
 
 ### Step 6: Demo apps, built only with the public SDK
-- [ ] Video app running on Whitechain
-- [ ] Chat app: an instant `charge()` per message, on a real AI API
-- [ ] 3D app: light mode, converts our credits into its own
-- [ ] Each app has a buy button
+- [x] Parley (chat): `charge()` per message, refund if the model fails
+- [ ] Second and third demo apps, to be picked (one using `hold()`/`capture()`, one using a per-unit price with `quote()`)
+- [x] Each app has the balance pill, connect and buy buttons
+- [ ] Real AI keys; until then each app runs in demo mode
+- [ ] Demo apps registered on Whitechain
 
-**Done when:** one user buys in the video app and spends the leftover in the chat and 3D apps. Tag `m4-three-apps`.
+**Done when:** one user buys credits once and spends them in all three demo apps. Tag `m4-three-apps`.
 
 ### Step 7: Reserves page and app directory
 - [x] Reserves page: the vault's USDT next to total credits outstanding, live from the chain

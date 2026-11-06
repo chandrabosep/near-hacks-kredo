@@ -26,6 +26,12 @@ echo "deploying contracts"
 (cd contracts && forge script script/Deploy.s.sol --rpc-url "$RPC" --broadcast --private-key "$ANVIL_KEY" >"../$LOGS/deploy.log" 2>&1)
 grep -E "CreditVault:|MockUSDT:" "$LOGS/deploy.log" | sed 's/^ */  /'
 
+# The test USDT faucet pays from the operator wallet, so give it mock USDT to hand out.
+USDT=$(jq -r .usdt contracts/deployments/31337.json)
+OPERATOR=$(cast wallet address --private-key "$ANVIL_KEY")
+cast send "$USDT" "mint(address,uint256)" "$OPERATOR" 1000000000 --private-key "$ANVIL_KEY" --rpc-url "$RPC" >/dev/null
+echo "  faucet funded with 1000 mock USDT"
+
 echo "building the SDK and React kit"
 npm run build -w @credits/sdk -w @credits/react --silent
 

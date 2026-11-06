@@ -21,6 +21,8 @@ export type Amount = { units: string; credits: string; usd: string };
 
 export type CreditsUser = {
   address: string;
+  /** The email the user connected with, when your backend passes it to `session()`. */
+  email?: string | null;
   balance: Amount;
   connected: boolean;
   /** What your app may still charge, under the limit the user signed. */

@@ -145,7 +145,7 @@ export function ConnectFlow() {
               />
               <p className="flex gap-2 text-[13px] leading-5 text-wc-text-muted">
                 <ShieldCheck className="mt-px size-4 shrink-0 text-wc-blue" aria-hidden />
-                Only {name} can use it, and never more than this. Nothing is spent now.
+                Only {name} can use it, and never more than this. Nothing is spent now. {name} will see your email.
               </p>
               {prices.length > 0 && (
                 <details className="group rounded-[12px] border border-wc-border-light bg-wc-bg text-[13px]">
@@ -245,6 +245,7 @@ export function ConnectFlow() {
                   <Point>Only {name} can use this limit, and only up to this amount.</Point>
                   <Point>The limit is enforced by the vault contract on Whitechain, not by us.</Point>
                   <Point>Nothing is spent now. No gas, no fees for you.</Point>
+                  <Point>{name} will see your email address.</Point>
                 </ul>
                 {error && (
                   <div className="mt-6">

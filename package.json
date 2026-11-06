@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "demos/*"
   ],
   "engines": {
     "node": ">=22"
@@ -23,6 +24,8 @@
     "dev:local": "scripts/dev-local.sh",
     "fund:local": "scripts/fund-local.sh",
     "deploy:whitechain": "scripts/deploy-whitechain.sh",
-    "start:whitechain": "scripts/start-whitechain.sh"
+    "start:whitechain": "scripts/start-whitechain.sh",
+    "dev:parley": "npm run dev -w @demo/parley",
+    "demos:keys": "scripts/demo-keys.sh"
   }
 }

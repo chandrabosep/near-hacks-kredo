@@ -118,14 +118,17 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
     });
   });
 
-  /** Swaps the code from the connect page for the user's address. Each code works once. */
+  /**
+   * Swaps the code from the connect page for the user's address and email. Each code works once.
+   * The email is shared here only, after the user approved this app on the connect page.
+   */
   r.post("/connect/exchange", async (req, res) => {
     const app = appOf(res);
     const { code } = z.object({ code: z.string().min(8).max(200) }).parse(req.body);
     const user = ctx.codes.redeem(app.id, code);
     if (!user) throw new HttpError(400, "That code is invalid, used or expired. Ask the user to connect again.", "bad_code");
     const limit = await ctx.vault.read.limitOf([user, app.id]);
-    res.json({ user, limit: amount(limit.remaining) });
+    res.json({ user, email: store.userByAddress(user)?.email ?? null, limit: amount(limit.remaining) });
   });
 
   // ---------------------------------------------------------------- charges

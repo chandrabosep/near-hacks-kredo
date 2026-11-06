@@ -175,22 +175,26 @@ export class Credits {
   }
 
   /**
-   * Swaps the one-time code from the connect page for the user's address. Call it from your
-   * server, then keep the address in your own session. Never take an address from the browser.
+   * Swaps the one-time code from the connect page for the user's address and email. Call it from
+   * your server, then keep both in your own session. Never take an address from the browser.
    */
-  exchangeCode(code: string): Promise<{ user: string; limit: Amount }> {
+  exchangeCode(code: string): Promise<{ user: string; email: string | null; limit: Amount }> {
     return this.request("POST", "/v1/connect/exchange", { body: { code } });
   }
 
   /**
    * What the React kit shows for one of your users: your app, and their balance and limit.
-   * Pass undefined for a visitor who hasn't connected yet.
+   * Pass undefined for a visitor who hasn't connected yet, and the email from `exchangeCode()` to
+   * show it in the UI.
    */
-  async session(user: string | undefined): Promise<CreditsSession> {
+  async session(user: string | undefined, opts: { email?: string | null } = {}): Promise<CreditsSession> {
     const app = this.appInfo ?? (this.appInfo = await this.app().then((a) => ({ id: a.id, name: a.name })));
     if (!user) return { app, user: null };
     const u = await this.user(user);
-    return { app, user: { address: u.user, balance: u.balance, connected: u.connected, limit: u.limit, spendable: u.spendable } };
+    return {
+      app,
+      user: { address: u.user, email: opts.email ?? null, balance: u.balance, connected: u.connected, limit: u.limit, spendable: u.spendable },
+    };
   }
 
   // ---------------------------------------------------------------- money out and reporting

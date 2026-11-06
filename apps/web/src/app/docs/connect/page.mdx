@@ -9,7 +9,7 @@ A user approves a spending limit for your app once, on our connect page. After t
 1. You send the user to the connect page.
 2. They sign in with email, choose a limit and approve it.
 3. They come back to your `returnTo` URL with a one-time `code`.
-4. Your server swaps the code for their address.
+4. Your server swaps the code for their address and email.
 
 ```ts
 app.get("/connect", async (req, res) => {
@@ -17,8 +17,9 @@ app.get("/connect", async (req, res) => {
 });
 
 app.get("/callback", async (req, res) => {
-  const { user } = await credits.exchangeCode(String(req.query.code));
+  const { user, email } = await credits.exchangeCode(String(req.query.code));
   req.session.creditsUser = user; // charge this address from now on
+  req.session.creditsEmail = email; // shown to the user, never used to charge
   res.redirect("/");
 });
 ```

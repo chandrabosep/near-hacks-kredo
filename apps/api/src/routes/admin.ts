@@ -4,8 +4,9 @@
  */
 import { Router } from "express";
 import { z } from "zod";
+import { creditVaultAbi } from "../abi/CreditVault.js";
 import type { Context } from "../context.js";
-import { requireAdmin } from "../http.js";
+import { HttpError, requireAdmin } from "../http.js";
 import { registerApp } from "../register.js";
 import { amount, creditsToUnits } from "../units.js";
 import { addressSchema, creditsSchema, txInfo } from "./shared.js";
@@ -39,6 +40,20 @@ export function adminRoutes(ctx: Context): Router {
       testKey: ctx.store.issueTestKey(app),
       ...txInfo(ctx, hash),
     });
+  });
+
+  /**
+   * Takes an app off the network: turned off in the vault, so it can't charge or hold any more,
+   * then dropped from the directory with its keys. Refunds and payouts of what it already earned
+   * still work onchain.
+   */
+  r.delete("/apps/:id", async (req, res) => {
+    const id = addressSchema.parse(req.params.id);
+    const app = store.appById(id);
+    if (!app) throw new HttpError(404, "No app with that id", "unknown_app");
+    const { hash } = await relayer.write({ address: config.vault, abi: creditVaultAbi, functionName: "setAppActive", args: [app.id, false] }, { app: app.id });
+    store.removeApp(app.id);
+    res.json({ id: app.id, name: app.name, removed: true, ...txInfo(ctx, hash) });
   });
 
   r.get("/apps", (_req, res) => {

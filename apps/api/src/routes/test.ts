@@ -92,7 +92,7 @@ export function testRoutes(ctx: Context): Router {
     const address = code.startsWith("cc_test_") ? code.slice(8) : "";
     if (!isAddress(address)) throw new HttpError(400, "In test mode, use the code cc_test_<address>", "bad_code");
     const user = getAddress(address);
-    res.json({ user, limit: amount(sandbox.user(appOf(res).id, user).limit), test: true });
+    res.json({ user, email: null, limit: amount(sandbox.user(appOf(res).id, user).limit), test: true });
   });
 
   r.post("/charges", (req, res) => {

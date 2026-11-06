@@ -427,10 +427,29 @@ describe("api", { skip }, () => {
     const swapped = await company("POST", "/v1/connect/exchange", { code: again.body.code });
     assert.equal(swapped.status, 200, JSON.stringify(swapped.body));
     assert.equal(swapped.body.user, alice.address);
+    assert.equal(swapped.body.email, "alice@example.com", "the app learns the email the user connected with");
     assert.equal(swapped.body.limit.credits, "40");
 
     const replay = await company("POST", "/v1/connect/exchange", { code: again.body.code });
     assert.equal(replay.status, 400, "a code works once");
+  });
+
+  test("an admin can take an app off the network", async () => {
+    const made = await call("POST", "/v1/admin/apps", { admin: "dev-admin", body: { name: "Leaving App", payout } });
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+
+    const denied = await call("DELETE", `/v1/admin/apps/${made.body.id}`, { admin: "wrong-token" });
+    assert.equal(denied.status, 401);
+
+    const removed = await call("DELETE", `/v1/admin/apps/${made.body.id}`, { admin: "dev-admin" });
+    assert.equal(removed.status, 200, JSON.stringify(removed.body));
+    assert.ok(removed.body.txHash, "turned off onchain");
+
+    const directory = await call("GET", "/v1/directory");
+    assert.ok(!directory.body.some((a: { id: string }) => a.id === made.body.id), "gone from the directory");
+    const keyGone = await call("GET", "/v1/app", { key: made.body.apiKey });
+    assert.equal(keyGone.status, 401, "its keys stop working");
+    assert.equal((await call("DELETE", `/v1/admin/apps/${made.body.id}`, { admin: "dev-admin" })).status, 404);
   });
 
   test("an already connected user gets a fresh code without signing again", async () => {
