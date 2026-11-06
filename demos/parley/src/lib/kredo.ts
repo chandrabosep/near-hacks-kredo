@@ -3,8 +3,7 @@
  */
 import { Credits, CreditsError } from "kredo";
 import { cookies } from "next/headers";
-import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 /** Parley's price list, in credits. 1 credit = $0.01. */
 export const PRICES = {
@@ -38,41 +37,38 @@ export async function kredo(): Promise<Credits> {
 // ---------------------------------------------------------------- Parley's own sessions
 
 /**
- * A real app links the Kredo user to its own account system. Parley has no accounts, so each
- * browser gets an id cookie, and the Kredo address and email it connected are kept in a small file.
+ * A real app links the Kredo user to its own account system. Parley has no accounts, so the
+ * Kredo address and email this browser connected live in an httpOnly cookie, signed so the
+ * browser can't swap in someone else's address. Nothing is stored on the server.
  */
-const COOKIE = "parley_sid";
-const FILE = ".data/sessions.json";
+const COOKIE = "parley_link";
+const MAX_AGE = 60 * 60 * 24 * 365;
 
-/** Older entries hold just the address. */
-type Linked = string | { address: string; email: string | null };
+type Linked = { address: string; email: string | null };
 
-function readAll(): Record<string, Linked> {
+/** PARLEY_SESSION_SECRET if set, otherwise derived from the API key, which is already secret. */
+function secret(): string {
+  const base = process.env.PARLEY_SESSION_SECRET ?? process.env.CREDITS_API_KEY;
+  if (!base) throw new CreditsError("Parley isn't set up yet: add CREDITS_API_KEY to .env.local", 503, "not_configured");
+  return createHash("sha256").update(`parley-session:${base}`).digest("hex");
+}
+
+function sign(payload: string): string {
+  return createHmac("sha256", secret()).update(payload).digest("base64url");
+}
+
+async function linked(): Promise<Linked | undefined> {
+  const value = (await cookies()).get(COOKIE)?.value;
+  const [payload, mac] = value?.split(".") ?? [];
+  if (!payload || !mac) return undefined;
+  const expected = Buffer.from(sign(payload));
+  const given = Buffer.from(mac);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return undefined;
   try {
-    return JSON.parse(readFileSync(FILE, "utf8"));
+    return JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Linked;
   } catch {
-    return {};
+    return undefined;
   }
-}
-
-function writeAll(all: Record<string, Linked>) {
-  mkdirSync(".data", { recursive: true });
-  writeFileSync(FILE, JSON.stringify(all, null, 2));
-}
-
-async function visitor(): Promise<string> {
-  const jar = await cookies();
-  let id = jar.get(COOKIE)?.value;
-  if (!id) {
-    id = randomUUID();
-    jar.set(COOKIE, id, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
-  }
-  return id;
-}
-
-async function linked(): Promise<{ address: string; email: string | null } | undefined> {
-  const entry = readAll()[await visitor()];
-  return typeof entry === "string" ? { address: entry, email: null } : entry;
 }
 
 /** The Kredo address this browser connected, if any. Never taken from the request body. */
@@ -86,15 +82,18 @@ export async function currentEmail(): Promise<string | null> {
 }
 
 export async function linkUser(address: string, email: string | null) {
-  const all = readAll();
-  all[await visitor()] = { address, email };
-  writeAll(all);
+  const payload = Buffer.from(JSON.stringify({ address, email } satisfies Linked)).toString("base64url");
+  (await cookies()).set(COOKIE, `${payload}.${sign(payload)}`, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: MAX_AGE,
+  });
 }
 
 export async function unlinkUser() {
-  const all = readAll();
-  delete all[await visitor()];
-  writeAll(all);
+  (await cookies()).delete(COOKIE);
 }
 
 /** Turns any thrown error into a JSON response the UI can act on. */
