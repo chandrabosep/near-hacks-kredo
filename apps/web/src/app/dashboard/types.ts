@@ -7,7 +7,7 @@ export type MyApp = AppProfile & {
   name: string;
   payout: string;
   feeBps: number;
-  apiKeyPrefix: string;
+  apiKeyPrefix: string | null;
   unpaidEarnings: Amount;
   prices: Record<string, PriceEntry>;
   createdAt: string;

@@ -2,11 +2,11 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getAddress, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import type { ActivityEvent, AppRecord, ClaimRecord, CompanyRecord, Db, HoldRecord, OpRecord, UserRecord, WebhookDelivery } from "./db.js";
+import type { ActivityEvent, ApiKeyRecord, AppRecord, ClaimRecord, CompanyRecord, Db, HoldRecord, OpRecord, UserRecord, WebhookDelivery } from "./db.js";
 import type { PriceList } from "./pricing.js";
 import type { AppProfileInput, CompanyInput } from "./profile.js";
 
-export type { ActivityEvent, AppRecord, ClaimRecord, CompanyRecord, HoldRecord, OpRecord, UserRecord, WebhookDelivery };
+export type { ActivityEvent, ApiKeyRecord, AppRecord, ClaimRecord, CompanyRecord, HoldRecord, OpRecord, UserRecord, WebhookDelivery };
 
 const API_KEY_PREFIX = "uc_live_";
 const TEST_KEY_PREFIX = "uc_test_";
@@ -17,7 +17,12 @@ export function sha256(value: string): Hex {
 
 export const hashApiKey = sha256;
 
-const newApiKey = () => `${API_KEY_PREFIX}${randomBytes(24).toString("hex")}`;
+const newKey = (mode: ApiKeyRecord["mode"]) => `${mode === "live" ? API_KEY_PREFIX : TEST_KEY_PREFIX}${randomBytes(24).toString("hex")}`;
+
+/** Most active keys an app can hold at once. */
+export const MAX_KEYS_PER_APP = 10;
+/** Last-used times are kept to the minute, so a busy key doesn't write on every request. */
+const LAST_USED_RESOLUTION_MS = 60_000;
 
 const same = (a: string | undefined, b: string | undefined) =>
   a !== undefined && b !== undefined && a.toLowerCase() === b.toLowerCase();
@@ -52,17 +57,14 @@ export function createStore(db: Db) {
 
     // ---------------------------------------------------------------- apps
 
-    /** Creates an app record. Returns the API key once; only its hash is stored. */
+    /** Creates an app record with a first live key. Returns the key once; only its hash is stored. */
     createApp(input: { name: string; payout: Address; feeBps: number; owner?: string; companyId?: string; profile?: AppProfileInput }): { app: AppRecord; apiKey: string } {
-      const apiKey = newApiKey();
       const app: AppRecord = {
         // A fresh address that only identifies the app onchain. Its key is thrown away.
         id: privateKeyToAccount(generatePrivateKey()).address,
         name: input.name,
         payout: getAddress(input.payout),
         feeBps: input.feeBps,
-        apiKeyHash: hashApiKey(apiKey),
-        apiKeyPrefix: apiKey.slice(0, API_KEY_PREFIX.length + 6),
         prices: {},
         owner: input.owner,
         companyId: input.companyId,
@@ -73,45 +75,89 @@ export function createStore(db: Db) {
         createdAt: Date.now(),
       };
       data.apps.push(app);
-      db.save();
-      return { app, apiKey };
+      const { key } = this.createKey(app, { mode: "live", name: "Default" });
+      return { app, apiKey: key };
     },
 
     removeApp(id: Address) {
       data.apps = data.apps.filter((a) => !same(a.id, id));
+      data.apiKeys = data.apiKeys.filter((k) => !same(k.appId, id));
       db.save();
-    },
-
-    appByApiKey(key: string): AppRecord | undefined {
-      const hash = hashApiKey(key);
-      return data.apps.find((a) => a.apiKeyHash === hash);
     },
 
     appById: (id: string) => data.apps.find((a) => same(a.id, id)),
 
     appsOwnedBy: (owner: string) => data.apps.filter((a) => a.owner === owner),
 
-    /** A new test key, for fake credits only. Replaces any earlier one. Returns it once. */
-    issueTestKey(app: AppRecord): string {
-      const key = `${TEST_KEY_PREFIX}${randomBytes(24).toString("hex")}`;
-      app.testKeyHash = hashApiKey(key);
-      app.testKeyPrefix = key.slice(0, TEST_KEY_PREFIX.length + 6);
+    // ---------------------------------------------------------------- API keys
+
+    /** A new named key. Returns it once; only its hash is stored. */
+    createKey(app: AppRecord, input: { mode: ApiKeyRecord["mode"]; name: string }): { key: string; record: ApiKeyRecord } {
+      const key = newKey(input.mode);
+      const record: ApiKeyRecord = {
+        id: randomUUID(),
+        appId: app.id,
+        mode: input.mode,
+        name: input.name,
+        hash: hashApiKey(key),
+        prefix: key.slice(0, API_KEY_PREFIX.length + 6),
+        createdAt: Date.now(),
+      };
+      data.apiKeys.push(record);
       db.save();
-      return key;
+      return { key, record };
     },
 
-    appByTestKey(key: string): AppRecord | undefined {
+    keysOf: (app: AppRecord) => data.apiKeys.filter((k) => same(k.appId, app.id)),
+
+    activeKeysOf: (app: AppRecord) => data.apiKeys.filter((k) => same(k.appId, app.id) && !k.revokedAt),
+
+    /** Turns a key off at once. Revoked keys stay listed, so the dashboard shows what happened. */
+    revokeKey(app: AppRecord, keyId: string): ApiKeyRecord | undefined {
+      const record = data.apiKeys.find((k) => k.id === keyId && same(k.appId, app.id));
+      if (record && !record.revokedAt) {
+        record.revokedAt = Date.now();
+        db.save();
+      }
+      return record;
+    },
+
+    /** The app behind an active key of the given mode, noting when the key was last used. */
+    appByKey(key: string, mode: ApiKeyRecord["mode"]): AppRecord | undefined {
       const hash = hashApiKey(key);
-      return data.apps.find((a) => a.testKeyHash === hash);
+      const record = data.apiKeys.find((k) => k.hash === hash && k.mode === mode && !k.revokedAt);
+      if (!record) return undefined;
+      const now = Date.now();
+      if (!record.lastUsedAt || now - record.lastUsedAt >= LAST_USED_RESOLUTION_MS) {
+        record.lastUsedAt = now;
+        db.save();
+      }
+      return data.apps.find((a) => same(a.id, record.appId));
     },
 
-    /** Replaces the API key. The old one stops working at once. Returns the new key once. */
+    appByApiKey(key: string) {
+      return this.appByKey(key, "live");
+    },
+
+    appByTestKey(key: string) {
+      return this.appByKey(key, "test");
+    },
+
+    /** The newest active key's prefix for a mode, for screens that show one key. */
+    keyPrefix(app: AppRecord, mode: ApiKeyRecord["mode"]): string | null {
+      return this.activeKeysOf(app).filter((k) => k.mode === mode).at(-1)?.prefix ?? null;
+    },
+
+    /** A new test key, for fake credits only. Earlier test keys stop working. Returns it once. */
+    issueTestKey(app: AppRecord): string {
+      for (const k of this.activeKeysOf(app)) if (k.mode === "test") k.revokedAt = Date.now();
+      return this.createKey(app, { mode: "test", name: "Test" }).key;
+    },
+
+    /** Replaces the live keys with one new key. The old ones stop working at once. Returns it once. */
     rotateApiKey(app: AppRecord): string {
-      const apiKey = newApiKey();
-      app.apiKeyHash = hashApiKey(apiKey);
-      app.apiKeyPrefix = apiKey.slice(0, API_KEY_PREFIX.length + 6);
-      db.save();
-      return apiKey;
+      for (const k of this.activeKeysOf(app)) if (k.mode === "live") k.revokedAt = Date.now();
+      return this.createKey(app, { mode: "live", name: "Default" }).key;
     },
 
     listApps: () => data.apps,

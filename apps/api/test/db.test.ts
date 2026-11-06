@@ -97,7 +97,7 @@ test("API keys are stored only as hashes", async () => {
   await db.flush();
 
   assert.match(apiKey, /^uc_live_[0-9a-f]{48}$/);
-  assert.equal(app.apiKeyHash, hashApiKey(apiKey));
+  assert.equal(store.keysOf(app)[0].hash, hashApiKey(apiKey));
   assert.equal(store.appByApiKey(apiKey)?.id, app.id);
   assert.equal(store.appByApiKey(`${apiKey}x`), undefined);
   assert.equal(store.appById(app.id.toLowerCase() as `0x${string}`)?.name, "Video");

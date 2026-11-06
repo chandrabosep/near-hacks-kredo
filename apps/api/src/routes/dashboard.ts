@@ -6,7 +6,7 @@
 import { Router, type RequestHandler } from "express";
 import { z } from "zod";
 import type { Context } from "../context.js";
-import type { CompanyRecord } from "../store.js";
+import { MAX_KEYS_PER_APP, type ApiKeyRecord, type CompanyRecord } from "../store.js";
 import { HttpError, requireUser, userOf } from "../http.js";
 import { appProfileSchema, companySchema } from "../profile.js";
 import { registerApp } from "../register.js";
@@ -72,7 +72,7 @@ export function dashboardRoutes(ctx: Context): Router {
         name: a.name,
         payout: a.payout,
         feeBps: a.feeBps,
-        apiKeyPrefix: a.apiKeyPrefix,
+        apiKeyPrefix: store.keyPrefix(a, "live"),
         unpaidEarnings: amount(earnings[i]),
         prices: a.prices,
         createdAt: new Date(a.createdAt).toISOString(),
@@ -98,13 +98,38 @@ export function dashboardRoutes(ctx: Context): Router {
   /** A new API key. The old one stops working at once. */
   r.post("/me/apps/:id/key", ownApp, (_req, res) => {
     const app = res.locals.app;
-    res.json({ apiKey: store.rotateApiKey(app), apiKeyPrefix: app.apiKeyPrefix });
+    const apiKey = store.rotateApiKey(app);
+    res.json({ apiKey, apiKeyPrefix: store.keyPrefix(app, "live") });
   });
 
   /** A test key: the same calls against fake credits, nothing onchain. */
   r.post("/me/apps/:id/test-key", ownApp, (_req, res) => {
     const app = res.locals.app;
-    res.json({ testKey: store.issueTestKey(app), testKeyPrefix: app.testKeyPrefix });
+    const testKey = store.issueTestKey(app);
+    res.json({ testKey, testKeyPrefix: store.keyPrefix(app, "test") });
+  });
+
+  /** Every key the app has had: live and test, active and revoked. Never the keys themselves. */
+  r.get("/me/apps/:id/keys", ownApp, (_req, res) => {
+    res.json(store.keysOf(res.locals.app).map(keyJson).reverse());
+  });
+
+  /** A new named key, shown once. */
+  r.post("/me/apps/:id/keys", ownApp, (req, res) => {
+    const app = res.locals.app;
+    const body = keySchema.parse(req.body);
+    if (store.activeKeysOf(app).length >= MAX_KEYS_PER_APP) {
+      throw new HttpError(409, `An app can have up to ${MAX_KEYS_PER_APP} active keys. Revoke one first.`, "too_many_keys");
+    }
+    const { key, record } = store.createKey(app, body);
+    res.status(201).json({ ...keyJson(record), key });
+  });
+
+  /** Turns a key off at once. */
+  r.delete("/me/apps/:id/keys/:keyId", ownApp, (req, res) => {
+    const record = store.revokeKey(res.locals.app, String(req.params.keyId));
+    if (!record) throw new HttpError(404, "No such key on this app", "not_found");
+    res.json(keyJson(record));
   });
 
   /** Revenue, fees and refunds for one app, from the indexed events. */
@@ -146,6 +171,16 @@ export function dashboardRoutes(ctx: Context): Router {
   r.use("/me/apps/:id", ownApp, appRoutes(ctx, alreadyChecked));
 
   return r;
+}
+
+const keySchema = z.object({
+  name: z.string().trim().min(1).max(40),
+  mode: z.enum(["live", "test"]),
+});
+
+function keyJson(k: ApiKeyRecord) {
+  const iso = (ms?: number) => (ms ? new Date(ms).toISOString() : null);
+  return { id: k.id, name: k.name, mode: k.mode, prefix: k.prefix, createdAt: iso(k.createdAt), lastUsedAt: iso(k.lastUsedAt), revokedAt: iso(k.revokedAt) };
 }
 
 function companyJson(c: CompanyRecord) {

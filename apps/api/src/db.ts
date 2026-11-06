@@ -7,6 +7,7 @@
  * written to Postgres shortly after (save) or right away (flush). A write sends only the rows
  * that changed since the last one, inside one transaction.
  */
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,10 +48,6 @@ export type AppRecord = {
   category?: string;
   payout: Address;
   feeBps: number;
-  /** sha256 of the API key. The key itself is shown once, at creation. */
-  apiKeyHash: Hex;
-  /** First characters of the key, so the dashboard can show which key is which. */
-  apiKeyPrefix: string;
   /** Deep mode: what each action costs, in credits. */
   prices: PriceList;
   /** Light mode: how many of our credits buy one of the app's own credits (e.g. "2"). */
@@ -58,12 +55,24 @@ export type AppRecord = {
   webhookUrl?: string;
   /** Signs webhook payloads (HMAC-SHA256). Kept in full: signing needs the secret itself. */
   webhookSecret?: string;
-  /** Test mode: a second key that works against fake credits only. */
-  testKeyHash?: Hex;
-  testKeyPrefix?: string;
   /** The Privy user who registered it from the dashboard. Admin-registered apps have none. */
   owner?: string;
   createdAt: number;
+};
+
+/** One API key. Live keys move real credits; test keys work against fake credits only. */
+export type ApiKeyRecord = {
+  id: string;
+  appId: Address;
+  mode: "live" | "test";
+  name: string;
+  /** sha256 of the key. The key itself is shown once, at creation. */
+  hash: Hex;
+  /** First characters of the key, so the dashboard can show which key is which. */
+  prefix: string;
+  createdAt: number;
+  lastUsedAt?: number;
+  revokedAt?: number;
 };
 
 /** Every credit-moving action the API performed for an app. Feeds idempotency, CSV and gas. */
@@ -167,6 +176,7 @@ export type Data = {
   genesis?: Hash;
   companies: CompanyRecord[];
   apps: AppRecord[];
+  apiKeys: ApiKeyRecord[];
   holds: HoldRecord[];
   ops: OpRecord[];
   users: UserRecord[];
@@ -207,7 +217,7 @@ type Row = Record<string, unknown>;
 // Both drivers share Drizzle's Postgres query builder.
 type Orm = PgDatabase<PgQueryResultHKT, typeof schema>;
 
-const empty = (): Data => ({ companies: [], apps: [], holds: [], ops: [], users: [], claims: [], txs: [], events: [], deliveries: [] });
+const empty = (): Data => ({ companies: [], apps: [], apiKeys: [], holds: [], ops: [], users: [], claims: [], txs: [], events: [], deliveries: [] });
 
 const replacer = (_key: string, v: unknown) => (typeof v === "bigint" ? { $bigint: v.toString() } : v);
 const reviver = (_key: string, v: unknown) =>
@@ -253,6 +263,14 @@ const SPECS: Record<Collection, Spec> = {
     toRow: (r: AppRecord) => withDates(r, ["createdAt"]),
     fromRow: (row) => clean(row),
     order: [asc(schema.apps.createdAt)],
+  },
+  apiKeys: {
+    table: schema.apiKeys,
+    pk: schema.apiKeys.id,
+    key: (r: ApiKeyRecord) => r.id,
+    toRow: (r: ApiKeyRecord) => withDates(r, ["createdAt", "lastUsedAt", "revokedAt"]),
+    fromRow: (row) => clean(row),
+    order: [asc(schema.apiKeys.createdAt)],
   },
   users: {
     table: schema.users,
@@ -456,6 +474,16 @@ export async function openDb(opts: DbOptions = {}): Promise<Db> {
   if (blank && opts.legacyFile && existsSync(opts.legacyFile)) {
     const old = JSON.parse(readFileSync(opts.legacyFile, "utf8"), reviver) as Partial<Data>;
     Object.assign(data, empty(), old);
+    // Older files kept one live and one test key on each app.
+    for (const app of data.apps as (AppRecord & { apiKeyHash?: Hex; apiKeyPrefix?: string; testKeyHash?: Hex; testKeyPrefix?: string })[]) {
+      const at = app.createdAt;
+      if (app.apiKeyHash) data.apiKeys.push({ id: randomUUID(), appId: app.id, mode: "live", name: "Default", hash: app.apiKeyHash, prefix: app.apiKeyPrefix ?? "", createdAt: at });
+      if (app.testKeyHash) data.apiKeys.push({ id: randomUUID(), appId: app.id, mode: "test", name: "Test", hash: app.testKeyHash, prefix: app.testKeyPrefix ?? "", createdAt: at });
+      delete app.apiKeyHash;
+      delete app.apiKeyPrefix;
+      delete app.testKeyHash;
+      delete app.testKeyPrefix;
+    }
     await db.flush();
     console.log(`[db] imported ${opts.legacyFile}`);
   }

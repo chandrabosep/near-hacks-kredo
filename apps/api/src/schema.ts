@@ -41,17 +41,31 @@ export const apps = pgTable("apps", {
   category: text("category"),
   payout: text("payout").notNull(),
   feeBps: integer("fee_bps").notNull(),
-  apiKeyHash: text("api_key_hash").notNull().unique(),
-  apiKeyPrefix: text("api_key_prefix").notNull(),
   prices: jsonb("prices").$type<PriceList>().notNull(),
   exchangeRate: text("exchange_rate"),
   webhookUrl: text("webhook_url"),
   webhookSecret: text("webhook_secret"),
-  testKeyHash: text("test_key_hash").unique(),
-  testKeyPrefix: text("test_key_prefix"),
   owner: text("owner"),
   createdAt: time("created_at").notNull(),
 });
+
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: text("id").primaryKey(),
+    appId: text("app_id")
+      .notNull()
+      .references(() => apps.id, { onDelete: "cascade" }),
+    mode: text("mode").notNull(),
+    name: text("name").notNull(),
+    hash: text("hash").notNull().unique(),
+    prefix: text("prefix").notNull(),
+    createdAt: time("created_at").notNull(),
+    lastUsedAt: time("last_used_at"),
+    revokedAt: time("revoked_at"),
+  },
+  (t) => [index("api_keys_app_idx").on(t.appId)],
+);
 
 export const users = pgTable(
   "users",

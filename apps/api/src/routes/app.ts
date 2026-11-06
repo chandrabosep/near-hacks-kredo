@@ -73,8 +73,8 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
       prices: app.prices,
       exchangeRate: app.exchangeRate ?? null,
       webhookUrl: app.webhookUrl ?? null,
-      apiKeyPrefix: app.apiKeyPrefix,
-      testKeyPrefix: app.testKeyPrefix ?? null,
+      apiKeyPrefix: ctx.store.keyPrefix(app, "live"),
+      testKeyPrefix: ctx.store.keyPrefix(app, "test"),
       ...appProfile(ctx, app),
     });
   });

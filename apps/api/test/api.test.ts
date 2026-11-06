@@ -512,6 +512,42 @@ describe("api", { skip }, () => {
     assert.ok(app, "first app still listed");
   });
 
+  test("named keys: create, use, list with last use, revoke", async () => {
+    const [app] = (await call("GET", "/v1/me/apps", { user: "bob" })).body;
+    const keys = `/v1/me/apps/${app.id}/keys`;
+
+    const made = await call("POST", keys, { user: "bob", body: { name: "Production server", mode: "live" } });
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    assert.match(made.body.key, /^uc_live_/);
+    assert.equal(made.body.lastUsedAt, null);
+    assert.equal((await call("GET", "/v1/app", { key: made.body.key })).status, 200);
+
+    const test = await call("POST", keys, { user: "bob", body: { name: "CI", mode: "test" } });
+    assert.match(test.body.key, /^uc_test_/);
+    assert.equal((await call("GET", "/v1/app", { key: test.body.key })).status, 200, "a test key runs in the sandbox");
+    assert.equal((await call("PUT", "/v1/prices", { key: test.body.key, body: { prices: {} } })).body.code, "test_mode_unsupported", "and can't change live settings");
+
+    const listed = (await call("GET", keys, { user: "bob" })).body;
+    const prod = listed.find((k: Json) => k.id === made.body.id);
+    assert.ok(prod.lastUsedAt, "last use is recorded");
+    assert.equal(JSON.stringify(listed).includes(made.body.key), false, "keys are never listed in full");
+    assert.equal((await call("GET", keys, { user: "alice" })).status, 404);
+
+    const revoked = await call("DELETE", `${keys}/${made.body.id}`, { user: "bob" });
+    assert.ok(revoked.body.revokedAt);
+    assert.equal((await call("GET", "/v1/app", { key: made.body.key })).status, 401);
+    assert.equal((await call("DELETE", `${keys}/nope`, { user: "bob" })).status, 404);
+    assert.equal((await call("POST", keys, { user: "bob", body: { name: "", mode: "live" } })).status, 400);
+  });
+
+  test("an app holds at most ten active keys", async () => {
+    const made = await call("POST", "/v1/me/apps", { user: "bob", body: { name: "Many Keys" } });
+    const keys = `/v1/me/apps/${made.body.id}/keys`;
+    // The first live key and the first test key come with the app.
+    for (let i = 0; i < 8; i++) assert.equal((await call("POST", keys, { user: "bob", body: { name: `k${i}`, mode: "live" } })).status, 201);
+    assert.equal((await call("POST", keys, { user: "bob", body: { name: "one too many", mode: "live" } })).body.code, "too_many_keys");
+  });
+
   // ---------------------------------------------------------------- test mode
 
   test("a test key runs the same calls against fake credits, never the chain", async () => {

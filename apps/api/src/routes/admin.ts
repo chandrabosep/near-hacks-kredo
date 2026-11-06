@@ -48,7 +48,7 @@ export function adminRoutes(ctx: Context): Router {
         name: a.name,
         payout: a.payout,
         feeBps: a.feeBps,
-        apiKeyPrefix: a.apiKeyPrefix,
+        apiKeyPrefix: ctx.store.keyPrefix(a, "live"),
         createdAt: new Date(a.createdAt).toISOString(),
       })),
     );

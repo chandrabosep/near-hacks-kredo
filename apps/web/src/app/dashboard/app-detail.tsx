@@ -10,6 +10,7 @@ import type { ActivityItem } from "@/lib/activity";
 import { ago, credits, short, usd } from "@/lib/format";
 import { useIdentityToken } from "@privy-io/react-auth";
 import { env } from "@/lib/env";
+import { ApiKeys } from "./api-keys";
 import { AppProfileForm } from "./app-profile";
 import { Integration } from "./integration";
 import { PricesEditor } from "./prices-editor";
@@ -128,6 +129,8 @@ export function AppDetail({ app, onChange }: { app: MyApp; onChange: () => void 
           <PricesEditor base={base} prices={info?.prices ?? app.prices} feeBps={app.feeBps} onSaved={refresh} />
         </div>
       </section>
+
+      <ApiKeys base={base} />
 
       {info && <Integration base={base} info={info} onChange={refresh} />}
 
