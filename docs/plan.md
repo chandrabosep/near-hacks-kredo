@@ -142,7 +142,7 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] buy page
 - [x] wallet page
 - [x] claim page
-- [ ] landing page
+- [x] landing page
 
 **React kit**
 - [ ] provider and `useCredits()`
