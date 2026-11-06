@@ -141,7 +141,7 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] connect page
 - [x] buy page
 - [x] wallet page
-- [ ] claim page
+- [x] claim page
 - [ ] landing page
 
 **React kit**
