@@ -27,6 +27,9 @@ export type AppRecord = {
   webhookUrl?: string;
   /** Signs webhook payloads (HMAC-SHA256). Kept in full: signing needs the secret itself. */
   webhookSecret?: string;
+  /** Test mode: a second key that works against fake credits only. */
+  testKeyHash?: Hex;
+  testKeyPrefix?: string;
   /** The Privy user who registered it from the dashboard. Admin-registered apps have none. */
   owner?: string;
   createdAt: number;

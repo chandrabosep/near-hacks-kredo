@@ -476,4 +476,52 @@ describe("api", { skip }, () => {
     assert.equal((await call("GET", "/v1/app", { key: rotated.body.apiKey })).body.name, "Second");
     assert.ok(app, "first app still listed");
   });
+
+  // ---------------------------------------------------------------- test mode
+
+  test("a test key runs the same calls against fake credits, never the chain", async () => {
+    const made = await call("POST", "/v1/admin/apps", { admin: "dev-admin", body: { name: "Sandbox App", payout } });
+    const testKey: string = made.body.testKey;
+    assert.match(testKey, /^uc_test_/);
+    const t = (method: string, path: string, body?: unknown) => call(method, path, { key: testKey, body });
+    const someone = privateKeyToAccount(generatePrivateKey()).address;
+    const sentBefore = await chain!.clients.publicClient.getTransactionCount({ address: chain!.clients.operator.address });
+
+    assert.equal((await t("PUT", "/v1/prices", { prices: {} })).body.code, "test_mode_unsupported", "config stays on the live key");
+    const fresh = await t("GET", `/v1/users/${someone}`);
+    assert.equal(fresh.body.balance.credits, "1000");
+    assert.equal(fresh.body.limit.credits, "500");
+    assert.equal(fresh.body.test, true);
+
+    const swapped = await t("POST", "/v1/connect/exchange", { code: `cc_test_${someone}` });
+    assert.equal(swapped.body.user, someone);
+
+    const charge = await t("POST", "/v1/charges", { user: someone, credits: 10, ref: "t-1" });
+    assert.equal(charge.status, 201);
+    assert.equal(charge.body.test, true);
+    assert.equal(charge.body.fee.credits, "0.5");
+    assert.equal((await t("POST", "/v1/charges", { user: someone, credits: 10, ref: "t-1" })).body.replayed, true);
+
+    const hold = await t("POST", "/v1/holds", { user: someone, credits: 40 });
+    const cap = await t("POST", `/v1/holds/${hold.body.holdId}/capture`, { credits: 25 });
+    assert.equal(cap.body.returned.credits, "15");
+    const hold2 = await t("POST", "/v1/holds", { user: someone, credits: 5 });
+    assert.equal((await t("POST", `/v1/holds/${hold2.body.holdId}/release`)).status, 200);
+    assert.equal((await t("POST", "/v1/refunds", { user: someone, credits: 5 })).status, 201);
+
+    const over = await t("POST", "/v1/charges", { user: someone, credits: 600 });
+    assert.equal(over.status, 422);
+    assert.equal(over.body.code, "OverLimit", "same refusals as the vault");
+
+    const after = await t("GET", `/v1/users/${someone}`);
+    assert.equal(after.body.balance.credits, "970", "1000 - 10 - 25 + 5 refund");
+    assert.equal((await t("POST", "/v1/payout")).body.code, "test_mode_unsupported");
+
+    const sentAfter = await chain!.clients.publicClient.getTransactionCount({ address: chain!.clients.operator.address });
+    assert.equal(sentAfter, sentBefore, "test mode sent nothing onchain");
+
+    await t("POST", "/v1/sandbox/reset");
+    assert.equal((await t("GET", `/v1/users/${someone}`)).body.balance.credits, "1000");
+    assert.equal((await call("GET", "/v1/app", { key: made.body.apiKey })).body.name, "Sandbox App", "the live key still works");
+  });
 });

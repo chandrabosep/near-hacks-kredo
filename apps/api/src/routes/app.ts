@@ -74,6 +74,7 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
       exchangeRate: app.exchangeRate ?? null,
       webhookUrl: app.webhookUrl ?? null,
       apiKeyPrefix: app.apiKeyPrefix,
+      testKeyPrefix: app.testKeyPrefix ?? null,
     });
   });
 

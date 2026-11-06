@@ -36,6 +36,7 @@ export function adminRoutes(ctx: Context): Router {
       feeBps: app.feeBps,
       maxCharge: maxCharge === 0n ? null : amount(maxCharge),
       apiKey,
+      testKey: ctx.store.issueTestKey(app),
       ...txInfo(ctx, hash),
     });
   });

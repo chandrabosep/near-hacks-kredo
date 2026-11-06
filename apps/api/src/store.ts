@@ -8,6 +8,7 @@ import type { PriceList } from "./pricing.js";
 export type { ActivityEvent, AppRecord, ClaimRecord, HoldRecord, OpRecord, UserRecord, WebhookDelivery };
 
 const API_KEY_PREFIX = "uc_live_";
+const TEST_KEY_PREFIX = "uc_test_";
 
 export function sha256(value: string): Hex {
   return `0x${createHash("sha256").update(value).digest("hex")}`;
@@ -59,6 +60,20 @@ export function createStore(db: Db) {
     appById: (id: string) => data.apps.find((a) => same(a.id, id)),
 
     appsOwnedBy: (owner: string) => data.apps.filter((a) => a.owner === owner),
+
+    /** A new test key, for fake credits only. Replaces any earlier one. Returns it once. */
+    issueTestKey(app: AppRecord): string {
+      const key = `${TEST_KEY_PREFIX}${randomBytes(24).toString("hex")}`;
+      app.testKeyHash = hashApiKey(key);
+      app.testKeyPrefix = key.slice(0, TEST_KEY_PREFIX.length + 6);
+      db.save();
+      return key;
+    },
+
+    appByTestKey(key: string): AppRecord | undefined {
+      const hash = hashApiKey(key);
+      return data.apps.find((a) => a.testKeyHash === hash);
+    },
 
     /** Replaces the API key. The old one stops working at once. Returns the new key once. */
     rotateApiKey(app: AppRecord): string {

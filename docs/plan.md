@@ -218,13 +218,13 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 - [x] README "Relayer security" section, updated with the real numbers
 
 ### Step 4: SDK test mode and starter app
-- [ ] Test mode: test API keys that work with fake credits
+- [x] Test mode: test API keys that work with fake credits
 - [ ] A bare starter app; count its lines for the "about 20 lines" claim
 
 **Done when:** a brand-new app integrates using only the README. This is the Operate drop-in piece.
 
 ### Step 5: Company dashboard
-- [ ] Register an app, get test and live API keys
+- [x] Register an app, get test and live API keys
 - [x] Price list in credits with the dollar value next to each price (flat or per-unit)
 - [x] "What you earn" preview: dollar value and payout after fee
 - [x] Light mode: set the rate from the company's own credits

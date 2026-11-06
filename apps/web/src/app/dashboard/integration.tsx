@@ -36,6 +36,12 @@ export function Integration({ base, info, onChange }: { base: string; info: AppI
       setSecret({ label: "New API key. The old one has stopped working.", value: apiKey });
     });
 
+  const testKey = () =>
+    run("test", async () => {
+      const { testKey: k } = await api<{ testKey: string }>("POST", `${base}/test-key`);
+      setSecret({ label: "Test key: the same calls against fake credits. Every test user starts with 1,000 credits. Nothing goes onchain.", value: k });
+    });
+
   const saveHook = () =>
     run("hook", async () => {
       const { secret: s } = await api<{ secret: string | null }>("PUT", `${base}/webhook`, { url: hook.trim() || null });
@@ -68,10 +74,17 @@ export function Integration({ base, info, onChange }: { base: string; info: AppI
           <p className="text-heading-lg text-wc-text-1">API key</p>
           <p className="mt-2 font-mono text-[14px] text-wc-text-2">{info.apiKeyPrefix}…</p>
           <p className="mt-2 text-[14px] leading-6 text-wc-text-muted">For your server only. Lost it, or think it leaked? Make a new one.</p>
-          <Button variant="outline" className="mt-6" disabled={busy !== undefined} onClick={rotate}>
-            {busy === "key" && <Spinner />}
-            Rotate key
-          </Button>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button variant="outline" disabled={busy !== undefined} onClick={rotate}>
+              {busy === "key" && <Spinner />}
+              Rotate key
+            </Button>
+            <Button variant="ghost" disabled={busy !== undefined} onClick={testKey}>
+              {busy === "test" && <Spinner />}
+              {info.testKeyPrefix ? "New test key" : "Get a test key"}
+            </Button>
+          </div>
+          {info.testKeyPrefix && <p className="mt-3 font-mono text-[13px] text-wc-icon-muted">Test: {info.testKeyPrefix}…</p>}
         </Tile>
         <Tile className="lg:px-12">
           <p className="text-heading-lg text-wc-text-1">Webhook</p>

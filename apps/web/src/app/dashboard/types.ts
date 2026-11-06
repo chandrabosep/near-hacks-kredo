@@ -17,6 +17,7 @@ export type AppInfo = MyApp & {
   active: boolean;
   exchangeRate: string | null;
   webhookUrl: string | null;
+  testKeyPrefix?: string | null;
 };
 
 export type AppStats = {

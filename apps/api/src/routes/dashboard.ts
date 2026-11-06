@@ -39,7 +39,7 @@ export function dashboardRoutes(ctx: Context): Router {
       payout: body.payout ?? userOf(res).address,
       owner: owner(res),
     });
-    res.status(201).json({ id: app.id, name: app.name, payout: app.payout, feeBps: app.feeBps, apiKey, ...txInfo(ctx, hash) });
+    res.status(201).json({ id: app.id, name: app.name, payout: app.payout, feeBps: app.feeBps, apiKey, testKey: store.issueTestKey(app), ...txInfo(ctx, hash) });
   });
 
   /** The owner's apps, with what each has earned and not yet withdrawn. */
@@ -71,6 +71,12 @@ export function dashboardRoutes(ctx: Context): Router {
   r.post("/me/apps/:id/key", ownApp, (_req, res) => {
     const app = res.locals.app;
     res.json({ apiKey: store.rotateApiKey(app), apiKeyPrefix: app.apiKeyPrefix });
+  });
+
+  /** A test key: the same calls against fake credits, nothing onchain. */
+  r.post("/me/apps/:id/test-key", ownApp, (_req, res) => {
+    const app = res.locals.app;
+    res.json({ testKey: store.issueTestKey(app), testKeyPrefix: app.testKeyPrefix });
   });
 
   /** Revenue, fees and refunds for one app, from the indexed events. */
