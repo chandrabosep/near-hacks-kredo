@@ -88,7 +88,7 @@ before(async () => {
     DATA_DIR: mkdtempSync(join(tmpdir(), "uc-api-")),
     OPERATOR_KEY: ANVIL_KEY,
   });
-  ctx = await createContext(config, { verifier });
+  ctx = await createContext(config, { verifier, memoryDb: true });
   const server = createServer(ctx).listen(0);
   await new Promise((r) => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -104,8 +104,10 @@ before(async () => {
   await chain.clients.publicClient.waitForTransactionReceipt({ hash });
 });
 
-after(() => {
+after(async () => {
   close?.();
+  ctx?.indexer.stop();
+  await ctx?.db.close();
   chain?.stop();
 });
 

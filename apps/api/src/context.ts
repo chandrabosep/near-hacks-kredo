@@ -5,7 +5,7 @@ import { mockUSDTAbi } from "./abi/MockUSDT.js";
 import { privyVerifier, type UserVerifier } from "./auth.js";
 import { createClients } from "./chain.js";
 import { loadConfig, type Config } from "./config.js";
-import { bindToGenesis, dbFileFor, openDb } from "./db.js";
+import { bindToGenesis, dbFileFor, openDb, pgDirFor } from "./db.js";
 import { createCodes } from "./codes.js";
 import { createIndexer } from "./indexer.js";
 import { createRelayer } from "./relayer.js";
@@ -14,13 +14,17 @@ import { createStore } from "./store.js";
 /** The ABI subset of USDT we use (ERC-20, permit, EIP-3009) is the same on the mock and the real token. */
 export const usdtAbi = mockUSDTAbi;
 
-export async function createContext(config: Config = loadConfig(), opts: { verifier?: UserVerifier } = {}) {
+export async function createContext(config: Config = loadConfig(), opts: { verifier?: UserVerifier; memoryDb?: boolean } = {}) {
   const clients = createClients(config);
-  const db = openDb(dbFileFor(config.dataDir, config.chainId, config.vault));
+  const db = await openDb({
+    url: config.databaseUrl,
+    dir: opts.memoryDb ? undefined : pgDirFor(config.dataDir, config.chainId, config.vault),
+    legacyFile: opts.memoryDb ? undefined : dbFileFor(config.dataDir, config.chainId, config.vault),
+  });
 
   const genesis = await clients.publicClient.getBlock({ blockNumber: 0n });
-  if (bindToGenesis(db, genesis.hash)) {
-    console.warn(`[db] ${db.file} belonged to an earlier chain; started clean`);
+  if (await bindToGenesis(db, genesis.hash)) {
+    console.warn(`[db] ${db.where} belonged to an earlier chain; started clean`);
   }
 
   const vault = getContract({ address: config.vault, abi: creditVaultAbi, client: clients.publicClient });

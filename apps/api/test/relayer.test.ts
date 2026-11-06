@@ -1,8 +1,5 @@
 /** Runs the relayer against a throwaway anvil chain with the real contracts. */
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { parseEther, parseGwei, type Address } from "viem";
 import { creditVaultAbi } from "../src/abi/CreditVault.js";
@@ -17,7 +14,7 @@ let relayer: Relayer;
 before(async () => {
   if (skip) return;
   chain = await startLocalChain();
-  db = openDb(join(mkdtempSync(join(tmpdir(), "uc-relayer-")), "db.json"));
+  db = await openDb();
   relayer = createRelayer({ clients: chain.clients, db, txTimeoutMs: 10_000 });
 });
 
@@ -99,8 +96,8 @@ const roomy: RelayerLimits = {
   minBalance: 0n,
 };
 
-function limited(overrides: Partial<RelayerLimits>) {
-  const ldb = openDb(join(mkdtempSync(join(tmpdir(), "uc-limits-")), "db.json"));
+async function limited(overrides: Partial<RelayerLimits>) {
+  const ldb = await openDb();
   return { ldb, r: createRelayer({ clients: chain!.clients, db: ldb, txTimeoutMs: 10_000, limits: { ...roomy, ...overrides } }) };
 }
 
@@ -123,7 +120,7 @@ async function sentCount() {
 }
 
 test("within the limits, a transaction goes out with a capped gas limit", { skip }, async () => {
-  const { r } = limited({});
+  const { r } = await limited({});
   const res = await registerWith(r, 20);
   const tx = await chain!.clients.publicClient.getTransaction({ hash: res.hash });
   assert.ok(tx.gas <= roomy.maxTxGas);
@@ -131,7 +128,7 @@ test("within the limits, a transaction goes out with a capped gas limit", { skip
 });
 
 test("a transaction above the gas ceiling is refused before sending", { skip }, async () => {
-  const { r, ldb } = limited({ maxTxGas: 21_000n });
+  const { r, ldb } = await limited({ maxTxGas: 21_000n });
   const before = await sentCount();
   await assert.rejects(registerWith(r, 21), refused("GasTooHigh"));
   assert.equal(await sentCount(), before);
@@ -139,12 +136,12 @@ test("a transaction above the gas ceiling is refused before sending", { skip }, 
 });
 
 test("a gas price above the ceiling is refused", { skip }, async () => {
-  const { r } = limited({ maxGasPrice: 1n });
+  const { r } = await limited({ maxGasPrice: 1n });
   await assert.rejects(registerWith(r, 22), refused("GasPriceTooHigh"));
 });
 
 test("the daily budget stops new work but exits still go out", { skip }, async () => {
-  const { r } = limited({ dailyBudget: 1n, appDailyBudget: 1n });
+  const { r } = await limited({ dailyBudget: 1n, appDailyBudget: 1n });
   await assert.rejects(registerWith(r, 23), refused("DailyBudgetReached"));
 
   // The operator revoking its own limit is an exit: no signature needed, and it skips the budget.
@@ -163,14 +160,14 @@ test("the daily budget stops new work but exits still go out", { skip }, async (
 });
 
 test("one app's budget can't spend the whole relayer's", { skip }, async () => {
-  const { r } = limited({ appDailyBudget: 1n });
+  const { r } = await limited({ appDailyBudget: 1n });
   await assert.rejects(registerWith(r, 24), refused("AppBudgetReached"));
   const res = await registerWith(r, 24, false);
   assert.equal(res.tx.status, "success");
 });
 
 test("below the minimum balance, only exits go out", { skip }, async () => {
-  const { r } = limited({ minBalance: parseEther("1000000") });
+  const { r } = await limited({ minBalance: parseEther("1000000") });
   await assert.rejects(registerWith(r, 25), refused("RelayerLowBalance"));
   assert.equal((await r.status()).exitsOnly, true);
 });
@@ -198,7 +195,7 @@ test("a send that fails once on the network goes out on the retry", { skip }, as
       }) as typeof walletClient.writeContract,
     } as typeof walletClient,
   };
-  const r = createRelayer({ clients: flaky, db: openDb(join(mkdtempSync(join(tmpdir(), "uc-retry-")), "db.json")), txTimeoutMs: 10_000 });
+  const r = createRelayer({ clients: flaky, db: await openDb(), txTimeoutMs: 10_000 });
   const res = await r.write({
     address: chain!.vault,
     abi: creditVaultAbi,

@@ -1,14 +1,26 @@
 /**
- * Tiny JSON-file database for what the chain doesn't hold: API keys, hold metadata and the
- * relayer's gas ledger. The chain is the source of truth for every balance.
+ * Storage for what the chain doesn't hold: API keys, hold metadata, users, the relayer's gas
+ * ledger and indexed events. The chain is the source of truth for every balance.
  *
- * Writes are debounced and atomic (temp file + rename), so a crash never leaves a half-written
- * file. bigint values survive the round trip.
+ * Postgres (DATABASE_URL) in production; an embedded Postgres (pglite) on disk locally and in
+ * memory for tests. One API process owns the data: reads come from memory, and every change is
+ * written to Postgres shortly after (save) or right away (flush). A write sends only the rows
+ * that changed since the last one, inside one transaction.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { PGlite } from "@electric-sql/pglite";
+import { asc, getTableColumns, inArray, sql, type SQL } from "drizzle-orm";
+import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
+import { migrate as migratePg } from "drizzle-orm/node-postgres/migrator";
+import type { PgColumn, PgDatabase, PgQueryResultHKT, PgTable } from "drizzle-orm/pg-core";
+import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
+import pg from "pg";
 import type { Address, Hash, Hex } from "viem";
 import type { PriceList } from "./pricing.js";
+import * as schema from "./schema.js";
 
 export type AppRecord = {
   /** The app's id address onchain. Only an identifier: nobody holds its key. */
@@ -132,7 +144,7 @@ export type WebhookDelivery = {
 };
 
 export type Data = {
-  /** Hash of block 0. A local chain restarts with a new genesis, which makes this file stale. */
+  /** Hash of block 0. A local chain restarts with a new genesis, which makes the data stale. */
   genesis?: Hash;
   apps: AppRecord[];
   holds: HoldRecord[];
@@ -148,14 +160,32 @@ export type Data = {
 
 export type Db = {
   data: Data;
-  file: string;
+  /** Where the data lives, for logs. */
+  where: string;
   /** Schedules a write. Cheap to call after every change. */
   save(): void;
   /** Writes now. */
-  flush(): void;
+  flush(): Promise<void>;
   /** Clears everything, for a replaced local chain. */
-  reset(): void;
+  reset(): Promise<void>;
+  /** Writes what's pending and closes the connection. */
+  close(): Promise<void>;
 };
+
+export type DbOptions = {
+  /** A Postgres connection string. Without one, an embedded Postgres is used. */
+  url?: string;
+  /** Folder for the embedded Postgres. Without one (and no url), data is kept in memory. */
+  dir?: string;
+  /** An older JSON data file, imported once into an empty database. */
+  legacyFile?: string;
+  debounceMs?: number;
+};
+
+type Collection = Exclude<keyof Data, "genesis" | "cursor">;
+type Row = Record<string, unknown>;
+// Both drivers share Drizzle's Postgres query builder.
+type Orm = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 const empty = (): Data => ({ apps: [], holds: [], ops: [], users: [], claims: [], txs: [], events: [], deliveries: [] });
 
@@ -163,56 +193,262 @@ const replacer = (_key: string, v: unknown) => (typeof v === "bigint" ? { $bigin
 const reviver = (_key: string, v: unknown) =>
   v !== null && typeof v === "object" && "$bigint" in v ? BigInt((v as { $bigint: string }).$bigint) : v;
 
-export function openDb(file: string, debounceMs = 50): Db {
-  mkdirSync(dirname(file), { recursive: true });
-  const data: Data = existsSync(file)
-    ? { ...empty(), ...(JSON.parse(readFileSync(file, "utf8"), reviver) as Partial<Data>) }
-    : empty();
+/** Rows come back with null for empty columns; records leave those fields out. */
+function clean(row: Row, drop: string[] = []): Row {
+  const out: Row = {};
+  for (const [k, v] of Object.entries(row)) if (v !== null && !drop.includes(k)) out[k] = v instanceof Date ? v.getTime() : v;
+  return out;
+}
+
+/** Millisecond fields become timestamps. */
+function withDates(record: object, fields: string[], extra: Row = {}): Row {
+  const row: Row = { ...record, ...extra };
+  for (const f of fields) if (typeof row[f] === "number") row[f] = new Date(row[f] as number);
+  return row;
+}
+
+type Spec = {
+  table: PgTable;
+  pk: PgColumn;
+  key: (r: never, i: number) => string;
+  toRow: (r: never, i: number) => Row;
+  fromRow: (row: Row) => unknown;
+  order: (PgColumn | SQL)[];
+};
+
+const SPECS: Record<Collection, Spec> = {
+  apps: {
+    table: schema.apps,
+    pk: schema.apps.id,
+    key: (r: AppRecord) => r.id,
+    toRow: (r: AppRecord) => withDates(r, ["createdAt"]),
+    fromRow: (row) => clean(row),
+    order: [asc(schema.apps.createdAt)],
+  },
+  users: {
+    table: schema.users,
+    pk: schema.users.privyId,
+    key: (r: UserRecord) => r.privyId,
+    toRow: (r: UserRecord) => withDates(r, ["createdAt"]),
+    fromRow: (row) => clean(row),
+    order: [asc(schema.users.createdAt)],
+  },
+  ops: {
+    table: schema.ops,
+    pk: schema.ops.id,
+    key: (r: OpRecord) => `${r.txHash}:${r.kind}`,
+    toRow: (r: OpRecord) => withDates(r, ["at"], { id: `${r.txHash}:${r.kind}` }),
+    fromRow: (row) => clean(row, ["id"]),
+    order: [asc(schema.ops.at)],
+  },
+  holds: {
+    table: schema.holds,
+    pk: schema.holds.holdId,
+    key: (r: HoldRecord) => r.holdId,
+    toRow: (r: HoldRecord) => ({ ...r }),
+    fromRow: (row) => clean(row),
+    order: [asc(schema.holds.expiry)],
+  },
+  claims: {
+    table: schema.claims,
+    pk: schema.claims.claimKey,
+    key: (r: ClaimRecord) => r.claimKey,
+    toRow: (r: ClaimRecord) => withDates(r, ["createdAt"]),
+    fromRow: (row) => clean(row),
+    order: [asc(schema.claims.createdAt)],
+  },
+  txs: {
+    table: schema.relayerTxs,
+    pk: schema.relayerTxs.seq,
+    // The ledger only grows, so its position is a stable key.
+    key: (_r: RelayerTx, i: number) => String(i),
+    toRow: (r: RelayerTx, i: number) => withDates(r, ["at"], { seq: i }),
+    fromRow: (row) => clean(row, ["seq"]),
+    order: [asc(schema.relayerTxs.seq)],
+  },
+  events: {
+    table: schema.events,
+    pk: schema.events.id,
+    key: (r: ActivityEvent) => r.id,
+    toRow: (r: ActivityEvent) => withDates(r, ["at"]),
+    fromRow: (row) => clean(row),
+    order: [asc(schema.events.block), asc(schema.events.logIndex)],
+  },
+  deliveries: {
+    table: schema.webhookDeliveries,
+    pk: schema.webhookDeliveries.id,
+    key: (r: WebhookDelivery) => r.id,
+    toRow: (r: WebhookDelivery) => withDates(r, ["nextAt"]),
+    fromRow: (row) => clean(row),
+    order: [asc(schema.webhookDeliveries.nextAt)],
+  },
+};
+
+const COLLECTIONS = Object.keys(SPECS) as Collection[];
+const CHUNK = 500;
+
+const chunks = <T>(xs: T[]) => Array.from({ length: Math.ceil(xs.length / CHUNK) }, (_, i) => xs.slice(i * CHUNK, (i + 1) * CHUNK));
+
+/** On conflict, take every non-key column from the new row. */
+function excludedSet(table: PgTable) {
+  return Object.fromEntries(
+    Object.entries(getTableColumns(table))
+      .filter(([, c]) => !c.primary)
+      .map(([k, c]) => [k, sql.raw(`excluded."${c.name}"`)]),
+  );
+}
+
+const here = dirname(fileURLToPath(import.meta.url));
+const MIGRATIONS = resolve(here, "../drizzle");
+
+async function connect(opts: DbOptions): Promise<{ orm: Orm; where: string; end: () => Promise<void> }> {
+  if (opts.url) {
+    const pool = new pg.Pool({ connectionString: opts.url, max: 5 });
+    const orm = drizzlePg({ client: pool, schema });
+    await migratePg(orm, { migrationsFolder: MIGRATIONS });
+    return { orm: orm as unknown as Orm, where: `postgres ${new URL(opts.url).host}`, end: () => pool.end() };
+  }
+  if (opts.dir) mkdirSync(opts.dir, { recursive: true });
+  const client = new PGlite(opts.dir);
+  const orm = drizzlePglite({ client, schema });
+  await migratePglite(orm, { migrationsFolder: MIGRATIONS });
+  return { orm: orm as unknown as Orm, where: opts.dir ? `embedded postgres ${opts.dir}` : "embedded postgres (memory)", end: () => client.close() };
+}
+
+export async function openDb(opts: DbOptions = {}): Promise<Db> {
+  const { orm, where, end } = await connect(opts);
+  const data = empty();
+  /** What each row looked like at the last write, by key, so a write sends only changes. */
+  const written = new Map<Collection, Map<string, string>>(COLLECTIONS.map((c) => [c, new Map()]));
+  let writtenMeta: Record<string, string> = {};
+
+  const snapshot = (c: Collection) => {
+    const out = new Map<string, string>();
+    (data[c] as never[]).forEach((r, i) => out.set(SPECS[c].key(r, i), JSON.stringify(r, replacer)));
+    return out;
+  };
+  const metaNow = (): Record<string, string> => ({
+    ...(data.genesis ? { genesis: data.genesis } : {}),
+    ...(data.cursor !== undefined ? { cursor: String(data.cursor) } : {}),
+  });
+
+  for (const c of COLLECTIONS) {
+    const spec = SPECS[c];
+    const rows = (await orm.select().from(spec.table).orderBy(...spec.order)) as Row[];
+    (data as Record<Collection, unknown[]>)[c] = rows.map(spec.fromRow);
+    written.set(c, snapshot(c));
+  }
+  for (const { key, value } of await orm.select().from(schema.meta)) {
+    if (key === "genesis") data.genesis = value as Hash;
+    if (key === "cursor") data.cursor = Number(value);
+  }
+  writtenMeta = metaNow();
+
+  async function write() {
+    const plan = COLLECTIONS.map((c) => {
+      const spec = SPECS[c];
+      const before = written.get(c)!;
+      const after = new Map<string, string>();
+      const upserts: Row[] = [];
+      (data[c] as never[]).forEach((r, i) => {
+        const key = spec.key(r, i);
+        const json = JSON.stringify(r, replacer);
+        after.set(key, json);
+        if (before.get(key) !== json) upserts.push(spec.toRow(r, i));
+      });
+      const deletes = [...before.keys()].filter((k) => !after.has(k));
+      return { c, spec, upserts, deletes, after };
+    });
+    const meta = metaNow();
+    const metaChanged = Object.entries(meta).filter(([k, v]) => writtenMeta[k] !== v);
+    const metaGone = Object.keys(writtenMeta).filter((k) => !(k in meta));
+    if (!plan.some((p) => p.upserts.length || p.deletes.length) && !metaChanged.length && !metaGone.length) return;
+
+    await orm.transaction(async (tx) => {
+      for (const { spec, upserts, deletes } of plan) {
+        for (const keys of chunks(deletes)) {
+          const typed = spec.pk.columnType === "PgInteger" ? keys.map(Number) : keys;
+          await tx.delete(spec.table).where(inArray(spec.pk, typed));
+        }
+        for (const rows of chunks(upserts)) {
+          await tx.insert(spec.table).values(rows).onConflictDoUpdate({ target: spec.pk, set: excludedSet(spec.table) });
+        }
+      }
+      if (metaGone.length) await tx.delete(schema.meta).where(inArray(schema.meta.key, metaGone));
+      for (const [key, value] of metaChanged) {
+        await tx.insert(schema.meta).values({ key, value }).onConflictDoUpdate({ target: schema.meta.key, set: { value } });
+      }
+    });
+    for (const { c, after } of plan) written.set(c, after);
+    writtenMeta = meta;
+  }
 
   let timer: NodeJS.Timeout | undefined;
-  let writes = 0;
-
-  // A failed background save is retried on the next change; it must never crash the server.
-  const scheduledFlush = () => {
-    try {
-      db.flush();
-    } catch (err) {
-      console.error(`[db] could not save ${file}: ${(err as Error).message}`);
-    }
-  };
+  let queue: Promise<void> = Promise.resolve();
+  const debounceMs = opts.debounceMs ?? 50;
 
   const db: Db = {
     data,
-    file,
+    where,
     save() {
-      if (!timer) timer = setTimeout(scheduledFlush, debounceMs);
+      if (timer) return;
+      // A failed background write is retried on the next change; it must never crash the server.
+      timer = setTimeout(() => {
+        timer = undefined;
+        db.flush().catch((err) => console.error(`[db] could not save: ${(err as Error).message}`));
+      }, debounceMs);
     },
     flush() {
       if (timer) clearTimeout(timer);
       timer = undefined;
-      // A temp file per write: an old and a new process (a dev reload) never share one.
-      const tmp = `${file}.${process.pid}.${++writes}.tmp`;
-      writeFileSync(tmp, JSON.stringify(data, replacer, 2));
-      renameSync(tmp, file);
+      // Writes run one at a time, in order.
+      const run = queue.then(write);
+      queue = run.catch(() => {});
+      return run;
     },
-    reset() {
+    async reset() {
       Object.assign(data, empty(), { genesis: undefined, cursor: undefined });
-      db.flush();
+      await queue;
+      await orm.transaction(async (tx) => {
+        for (const c of COLLECTIONS) await tx.delete(SPECS[c].table);
+        await tx.delete(schema.meta);
+      });
+      for (const c of COLLECTIONS) written.set(c, new Map());
+      writtenMeta = {};
+    },
+    async close() {
+      await db.flush();
+      await end();
     },
   };
+
+  // First start on an older JSON file: bring its data over once.
+  const blank = COLLECTIONS.every((c) => data[c].length === 0) && data.cursor === undefined;
+  if (blank && opts.legacyFile && existsSync(opts.legacyFile)) {
+    const old = JSON.parse(readFileSync(opts.legacyFile, "utf8"), reviver) as Partial<Data>;
+    Object.assign(data, empty(), old);
+    await db.flush();
+    console.log(`[db] imported ${opts.legacyFile}`);
+  }
+
   return db;
 }
 
-/** One file per chain and vault, so a fresh local deploy starts with a clean slate. */
+/** The older JSON file for a chain and vault, imported on first start. */
 export function dbFileFor(dataDir: string, chainId: number, vault: Address): string {
   return join(dataDir, `db-${chainId}-${vault.slice(2, 10).toLowerCase()}.json`);
 }
 
-/** Wipes the file if it belongs to an earlier local chain with a different genesis block. */
-export function bindToGenesis(db: Db, genesis: Hash): boolean {
+/** The embedded Postgres folder for a chain and vault, so a fresh local deploy starts clean. */
+export function pgDirFor(dataDir: string, chainId: number, vault: Address): string {
+  return join(dataDir, `pg-${chainId}-${vault.slice(2, 10).toLowerCase()}`);
+}
+
+/** Clears data that belongs to an earlier local chain with a different genesis block. */
+export async function bindToGenesis(db: Db, genesis: Hash): Promise<boolean> {
   const stale = db.data.genesis !== undefined && db.data.genesis !== genesis;
-  if (stale) db.reset();
+  if (stale) await db.reset();
   db.data.genesis = genesis;
-  db.flush();
+  await db.flush();
   return stale;
 }

@@ -32,6 +32,7 @@ const envSchema = z.object({
   START_BLOCK: z.coerce.number().int().nonnegative().optional(),
   DEPLOYMENTS_DIR: z.string().default(DEFAULT_DEPLOYMENTS_DIR),
   DATA_DIR: z.string().default("./data"),
+  DATABASE_URL: z.string().url().optional(),
   /** How long the relayer waits for a receipt before giving up on a transaction. */
   TX_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   /** Privy app credentials. Without them, user routes answer 503. */
@@ -81,6 +82,8 @@ export type Config = {
   usdt: Address;
   startBlock: number;
   dataDir: string;
+  /** Postgres. Without it, an embedded Postgres under dataDir. */
+  databaseUrl?: string;
   txTimeoutMs: number;
   privy?: { appId: string; appSecret: string };
   webOrigins: string[];
@@ -146,6 +149,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     usdt,
     startBlock: startBlock ?? 0,
     dataDir: e.DATA_DIR,
+    databaseUrl: e.DATABASE_URL,
     txTimeoutMs: e.TX_TIMEOUT_MS,
     privy: e.PRIVY_APP_ID && e.PRIVY_APP_SECRET ? { appId: e.PRIVY_APP_ID, appSecret: e.PRIVY_APP_SECRET } : undefined,
     webOrigins: e.WEB_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean),
