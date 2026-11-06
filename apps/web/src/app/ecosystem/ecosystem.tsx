@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { Notice } from "@/components/shell";
 import { buttonVariants } from "@/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
+import { Kbd } from "@/components/ui/kbd";
 import { credits as fmtCredits, usd } from "@/lib/format";
 import { CATEGORIES, hostOf } from "@/lib/profile";
 import { describePrice, getPublic, useDirectory, type DirectoryApp } from "@/lib/public";
@@ -112,7 +114,7 @@ export function Ecosystem() {
       )}
 
       {shown.length > 0 && (
-        <div className="grid gap-px bg-wc-border-light md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid auto-rows-fr gap-px bg-wc-border-light md:grid-cols-2 xl:grid-cols-3">
           {shown.map((app) => (
             <AppCard key={app.id} app={app} badge={app.id === topId ? "Most used" : now && now - Date.parse(app.listedAt) < NEW_FOR_MS ? "New" : undefined} />
           ))}
@@ -189,33 +191,39 @@ function SearchBox({ value, onChange, results }: { value: string; onChange: (v: 
   }, []);
 
   return (
-    <label className="group relative flex h-14 items-center gap-3 border-t border-wc-border-light px-6 transition-colors focus-within:bg-wc-bg sm:px-8 lg:border-t-0 lg:border-l lg:px-6">
-      <Search className="size-[18px] shrink-0 text-wc-icon-muted transition-colors group-focus-within:text-wc-blue" />
-      <input
-        ref={ref}
-        type="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => e.key === "Escape" && (onChange(""), e.currentTarget.blur())}
-        placeholder="Search the ecosystem"
-        aria-label="Search the ecosystem"
-        className="min-w-0 flex-1 bg-transparent text-[15px] text-wc-text-1 outline-none placeholder:text-wc-icon-muted [&::-webkit-search-cancel-button]:hidden"
-      />
-      {results !== undefined && (
-        <span className="shrink-0 text-[13px] text-wc-text-muted" aria-live="polite">
-          {results} {results === 1 ? "result" : "results"}
-        </span>
-      )}
-      {value ? (
-        <button type="button" aria-label="Clear search" onClick={() => onChange("")} className="flex size-6 shrink-0 items-center justify-center rounded-full text-wc-icon-muted hover:bg-wc-surface-2 hover:text-wc-navy">
-          <X className="size-3.5" />
-        </button>
-      ) : (
-        <kbd className="hidden shrink-0 rounded-[6px] border border-wc-border-light px-1.5 font-mono text-[11px] leading-5 text-wc-icon-muted sm:inline">/</kbd>
-      )}
+    <div className="group/search relative border-t border-wc-border-light transition-colors focus-within:bg-wc-bg lg:border-t-0 lg:border-l">
+      <InputGroup className="h-14 rounded-none border-0 px-4 sm:px-6 has-[[data-slot=input-group-control]:focus-visible]:border-0 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
+        <InputGroupAddon>
+          <Search className="size-[18px] text-wc-icon-muted group-focus-within/input-group:text-wc-blue" />
+        </InputGroupAddon>
+        <InputGroupInput
+          ref={ref}
+          type="search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && (onChange(""), e.currentTarget.blur())}
+          placeholder="Search the ecosystem"
+          aria-label="Search the ecosystem"
+          className="h-full text-[15px] text-wc-text-1 md:text-[15px] placeholder:text-wc-icon-muted [&::-webkit-search-cancel-button]:hidden"
+        />
+        <InputGroupAddon align="inline-end">
+          {results !== undefined && (
+            <InputGroupText className="text-[13px] font-normal text-wc-text-muted" aria-live="polite">
+              {results} {results === 1 ? "result" : "results"}
+            </InputGroupText>
+          )}
+          {value ? (
+            <InputGroupButton size="icon-xs" aria-label="Clear search" onClick={() => onChange("")} className="rounded-full text-wc-icon-muted hover:text-wc-navy">
+              <X />
+            </InputGroupButton>
+          ) : (
+            <Kbd className="hidden sm:inline-flex">/</Kbd>
+          )}
+        </InputGroupAddon>
+      </InputGroup>
       {/* The focused field gets the same blue edge as the active tab. */}
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-wc-blue opacity-0 transition-opacity group-focus-within:opacity-100" />
-    </label>
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-wc-blue opacity-0 transition-opacity group-focus-within/search:opacity-100" />
+    </div>
   );
 }
 
@@ -237,62 +245,83 @@ function Tab({ active, onClick, count, children }: { active: boolean; onClick: (
   );
 }
 
+/** Rows in a card's price block. Every card reserves this many, so all cards line up. */
+const PRICE_ROWS = 3;
+
+/**
+ * One app. Every section has a fixed height and is always present, even when empty,
+ * so cards in a row line up exactly: header, tags, description, prices, footer.
+ */
 function AppCard({ app, badge }: { app: DirectoryApp; badge?: string }) {
   const prices = Object.entries(app.prices);
+  // With more prices than rows, the last row says how many are hidden.
+  const visible = prices.length > PRICE_ROWS ? prices.slice(0, PRICE_ROWS - 1) : prices;
+  const hidden = prices.length - visible.length;
   const Wrapper = app.website ? "a" : "div";
+  const tags = [app.category && CATEGORIES[app.category], app.exchangeRate && `Own credits · ${app.exchangeRate} of ours buy 1`].filter(Boolean) as string[];
+
   return (
     <Wrapper
       {...(app.website ? { href: app.website, target: "_blank", rel: "noreferrer" } : {})}
-      className="group relative flex flex-col bg-wc-surface px-6 py-8 transition-colors hover:bg-wc-bg sm:px-8 lg:px-10 lg:py-10"
+      className="group flex h-full flex-col bg-wc-surface px-6 py-8 transition-colors hover:bg-wc-bg sm:px-8 lg:px-10"
     >
-      <div className="flex items-start gap-4">
+      {/* Header: 56px. */}
+      <div className="flex h-14 items-center gap-4">
         <BrandLogo src={app.logoUrl} name={app.name} className="size-14 rounded-[16px] text-[22px]" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-[19px] leading-7 font-semibold text-wc-text-1">{app.name}</p>
+          <div className="flex h-7 items-center gap-2">
+            <p className="truncate text-[19px] font-semibold text-wc-text-1">{app.name}</p>
             {badge && (
               <span className={cn("shrink-0 rounded-[20px] px-2 py-0.5 text-[11px] font-semibold", badge === "New" ? "bg-wc-mint-pastel text-wc-navy" : "bg-wc-blue/10 text-wc-blue")}>{badge}</span>
             )}
           </div>
-          <p className="truncate text-[14px] text-wc-text-muted">
-            {app.company ? `by ${app.company.name}` : <span className="font-mono text-[12px]">{app.id.slice(0, 10)}…</span>}
-          </p>
+          <p className="h-5 truncate text-[14px] leading-5 text-wc-text-muted">{app.company ? `by ${app.company.name}` : "Independent app"}</p>
         </div>
-        {app.website && <ArrowUpRight className="size-4 shrink-0 text-wc-icon-muted transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-wc-blue" />}
+        <ArrowUpRight className={cn("size-4 shrink-0 self-start text-wc-icon-muted transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-wc-blue", !app.website && "invisible")} />
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {app.category && <span className="rounded-[20px] bg-wc-surface-2 px-2.5 py-0.5 text-[12px] font-medium text-wc-text-2">{CATEGORIES[app.category]}</span>}
-        {app.exchangeRate && <span className="rounded-[20px] bg-wc-surface-2 px-2.5 py-0.5 text-[12px] font-medium text-wc-text-2">Own credits · {app.exchangeRate} of ours buy 1</span>}
+      {/* Tags: 24px, always present. */}
+      <div className="mt-5 flex h-6 gap-2 overflow-hidden">
+        {(tags.length ? tags : ["Uncategorised"]).map((t) => (
+          <span key={t} className={cn("flex h-6 shrink-0 items-center rounded-[20px] px-2.5 text-[12px] font-medium", tags.length ? "bg-wc-surface-2 text-wc-text-2" : "border border-dashed border-wc-border text-wc-icon-muted")}>
+            {t}
+          </span>
+        ))}
       </div>
 
-      <p className={cn("mt-4 line-clamp-2 min-h-12 text-[15px] leading-6", app.description ? "text-wc-text-2" : "text-wc-icon-muted")}>
-        {app.description ?? "No description yet."}
-      </p>
+      {/* Description: two lines, 48px. */}
+      <p className={cn("mt-4 line-clamp-2 h-12 text-[15px] leading-6", app.description ? "text-wc-text-2" : "text-wc-icon-muted")}>{app.description ?? "No description yet."}</p>
 
-      <div className="mt-6 flex-1">
-        {prices.length > 0 ? (
-          <dl className="divide-y divide-wc-border-light border-y border-wc-border-light">
-            {prices.slice(0, 3).map(([action, p]) => (
-              <div key={action} className="flex items-center justify-between gap-4 py-2.5 text-[14px]">
-                <dt className="truncate font-mono text-[13px] text-wc-text-2">{action}</dt>
-                <dd className="shrink-0 font-medium text-wc-text-1">{describePrice(p)}</dd>
-              </div>
-            ))}
-            {prices.length > 3 && <div className="py-2.5 text-[13px] text-wc-text-muted">+{prices.length - 3} more prices</div>}
-          </dl>
-        ) : (
-          !app.exchangeRate && <p className="border-y border-wc-border-light py-2.5 text-[14px] text-wc-text-muted">No prices listed yet.</p>
-        )}
-      </div>
+      {/* Prices: three 40px rows. */}
+      <dl className="mt-6 mb-6 border-t border-wc-border-light">
+        {Array.from({ length: PRICE_ROWS }, (_, i) => {
+          const row = visible[i];
+          const isMore = !row && i === visible.length && hidden > 0;
+          return (
+            <div key={i} className={cn("flex h-10 items-center justify-between gap-4 text-[14px]", i > 0 && (row || isMore) && "border-t border-wc-border-light")}>
+              {row ? (
+                <>
+                  <dt className="truncate font-mono text-[13px] text-wc-text-2">{row[0]}</dt>
+                  <dd className="shrink-0 font-medium text-wc-text-1">{describePrice(row[1])}</dd>
+                </>
+              ) : isMore ? (
+                <dt className="text-[13px] text-wc-text-muted">+{hidden} more prices</dt>
+              ) : i === 0 ? (
+                <dt className="text-[13px] text-wc-icon-muted">{app.exchangeRate ? "Sells its own credits for ours" : "No prices listed yet"}</dt>
+              ) : null}
+            </div>
+          );
+        })}
+      </dl>
 
-      <div className="mt-6 flex items-center justify-between gap-4 text-[13px] text-wc-text-muted">
-        <span>
+      {/* Footer: 20px, pinned to the bottom. */}
+      <div className="mt-auto flex h-5 shrink-0 items-center justify-between gap-4 text-[13px] leading-5 text-wc-text-muted">
+        <span className="truncate">
           {app.usage.charges > 0
             ? `${app.usage.charges} ${app.usage.charges === 1 ? "charge" : "charges"} · ${app.usage.payingUsers} paying ${app.usage.payingUsers === 1 ? "user" : "users"}`
             : "No charges yet"}
         </span>
-        {app.website && <span className="truncate font-medium text-wc-blue">{hostOf(app.website)}</span>}
+        {app.website && <span className="shrink-0 truncate font-medium text-wc-blue">{hostOf(app.website)}</span>}
       </div>
     </Wrapper>
   );
