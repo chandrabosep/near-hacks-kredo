@@ -1,12 +1,11 @@
 "use client";
 
-import { ArrowUpRight, Search } from "lucide-react";
+import { ArrowUpRight, Search, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { Notice } from "@/components/shell";
 import { buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { credits as fmtCredits, usd } from "@/lib/format";
 import { CATEGORIES, hostOf } from "@/lib/profile";
 import { describePrice, getPublic, useDirectory, type DirectoryApp } from "@/lib/public";
@@ -55,19 +54,9 @@ export function Ecosystem() {
     <>
       <Hero apps={ranked} stats={stats} />
 
-      <div className="sticky top-16 z-20 border-b border-wc-border-light bg-wc-surface/90 px-6 py-4 backdrop-blur-md sm:px-8 lg:top-[76px] lg:px-16">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-          <div className="relative lg:w-80">
-            <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-wc-icon-muted" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search apps, makers or actions"
-              aria-label="Search the ecosystem"
-              className="h-11 rounded-control border-wc-border bg-wc-surface pl-10 text-[15px] md:text-[15px] focus-visible:border-wc-blue focus-visible:ring-3 focus-visible:ring-wc-blue/20"
-            />
-          </div>
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:pb-0">
+      <div className="sticky top-16 z-20 border-b border-wc-border-light bg-wc-surface/90 px-6 py-3 backdrop-blur-md sm:px-8 lg:top-[76px] lg:px-16">
+        <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 py-1">
             <Chip active={category === "all"} onClick={() => setCategory("all")} count={ranked.length}>
               All apps
             </Chip>
@@ -79,6 +68,7 @@ export function Ecosystem() {
                 </Chip>
               ))}
           </div>
+          <SearchBox value={query} onChange={setQuery} results={query.trim() ? shown.length : undefined} />
         </div>
       </div>
 
@@ -168,13 +158,60 @@ function Metric({ label, value }: { label: string; value?: string }) {
   );
 }
 
+/** Search that matches the chips: a soft pill, "/" to focus, a clear button and a result count. */
+function SearchBox({ value, onChange, results }: { value: string; onChange: (v: string) => void; results?: number }) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLElement && (e.target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName));
+      if (e.key === "/" && !typing) {
+        e.preventDefault();
+        ref.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-3">
+      {results !== undefined && (
+        <span className="hidden shrink-0 text-[13px] text-wc-text-muted sm:inline" aria-live="polite">
+          {results} {results === 1 ? "result" : "results"}
+        </span>
+      )}
+      <label className="group flex h-10 w-full items-center gap-2 rounded-[20px] border border-transparent bg-wc-surface-2/70 px-4 transition-colors focus-within:border-wc-blue focus-within:bg-wc-surface focus-within:ring-3 focus-within:ring-wc-blue/15 hover:bg-wc-surface-2 lg:w-80">
+        <Search className="size-4 shrink-0 text-wc-icon-muted group-focus-within:text-wc-blue" />
+        <input
+          ref={ref}
+          type="search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && (onChange(""), e.currentTarget.blur())}
+          placeholder="Search apps, makers, actions"
+          aria-label="Search the ecosystem"
+          className="min-w-0 flex-1 bg-transparent text-[14px] text-wc-text-1 outline-none placeholder:text-wc-icon-muted [&::-webkit-search-cancel-button]:hidden"
+        />
+        {value ? (
+          <button type="button" aria-label="Clear search" onClick={() => onChange("")} className="flex size-5 shrink-0 items-center justify-center rounded-full bg-wc-icon-muted/20 text-wc-text-2 hover:bg-wc-icon-muted/30">
+            <X className="size-3" />
+          </button>
+        ) : (
+          <kbd className="hidden shrink-0 rounded-[6px] border border-wc-border bg-wc-surface px-1.5 font-mono text-[11px] leading-5 text-wc-icon-muted sm:inline">/</kbd>
+        )}
+      </label>
+    </div>
+  );
+}
+
 function Chip({ active, onClick, count, children }: { active: boolean; onClick: () => void; count: number; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 shrink-0 items-center gap-2 rounded-[20px] border px-3.5 text-[14px] font-medium whitespace-nowrap transition-colors",
+        "inline-flex h-10 shrink-0 items-center gap-2 rounded-[20px] border px-4 text-[14px] font-medium whitespace-nowrap transition-colors",
         active ? "border-wc-navy bg-wc-navy text-white" : "border-wc-border-light bg-wc-surface text-wc-text-2 hover:border-wc-border hover:text-wc-navy",
       )}
     >
