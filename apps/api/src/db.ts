@@ -96,6 +96,8 @@ export type UserRecord = {
   address: Address;
   email?: string;
   createdAt: number;
+  /** When this user took test USDT from the faucet. Once per account. */
+  faucetAt?: number;
 };
 
 /** Claim links a user created, so the wallet can list and cancel them. */
@@ -276,7 +278,7 @@ const SPECS: Record<Collection, Spec> = {
     table: schema.users,
     pk: schema.users.privyId,
     key: (r: UserRecord) => r.privyId,
-    toRow: (r: UserRecord) => withDates(r, ["createdAt"]),
+    toRow: (r: UserRecord) => withDates(r, ["createdAt", "faucetAt"]),
     fromRow: (row) => clean(row),
     order: [asc(schema.users.createdAt)],
   },

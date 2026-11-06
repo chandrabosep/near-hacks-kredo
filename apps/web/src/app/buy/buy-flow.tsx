@@ -8,7 +8,7 @@ import { AmountField } from "@/components/amount-field";
 import { CopyValue } from "@/components/copy";
 import { Notice, SignInPanel, Spinner, Tile, TxLink } from "@/components/shell";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { ApiError, useAction } from "@/lib/api";
+import { ApiError, useAction, useApi } from "@/lib/api";
 import { credits, creditsToUsd, parseCredits, safeReturnTo, usd, type Amount } from "@/lib/format";
 import { postToOpener, returnUrl } from "@/lib/handoff";
 import { useMe } from "@/lib/me";
@@ -86,7 +86,10 @@ export function BuyFlow() {
               <Step n={1} title="Add USDT to your wallet" state={hasUsdt || done ? "done" : "active"} aside={hasUsdt ? `${usd(me.walletUsdt)} USDT ready` : undefined}>
                 {!hasUsdt && !done && (
                   <>
-                    <p className="text-[15px] leading-6 text-wc-text-muted">Send Whitechain test USDT to your wallet address. The Whitechain team hands it out at their booth.</p>
+                    {me.faucet?.available && <Faucet usdt={me.faucet.usdt} onDone={() => void refresh()} />}
+                    <p className="text-[15px] leading-6 text-wc-text-muted">
+                      {me.faucet?.available ? "Or send" : "Send"} Whitechain test USDT to your wallet address. The Whitechain team hands it out at their booth.
+                    </p>
                     <CopyValue value={me.address} className="mt-5" />
                     <dl className="mt-4 grid grid-cols-3 overflow-hidden rounded-[12px] border border-wc-border-light text-[13px]">
                       {[
@@ -218,6 +221,56 @@ function Hero({ balance, wallet }: { balance?: Amount; wallet?: Amount }) {
         )}
       </div>
     </section>
+  );
+}
+
+/** Free test USDT from the network, once per account, so anyone can try it without the booth. */
+function Faucet({ usdt, onDone }: { usdt: string; onDone: () => void }) {
+  const api = useApi();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const [sent, setSent] = useState<{ explorer?: string }>();
+  const credits = Math.round(Number(usdt) * 100);
+
+  async function claim() {
+    setBusy(true);
+    setError(undefined);
+    try {
+      setSent(await api<{ usdt: string; explorer?: string }>("POST", "/v1/me/faucet"));
+      onDone();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : (err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-6 rounded-[14px] border border-wc-blue/20 bg-wc-blue/5 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-[15px] font-semibold text-wc-text-1">Try it free</p>
+          <p className="mt-0.5 text-[14px] text-wc-text-muted">
+            Get {usdt} test USDT, enough for {credits} credits. Once per account.
+          </p>
+        </div>
+        {sent ? (
+          <span className="flex items-center gap-2 text-[14px] font-medium text-emerald-700">
+            <Check className="size-4" /> Sent. <TxLink href={sent.explorer} />
+          </span>
+        ) : (
+          <Button size="lg" className="h-11 px-5" disabled={busy} onClick={claim}>
+            {busy && <Spinner />}
+            {busy ? "Sending" : `Get ${usdt} test USDT`}
+          </Button>
+        )}
+      </div>
+      {error && (
+        <div className="mt-4">
+          <Notice tone="error">{error}</Notice>
+        </div>
+      )}
+    </div>
   );
 }
 

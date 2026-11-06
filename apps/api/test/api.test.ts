@@ -33,12 +33,14 @@ let appId: Address;
 
 const alice = privateKeyToAccount(generatePrivateKey());
 const bob = privateKeyToAccount(generatePrivateKey());
+const dana = privateKeyToAccount(generatePrivateKey());
 const payout = privateKeyToAccount(generatePrivateKey()).address;
 
 /** Fake Privy: the token is the user's name. */
 const users: Record<string, { account: PrivateKeyAccount; email: string }> = {
   alice: { account: alice, email: "alice@example.com" },
   bob: { account: bob, email: "bob@example.com" },
+  dana: { account: dana, email: "dana@example.com" },
 };
 const verifier: UserVerifier = async (token) => {
   const u = users[token];
@@ -546,6 +548,30 @@ describe("api", { skip }, () => {
     // The first live key and the first test key come with the app.
     for (let i = 0; i < 8; i++) assert.equal((await call("POST", keys, { user: "bob", body: { name: `k${i}`, mode: "live" } })).status, 201);
     assert.equal((await call("POST", keys, { user: "bob", body: { name: "one too many", mode: "live" } })).body.code, "too_many_keys");
+  });
+
+  // ---------------------------------------------------------------- faucet
+
+  test("a new user takes test USDT once, and only while their wallet is empty", async () => {
+    // Stock the operator wallet, as the deployer does on Whitechain.
+    const stock = await chain!.clients.walletClient.writeContract({ address: chain!.usdt, abi: mockUSDTAbi, functionName: "mint", args: [chain!.clients.operator.address, 5_000_000n] });
+    await chain!.clients.publicClient.waitForTransactionReceipt({ hash: stock });
+
+    const before = await call("GET", "/v1/me", { user: "dana" });
+    assert.deepEqual(before.body.faucet, { usdt: "0.5", claimed: false, available: true });
+
+    const got = await call("POST", "/v1/me/faucet", { user: "dana" });
+    assert.equal(got.status, 200, JSON.stringify(got.body));
+    assert.equal(got.body.usdt, "0.5");
+    const wallet = await chain!.clients.publicClient.readContract({ address: chain!.usdt, abi: mockUSDTAbi, functionName: "balanceOf", args: [dana.address] });
+    assert.equal(wallet, 500_000n);
+
+    const again = await call("POST", "/v1/me/faucet", { user: "dana" });
+    assert.equal(again.body.code, "faucet_claimed");
+    assert.equal((await call("GET", "/v1/me", { user: "dana" })).body.faucet.available, false);
+
+    // Alice already holds USDT, so she doesn't need any.
+    assert.equal((await call("POST", "/v1/me/faucet", { user: "alice" })).body.code, "faucet_not_needed");
   });
 
   // ---------------------------------------------------------------- test mode

@@ -14,6 +14,8 @@ export type Me = {
   balance: Amount;
   /** Test USDT in the user's own wallet, ready to turn into credits. */
   walletUsdt: Amount;
+  /** Test USDT the network can hand out. Null when the faucet is off. */
+  faucet: { usdt: string; claimed: boolean; available: boolean } | null;
   connections: Connection[];
   claims: MyClaim[];
 };

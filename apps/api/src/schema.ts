@@ -74,6 +74,7 @@ export const users = pgTable(
     address: text("address").notNull(),
     email: text("email"),
     createdAt: time("created_at").notNull(),
+    faucetAt: time("faucet_at"),
   },
   (t) => [index("users_address_idx").on(t.address), index("users_email_idx").on(t.email)],
 );

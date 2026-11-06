@@ -246,6 +246,14 @@ export function createStore(db: Db) {
       return u;
     },
 
+    listUsers: () => data.users,
+
+    /** Marks (or, with undefined, clears) when the user took test USDT. */
+    setFaucetAt(u: UserRecord, at: number | undefined) {
+      u.faucetAt = at;
+      db.save();
+    },
+
     userByAddress: (address: string) => data.users.find((u) => same(u.address, address)),
 
     userByPrivyId: (privyId: string) => data.users.find((u) => u.privyId === privyId),

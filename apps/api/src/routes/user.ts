@@ -11,7 +11,7 @@ import { Router } from "express";
 import { getAddress, isHex, parseSignature, type Address, type Hex } from "viem";
 import { z } from "zod";
 import { creditVaultAbi } from "../abi/CreditVault.js";
-import type { Context } from "../context.js";
+import { usdtAbi, type Context } from "../context.js";
 import { HttpError, perIp, requireUser, userOf } from "../http.js";
 import { deadlineIn, newNonce, permitTypes, signRequest, usdtDomain, vaultDomain } from "../typedData.js";
 import { amount, creditsToUnits } from "../units.js";
@@ -80,6 +80,7 @@ export function userRoutes(ctx: Context): Router {
       email: u.email ?? null,
       balance: amount(balance),
       walletUsdt: amount(wallet),
+      faucet: faucetState(u.record, wallet),
       connections,
       claims: store.claimsFrom(u.address).map((c) => ({
         claimKey: c.claimKey,
@@ -88,6 +89,48 @@ export function userRoutes(ctx: Context): Router {
         expiresAt: new Date(c.expiry * 1000).toISOString(),
       })),
     });
+  });
+
+  // ---------------------------------------------------------------- faucet
+
+  /** Whether this user can take test USDT now, and how much. Null when the faucet is off. */
+  const faucetState = (u: { faucetAt?: number }, wallet: bigint) => {
+    const f = config.faucet;
+    if (!f) return null;
+    return { usdt: f.usdt, claimed: u.faucetAt !== undefined, available: u.faucetAt === undefined && wallet < f.units };
+  };
+
+  const claimsToday = () => {
+    const since = Date.now() - 86_400_000;
+    return store.listUsers().filter((u) => u.faucetAt !== undefined && u.faucetAt > since).length;
+  };
+
+  const faucetLimit = config.faucet ? perIp(config.faucet.perIpPerHour, 3_600_000, "Too many test USDT requests from this network.") : undefined;
+
+  /**
+   * Test USDT from the operator wallet, so anyone can try the network without the booth.
+   * Once per account, only while their wallet is nearly empty, under per-IP and daily caps.
+   */
+  r.post("/me/faucet", (req, res, next) => (faucetLimit ? faucetLimit(req, res, next) : next()), async (_req, res) => {
+    const f = config.faucet;
+    if (!f) throw new HttpError(404, "The test USDT faucet is off", "faucet_off");
+    const u = userOf(res);
+    if (u.record.faucetAt !== undefined) throw new HttpError(409, "You've already had test USDT on this account", "faucet_claimed");
+    const wallet = await ctx.usdt.read.balanceOf([u.address]);
+    if (wallet >= f.units) throw new HttpError(409, "Your wallet already holds test USDT", "faucet_not_needed");
+    if (claimsToday() >= f.dailyLimit) throw new HttpError(503, "Today's test USDT is all handed out. Try again tomorrow.", "faucet_daily_limit");
+    const left = await ctx.usdt.read.balanceOf([ctx.relayer.operator]);
+    if (left < f.units) throw new HttpError(503, "The faucet is out of test USDT", "faucet_empty");
+
+    // Mark first, so a double click can't send twice. Undo if the transfer fails.
+    store.setFaucetAt(u.record, Date.now());
+    try {
+      const { hash } = await ctx.relayer.write({ address: config.usdt, abi: usdtAbi, functionName: "transfer", args: [u.address, f.units] });
+      res.json({ usdt: f.usdt, ...txInfo(ctx, hash) });
+    } catch (err) {
+      store.setFaucetAt(u.record, undefined);
+      throw err;
+    }
   });
 
   /** Everything that moved this user's credits, newest first. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fuel } from "lucide-react";
+import { ArrowDownLeft, Banknote, CircleCheck, Fuel, Plug, Rocket, Timer, TimerOff, Undo2, Unplug, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { formatEther } from "viem";
 import { Notice, Spinner, TxLink } from "@/components/shell";
@@ -10,6 +10,7 @@ import type { ActivityItem } from "@/lib/activity";
 import { ago, credits, short, usd } from "@/lib/format";
 import { useIdentityToken } from "@privy-io/react-auth";
 import { env } from "@/lib/env";
+import { cn } from "@/lib/utils";
 import type { AppStats } from "../../types";
 import { DashSection, StatCard } from "../../ui";
 import { useApp } from "./app-shell";
@@ -113,17 +114,32 @@ export function AppOverview() {
   );
 }
 
-const KIND: Record<string, string> = {
-  Charged: "Charge",
-  Held: "Hold",
-  Captured: "Capture",
-  Released: "Release",
-  Refunded: "Refund",
-  PaidOut: "Payout",
-  AppApproved: "Connected",
-  AppRevoked: "Disconnected",
-  AppRegistered: "Registered",
+/** Each event from the app's side: a label, an icon, and a tone (green in, amber pending, red back out, blue paid out). */
+const KIND: Record<string, { label: string; icon: LucideIcon; tone: string }> = {
+  Charged: { label: "Charge", icon: ArrowDownLeft, tone: "bg-emerald-50 text-emerald-700" },
+  Captured: { label: "Capture", icon: CircleCheck, tone: "bg-emerald-50 text-emerald-700" },
+  Held: { label: "Hold", icon: Timer, tone: "bg-amber-50 text-amber-700" },
+  Released: { label: "Release", icon: TimerOff, tone: "bg-wc-surface-2 text-wc-text-muted" },
+  Refunded: { label: "Refund", icon: Undo2, tone: "bg-red-50 text-wc-error" },
+  PaidOut: { label: "Payout", icon: Banknote, tone: "bg-wc-blue/8 text-wc-blue" },
+  AppApproved: { label: "Connected", icon: Plug, tone: "bg-violet-50 text-violet-700" },
+  AppRevoked: { label: "Disconnected", icon: Unplug, tone: "bg-wc-surface-2 text-wc-text-muted" },
+  AppRegistered: { label: "Registered", icon: Rocket, tone: "bg-wc-ink/6 text-wc-ink" },
 };
+
+function Kind({ type }: { type: string }) {
+  const k = KIND[type];
+  if (!k) return <>{type}</>;
+  const Icon = k.icon;
+  return (
+    <span className="inline-flex items-center gap-2.5">
+      <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full", k.tone)}>
+        <Icon className="size-3.5" strokeWidth={2.25} />
+      </span>
+      {k.label}
+    </span>
+  );
+}
 
 function ActivityTable({ rows, base, onRefunded }: { rows?: ActivityItem[]; base: string; onRefunded: () => void }) {
   if (!rows) return <div className="h-24 animate-pulse rounded-control bg-wc-surface-2" />;
@@ -146,7 +162,9 @@ function ActivityTable({ rows, base, onRefunded }: { rows?: ActivityItem[]; base
           {rows.map((r) => (
             <tr key={r.id}>
               <td className="py-3 pl-4 text-wc-text-muted">{ago(r.at)}</td>
-              <td className="py-3">{KIND[r.type] ?? r.type}</td>
+              <td className="py-3">
+                <Kind type={r.type} />
+              </td>
               <td className="py-3 font-mono text-[13px]">{short(r.user ?? r.to)}</td>
               <td className="max-w-40 truncate py-3 font-mono text-[13px] text-wc-text-muted">{r.ref ?? r.label ?? ""}</td>
               <td className="py-3 text-right font-mono">{r.amount ? credits(r.amount, { unit: false }) : ""}</td>

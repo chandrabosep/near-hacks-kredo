@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "faucet_at" timestamp with time zone;
