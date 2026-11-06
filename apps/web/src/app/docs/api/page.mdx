@@ -13,6 +13,7 @@ Need your API key.
 | Method and path | What it does |
 |---|---|
 | `GET /v1/app` | Your app: payout, fee, prices, earnings, profile |
+| `PATCH /v1/profile` | `{ name?, description?, logoUrl?, website?, category? }`, your listing in the directory |
 | `GET /v1/prices`, `PUT /v1/prices` | Read or replace the price list |
 | `GET /v1/quote?action=&quantity=` | Price, fee and what you earn |
 | `GET /v1/users/:address` | A user's balance and limit for your app |

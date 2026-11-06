@@ -13,10 +13,20 @@ export const PRICES = {
 
 export type PriceAction = keyof typeof PRICES;
 
+/** The deployed site, from Vercel. Unset when running locally. */
+const SITE = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined;
+
+/** How Parley appears in the Kredo directory. */
+const listing = () => ({
+  description: "Chat with Claude, paid per message with Kredo credits. Pick Fast for quick answers or Pro for hard problems. If a reply fails, the credit is refunded.",
+  category: "ai" as const,
+  ...(SITE && { website: SITE, logoUrl: `${SITE}/icon.svg` }),
+});
+
 let client: Credits | undefined;
 let priced: Promise<unknown> | undefined;
 
-/** The Kredo client, with Parley's prices set once per server start. */
+/** The Kredo client, with Parley's prices and directory listing set once per server start. */
 export async function kredo(): Promise<Credits> {
   if (!process.env.CREDITS_API_KEY) {
     throw new CreditsError("Parley isn't set up yet: add CREDITS_API_KEY to .env.local", 503, "not_configured");
@@ -26,7 +36,8 @@ export async function kredo(): Promise<Credits> {
     baseUrl: process.env.CREDITS_API_URL,
     pagesUrl: process.env.NEXT_PUBLIC_CREDITS_PAGES_URL,
   });
-  priced ??= client.setPrices(PRICES).catch((err) => {
+  // The listing is best effort: billing works without it.
+  priced ??= Promise.all([client.setPrices(PRICES), client.setProfile(listing()).catch(() => undefined)]).catch((err) => {
     priced = undefined;
     throw err;
   });

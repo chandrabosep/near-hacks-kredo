@@ -56,15 +56,25 @@ export function EcosystemPreview() {
     <div className="flex h-full flex-col">
       <div className="grid flex-1 grid-cols-2 gap-px bg-wc-border-light sm:grid-cols-3">
         {shown
-          ? shown.map((app) => (
-              <div key={app.id} className="flex flex-col justify-center gap-4 bg-wc-surface p-5 sm:p-6">
-                <BrandLogo src={app.logoUrl} name={app.name} />
-                <div className="min-w-0">
-                  <p className="truncate text-[15px] font-semibold text-wc-text-1">{app.name}</p>
-                  <p className="truncate text-[13px] text-wc-text-muted">{(app.category && CATEGORIES[app.category]) ?? "Live on the network"}</p>
-                </div>
-              </div>
-            ))
+          ? shown.map((app) => {
+              const Tile = app.website ? "a" : "div";
+              return (
+                <Tile
+                  key={app.id}
+                  {...(app.website ? { href: app.website, target: "_blank", rel: "noreferrer" } : {})}
+                  className="group relative flex flex-col justify-center gap-4 bg-wc-surface p-5 transition-colors hover:bg-wc-bg sm:p-6"
+                >
+                  <BrandLogo src={app.logoUrl} name={app.name} />
+                  <div className="min-w-0">
+                    <p className="truncate text-[15px] font-semibold text-wc-text-1">{app.name}</p>
+                    <p className="truncate text-[13px] text-wc-text-muted">{(app.category && CATEGORIES[app.category]) ?? "Live on the network"}</p>
+                  </div>
+                  {app.website && (
+                    <ArrowUpRight className="absolute top-5 right-5 size-4 text-wc-icon-muted transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-wc-blue sm:top-6 sm:right-6" />
+                  )}
+                </Tile>
+              );
+            })
           : [0, 1, 2, 3, 4].map((i) => (
               <div key={i} className="flex flex-col justify-center bg-wc-surface p-5 sm:p-6">
                 <span className="block size-11 animate-pulse rounded-[12px] bg-wc-surface-2" />

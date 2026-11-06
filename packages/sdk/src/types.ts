@@ -56,6 +56,11 @@ export type PriceEntry = { price: string } | { rate: string; unit: string };
 export type PriceList = Record<string, PriceEntry>;
 export type PriceListInput = Record<string, { price: Credits } | { rate: Credits; unit: string }>;
 
+export type AppCategory = "ai" | "media" | "audio" | "developer" | "games" | "productivity" | "other";
+
+/** How your app appears in the Kredo directory. Fields left out stay as they are. */
+export type AppProfileInput = { name?: string; description?: string; logoUrl?: string; website?: string; category?: AppCategory };
+
 export type AppInfo = {
   id: string;
   name: string;

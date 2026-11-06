@@ -9,6 +9,7 @@ import { creditVaultAbi } from "../abi/CreditVault.js";
 import type { Context } from "../context.js";
 import { appOf, HttpError, rateLimit, requireApiKey } from "../http.js";
 import { amountInputSchema, priceListSchema, resolveAmount } from "../pricing.js";
+import { appProfileSchema } from "../profile.js";
 import type { OpRecord } from "../store.js";
 import { amount, creditsToUnits, unitsToCreditsString, UNITS_PER_CREDIT } from "../units.js";
 import { activityFor, addressSchema, appProfile, creditsSchema, forApp, newRef, onchainRef, refSchema, txInfo, vaultEvent } from "./shared.js";
@@ -77,6 +78,13 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
       testKeyPrefix: ctx.store.keyPrefix(app, "test"),
       ...appProfile(ctx, app),
     });
+  });
+
+  /** Updates the app's name, description, logo, website or category, as the directory shows them. */
+  r.patch("/profile", (req, res) => {
+    const app = appOf(res);
+    ctx.store.updateAppProfile(app, appProfileSchema.parse(req.body));
+    res.json({ id: app.id, name: app.name, ...appProfile(ctx, app) });
   });
 
   r.get("/prices", (_req, res) => res.json(appOf(res).prices));

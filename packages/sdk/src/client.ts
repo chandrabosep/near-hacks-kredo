@@ -17,6 +17,7 @@ import type {
   CreditsSession,
   AmountInput,
   AppInfo,
+  AppProfileInput,
   Capture,
   Conversion,
   Credits as CreditAmount,
@@ -87,6 +88,11 @@ export class Credits {
   /** Replaces your price list, in credits: `{ "chat.message": { price: 2 }, "video.render": { rate: 8, unit: "second" } }`. */
   setPrices(prices: PriceListInput): Promise<PriceList> {
     return this.request("PUT", "/v1/prices", { body: { prices } });
+  }
+
+  /** Sets how your app appears in the Kredo directory: name, description, logo, website and category. */
+  setProfile(profile: AppProfileInput): Promise<AppProfileInput & { id: string; name: string }> {
+    return this.request("PATCH", "/v1/profile", { body: profile });
   }
 
   // ---------------------------------------------------------------- prices and users

@@ -43,6 +43,7 @@ test("connectUrl looks up the app once and links to the hosted page", async () =
 test("company calls hit the right routes", async () => {
   calls.length = 0;
   await credits.setPrices({ "chat.message": { price: 2 }, "video.render": { rate: 8, unit: "second" } });
+  await credits.setProfile({ description: "Renders video.", category: "media" });
   await credits.setExchangeRate("2");
   await credits.convert({ user: "0xU", credits: 10 });
   await credits.payout();
@@ -52,6 +53,7 @@ test("company calls hit the right routes", async () => {
   const seen = calls.map((c) => `${c.method} ${new URL(c.url).pathname}${new URL(c.url).search}`);
   assert.deepEqual(seen, [
     "PUT /v1/prices",
+    "PATCH /v1/profile",
     "PUT /v1/exchange-rate",
     "POST /v1/convert",
     "POST /v1/payout",
@@ -60,7 +62,8 @@ test("company calls hit the right routes", async () => {
     "PUT /v1/webhook",
   ]);
   assert.deepEqual(calls[0].body.prices["video.render"], { rate: 8, unit: "second" });
-  assert.ok(calls[2].body.ref, "convert gets a ref too");
+  assert.equal(calls[1].body.category, "media");
+  assert.ok(calls[3].body.ref, "convert gets a ref too");
 });
 
 test("exportCsv returns the CSV text", async () => {

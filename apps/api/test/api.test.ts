@@ -152,6 +152,22 @@ describe("api", { skip }, () => {
     assert.equal(q.body.youEarn.credits, "38");
   });
 
+  test("an app sets its own directory listing with its API key", async () => {
+    const res = await company("PATCH", "/v1/profile", {
+      description: "Renders short videos.",
+      logoUrl: "https://video.example/icon.svg",
+      website: "https://video.example",
+      category: "media",
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const listed = (await call("GET", "/v1/directory")).body.find((a: Json) => a.name === "Video Studio");
+    assert.equal(listed.description, "Renders short videos.");
+    assert.equal(listed.logoUrl, "https://video.example/icon.svg");
+    assert.equal(listed.website, "https://video.example");
+    assert.equal(listed.category, "media");
+    assert.equal((await company("PATCH", "/v1/profile", { website: "ftp://video.example" })).status, 400);
+  });
+
   test("user routes need a login", async () => {
     assert.equal((await call("GET", "/v1/me")).status, 401);
     assert.equal((await call("GET", "/v1/me", { user: "mallory" })).status, 401);
