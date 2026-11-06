@@ -3,7 +3,7 @@ import { JetBrains_Mono, Onest } from "next/font/google";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
-const onest = Onest({ variable: "--font-onest", subsets: ["latin"], weight: ["300", "400", "500", "600"] });
+const onest = Onest({ variable: "--font-onest", subsets: ["latin"], weight: ["300", "400", "500", "600", "700"] });
 const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], weight: ["400"] });
 
 export const metadata: Metadata = {

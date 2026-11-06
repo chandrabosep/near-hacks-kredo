@@ -42,7 +42,7 @@ export default function Home() {
   return (
     <>
       <Header />
-      <main className="mx-auto w-full max-w-[1400px] pt-16 lg:px-8 lg:pt-[72px]">
+      <main className="mx-auto w-full max-w-[1400px] pt-16 lg:px-8 lg:pt-[76px]">
         <div className="overflow-hidden border-x border-wc-surface-2 bg-wc-surface">
           {/* Hero */}
           <section className="relative grid min-h-[560px] md:grid-cols-[1fr_320px] lg:h-[643px] lg:grid-cols-[1fr_360px]">
@@ -148,7 +148,7 @@ export default function Home() {
           </section>
 
           {/* Build */}
-          <section id="build" className="scroll-mt-16 border-t border-wc-border-light lg:scroll-mt-[72px]">
+          <section id="build" className="scroll-mt-16 border-t border-wc-border-light lg:scroll-mt-[76px]">
             <div className="grid gap-12 px-6 pt-section-t pb-section-t sm:px-8 lg:grid-cols-[1fr_1.2fr] lg:px-16">
               <div>
                 <h2 className="type-section max-w-xl font-semibold text-black">Add it in about 20 lines.</h2>

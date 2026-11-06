@@ -4,7 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { ArrowUpRight, CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useId, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -12,14 +12,14 @@ import { cn } from "@/lib/utils";
 /** The brand mark: a notched square with the leaf inside. */
 export function Logo({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cn("flex items-center gap-2.5 text-wc-navy", className)} aria-label="Universal Credits home">
-      <svg viewBox="0 0 32 32" className="size-7" aria-hidden>
-        <rect x="5" y="5" width="24" height="24" rx="6" fill="#0066FF" />
+    <Link href="/" className={cn("flex shrink-0 items-center gap-2.5 text-wc-navy", className)} aria-label="Universal Credits home">
+      <svg viewBox="0 0 35 35" className="size-9" aria-hidden>
+        <rect x="9" y="9" width="25" height="25" rx="7" fill="#0066FF" />
         <path d="M9 2h15l6 6v15a7 7 0 0 1-7 7H8l-6-6V9a7 7 0 0 1 7-7Z" fill="#080A28" />
         <rect x="9" y="9" width="14" height="14" rx="3" fill="#fff" />
         <path d="M21 21a8 8 0 0 1-11.3-11.3L21 21Z" fill="#080A28" />
       </svg>
-      <span className="text-[17px] font-semibold tracking-[-0.01em]">Universal Credits</span>
+      <span className="text-[22px] leading-none font-bold tracking-[-0.04em]">universal credits</span>
     </Link>
   );
 }
@@ -28,27 +28,24 @@ const NAV = [
   { href: "/wallet", label: "Wallet" },
   { href: "/buy", label: "Buy" },
   { href: "/send", label: "Send" },
+  { href: "/apps", label: "Apps" },
   { href: "/reserves", label: "Reserves" },
-  { href: "/dashboard", label: "For companies" },
 ];
 
 function Account() {
   const { ready, authenticated, user, login, logout } = usePrivy();
-  if (!ready) return <span className="h-9 w-24 animate-pulse rounded-control bg-wc-surface-2" />;
+  if (!ready) return <span className="h-10 w-20 animate-pulse rounded-control bg-wc-surface-2" />;
   if (!authenticated) {
     return (
-      <Button size="sm" onClick={() => login()}>
+      <Button variant="ghost" size="lg" className="text-[17px] text-wc-text-2" onClick={() => login()}>
         Sign in
       </Button>
     );
   }
   return (
-    <div className="flex items-center gap-3">
-      <span className="hidden max-w-48 truncate text-[13px] font-medium text-wc-text-muted sm:inline">{user?.email?.address}</span>
-      <Button size="sm" variant="outline" onClick={() => logout()}>
-        Sign out
-      </Button>
-    </div>
+    <Button variant="ghost" size="lg" className="text-[17px] text-wc-text-2" title={user?.email?.address} onClick={() => logout()}>
+      Sign out
+    </Button>
   );
 }
 
@@ -56,16 +53,21 @@ export function Header() {
   return (
     <header className="fixed inset-x-0 top-0 z-30">
       <div className="mx-auto max-w-[1400px] lg:px-8">
-        <div className="flex h-16 items-center justify-between border-x border-b border-wc-surface-2 bg-wc-bg/70 px-6 backdrop-blur-[24px] backdrop-saturate-150 sm:px-8 lg:h-[72px]">
+        <div className="flex h-16 items-center gap-12 border-x border-b border-wc-surface-2 bg-wc-bg/70 px-6 backdrop-blur-[24px] backdrop-saturate-150 sm:px-8 lg:h-[76px]">
           <Logo />
-          <nav className="hidden items-center gap-6 md:flex">
+          <nav className="hidden items-center gap-9 md:flex">
             {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className="text-[16px] font-medium text-wc-text-muted transition-colors hover:text-wc-navy">
+              <Link key={n.href} href={n.href} className="text-[17px] font-medium text-wc-text-2 transition-colors hover:text-wc-navy">
                 {n.label}
               </Link>
             ))}
           </nav>
-          <Account />
+          <div className="ml-auto flex items-center gap-2">
+            <Account />
+            <Link href="/dashboard" className={cn(buttonVariants({ size: "lg" }), "hidden h-12 px-6 text-[17px] sm:inline-flex")}>
+              Start building
+            </Link>
+          </div>
         </div>
       </div>
     </header>
@@ -77,8 +79,8 @@ export function Page({ children }: { children: ReactNode }) {
   return (
     <>
       <Header />
-      <main className="mx-auto w-full max-w-[1400px] flex-1 pt-16 lg:px-8 lg:pt-[72px]">
-        <div className="min-h-[calc(100vh-72px)] border-x border-wc-surface-2 bg-wc-surface">{children}</div>
+      <main className="mx-auto w-full max-w-[1400px] flex-1 pt-16 lg:px-8 lg:pt-[76px]">
+        <div className="min-h-[calc(100vh-76px)] border-x border-wc-surface-2 bg-wc-surface">{children}</div>
       </main>
     </>
   );
