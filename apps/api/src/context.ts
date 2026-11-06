@@ -6,6 +6,7 @@ import { privyVerifier, type UserVerifier } from "./auth.js";
 import { createClients } from "./chain.js";
 import { loadConfig, type Config } from "./config.js";
 import { bindToGenesis, dbFileFor, openDb } from "./db.js";
+import { createCodes } from "./codes.js";
 import { createIndexer } from "./indexer.js";
 import { createRelayer } from "./relayer.js";
 import { createStore } from "./store.js";
@@ -40,6 +41,7 @@ export async function createContext(config: Config = loadConfig(), opts: { verif
     store,
     relayer,
     indexer,
+    codes: createCodes(),
     vault,
     usdt,
     usdtName,

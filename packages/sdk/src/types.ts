@@ -145,3 +145,9 @@ export type NetworkStats = {
 };
 
 export type DirectoryEntry = { id: string; name: string; prices: PriceList; exchangeRate: string | null };
+
+/** The state the React kit renders, as your backend returns it from `credits.session()`. */
+export type CreditsSession = {
+  app: { id: string; name: string };
+  user: { address: string; balance: Amount; connected: boolean; limit: Amount; spendable: Amount } | null;
+};

@@ -13,6 +13,8 @@ import { randomUUID } from "node:crypto";
 import { CreditsError } from "./errors.js";
 import type {
   ActivityItem,
+  Amount,
+  CreditsSession,
   AmountInput,
   AppInfo,
   Capture,
@@ -54,6 +56,7 @@ export class Credits {
   readonly pagesUrl: string;
   private readonly apiKey: string;
   private appId?: string;
+  private appInfo?: { id: string; name: string };
   private readonly retries: number;
   private readonly timeoutMs: number;
   private readonly fetchFn: typeof fetch;
@@ -164,6 +167,25 @@ export class Credits {
   /** The user's wallet, where they see their balance and can disconnect any app. */
   walletUrl(): string {
     return this.page("/wallet", {});
+  }
+
+  /**
+   * Swaps the one-time code from the connect page for the user's address. Call it from your
+   * server, then keep the address in your own session. Never take an address from the browser.
+   */
+  exchangeCode(code: string): Promise<{ user: string; limit: Amount }> {
+    return this.request("POST", "/v1/connect/exchange", { body: { code } });
+  }
+
+  /**
+   * What the React kit shows for one of your users: your app, and their balance and limit.
+   * Pass undefined for a visitor who hasn't connected yet.
+   */
+  async session(user: string | undefined): Promise<CreditsSession> {
+    const app = this.appInfo ?? (this.appInfo = await this.app().then((a) => ({ id: a.id, name: a.name })));
+    if (!user) return { app, user: null };
+    const u = await this.user(user);
+    return { app, user: { address: u.user, balance: u.balance, connected: u.connected, limit: u.limit, spendable: u.spendable } };
   }
 
   // ---------------------------------------------------------------- money out and reporting

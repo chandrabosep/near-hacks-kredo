@@ -6,12 +6,13 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Field, Notice, PageTitle, SignInPanel, Spinner, Tile, Tiles, TxLink } from "@/components/shell";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { ApiError, useAction } from "@/lib/api";
+import { ApiError, useAction, useApi } from "@/lib/api";
 import { credits, creditsToUsd, parseCredits, safeReturnTo, usd, type Amount } from "@/lib/format";
+import { postToOpener, returnUrl } from "@/lib/handoff";
 import { useMe } from "@/lib/me";
 import { describePrice, useDirectory } from "@/lib/public";
 
-type Connected = { app: string; limit: Amount; explorer?: string };
+type Connected = { app: string; limit: Amount; code: string; explorer?: string };
 
 /**
  * /connect?app=0x...&credits=200&returnTo=https://...
@@ -29,11 +30,13 @@ export function ConnectFlow() {
   const app = apps?.find((a) => a.id.toLowerCase() === appId.toLowerCase());
   const { me, status, refresh } = useMe();
   const { prepare, confirm } = useAction();
+  const api = useApi();
 
   const [limit, setLimit] = useState(params.get("credits") ?? "200");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [done, setDone] = useState<Connected>();
+  const [closing, setClosing] = useState(false);
 
   if (dirError) return <Problem text={`We couldn't reach the network: ${dirError}`} />;
   if (!apps) return <Loading />;
@@ -50,7 +53,9 @@ export function ConnectFlow() {
     setError(undefined);
     try {
       const prepared = await prepare("connect", { app: app!.id, credits: parsed, expiresInDays: days });
-      setDone(await confirm<Connected>("connect", prepared));
+      const res = await confirm<Connected>("connect", prepared);
+      setDone(res);
+      setClosing(postToOpener(returnTo, { type: "credits:connected", code: res.code }));
       void refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : `Signing didn't finish: ${(err as Error).message}`);
@@ -59,7 +64,22 @@ export function ConnectFlow() {
     }
   }
 
-  const back = returnTo && appendParam(returnTo, "connected", "1");
+  /** Already connected with enough limit: go back to the app without signing again. */
+  async function continueAsIs() {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const { code } = await api<{ code: string }>("POST", "/v1/me/connect-code", { app: app!.id });
+      if (postToOpener(returnTo, { type: "credits:connected", code })) setClosing(true);
+      else if (returnTo) window.location.assign(returnUrl(returnTo, { type: "credits:connected", code }));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const back = returnTo && done && returnUrl(returnTo, { type: "credits:connected", code: done.code });
   const buyHref = `/buy?returnTo=${encodeURIComponent(typeof window === "undefined" ? "" : window.location.href)}`;
 
   return (
@@ -85,6 +105,7 @@ export function ConnectFlow() {
               <div className="max-w-xl">
                 <Notice tone="success">
                   {name} can now spend up to <strong>{credits(done.limit)}</strong> ({usd(done.limit)}).
+                  {closing && ` Taking you back to ${name}.`}
                 </Notice>
                 <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
                   {back ? (
@@ -133,7 +154,12 @@ export function ConnectFlow() {
                     {busy && <Spinner />}
                     {busy ? "Approving" : `Approve ${parsed ? credits(parsed) : ""}`}
                   </Button>
-                  {returnTo && (
+                  {existing?.connected && returnTo && (
+                    <Button size="lg" variant="outline" disabled={busy} onClick={continueAsIs}>
+                      Keep {credits(existing.limit)}
+                    </Button>
+                  )}
+                  {returnTo && !existing?.connected && (
                     <a className={buttonVariants({ size: "lg", variant: "outline" })} href={appendParam(returnTo, "connected", "0")}>
                       Not now
                     </a>

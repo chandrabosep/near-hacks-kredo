@@ -396,4 +396,37 @@ describe("api", { skip }, () => {
     const h = await company("GET", `/v1/holds/${held.body.holdId}`);
     assert.equal(h.body.status, "released");
   });
+
+  // ---------------------------------------------------------------- connect codes
+
+  test("connecting returns a one-time code that only this app can swap for the user", async () => {
+    const connected = await act("alice", "connect", { app: appId, credits: 40 });
+    assert.equal(connected.status, 201, JSON.stringify(connected.body));
+    const code: string = connected.body.code;
+    assert.match(code, /^cc_/);
+
+    const other = await call("POST", "/v1/admin/apps", { admin: "dev-admin", body: { name: "Other App", payout } });
+    const stolen = await call("POST", "/v1/connect/exchange", { key: other.body.apiKey, body: { code } });
+    assert.equal(stolen.status, 400, "another app can't use it");
+
+    // The failed attempt burned it, so connect again for a fresh one.
+    const again = await act("alice", "connect", { app: appId, credits: 40 });
+    const swapped = await company("POST", "/v1/connect/exchange", { code: again.body.code });
+    assert.equal(swapped.status, 200, JSON.stringify(swapped.body));
+    assert.equal(swapped.body.user, alice.address);
+    assert.equal(swapped.body.limit.credits, "40");
+
+    const replay = await company("POST", "/v1/connect/exchange", { code: again.body.code });
+    assert.equal(replay.status, 400, "a code works once");
+  });
+
+  test("an already connected user gets a fresh code without signing again", async () => {
+    const res = await call("POST", "/v1/me/connect-code", { user: "alice", body: { app: appId } });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const swapped = await company("POST", "/v1/connect/exchange", { code: res.body.code });
+    assert.equal(swapped.body.user, alice.address);
+
+    const notYet = await call("POST", "/v1/me/connect-code", { user: "bob", body: { app: appId } });
+    assert.equal(notYet.status, 409);
+  });
 });

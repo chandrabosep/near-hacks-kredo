@@ -8,6 +8,7 @@ import { Field, Notice, PageTitle, SignInPanel, Spinner, Tile, Tiles, TxLink } f
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ApiError, useAction } from "@/lib/api";
 import { credits, creditsToUsd, parseCredits, safeReturnTo, usd, type Amount } from "@/lib/format";
+import { postToOpener, returnUrl } from "@/lib/handoff";
 import { useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +52,7 @@ export function BuyFlow() {
     try {
       const prepared = await prepare("buy", { credits: parsed });
       setDone(await confirm<Bought>("buy", prepared));
+      postToOpener(returnTo, { type: "credits:bought" });
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : `Signing didn't finish: ${(err as Error).message}`);
@@ -89,7 +91,7 @@ export function BuyFlow() {
                 </Notice>
                 <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
                   {returnTo ? (
-                    <a className={buttonVariants({ size: "lg" })} href={returnTo}>
+                    <a className={buttonVariants({ size: "lg" })} href={returnUrl(returnTo, { type: "credits:bought" })}>
                       Back to the app
                     </a>
                   ) : (

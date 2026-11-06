@@ -95,6 +95,16 @@ export function userRoutes(ctx: Context): Router {
     res.json(activityFor(ctx, involves(me(res)), req.query.limit));
   });
 
+  /** Already connected: a fresh code to hand back to the app, with no new signature. */
+  r.post("/me/connect-code", async (req, res) => {
+    const app = addressSchema.parse(req.body?.app);
+    if (!store.appById(app)) throw new HttpError(404, "No such app", "not_found");
+    const limit = await ctx.vault.read.limitOf([me(res), app]);
+    const expired = limit.expiry !== 0n && Number(limit.expiry) <= Math.floor(Date.now() / 1000);
+    if (limit.remaining === 0n || expired) throw new HttpError(409, "Connect this app first", "not_connected");
+    res.json({ code: ctx.codes.issue(app, me(res)) });
+  });
+
   // ---------------------------------------------------------------- sign
 
   const signSchemas = {
@@ -225,7 +235,9 @@ export function userRoutes(ctx: Context): Router {
           },
           { app: m.app },
         );
-        return void res.status(201).json({ app: m.app, limit: amount(BigInt(m.limit)), ...txInfo(ctx, hash) });
+        // The app gets a one-time code, never the address itself. Its server swaps it with its API key.
+        const code = ctx.codes.issue(m.app, address);
+        return void res.status(201).json({ app: m.app, limit: amount(BigInt(m.limit)), code, ...txInfo(ctx, hash) });
       }
       case "disconnect": {
         const m = submitSchemas.disconnect.parse(req.body?.message);
