@@ -1,5 +1,7 @@
+"use client";
+
 import { useEffect, useRef, useState } from "react";
-import { useCredits, type Amount } from "./provider";
+import { useCredits, type Amount } from "./provider.js";
 
 const n = (a: Amount) => Number(a.credits).toLocaleString("en-US", { maximumFractionDigits: 4 });
 const usd = (a: Amount) => `$${Number(a.usd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;

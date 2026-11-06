@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * The frontend half of an integration. It never holds a key or a token: it reads state from
  * your own backend, and opens the network's hosted pages in a popup for anything that moves
@@ -15,7 +17,7 @@
  *                             remembers it in your session, and returns the new CreditsState
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useStyles } from "./styles";
+import { useStyles } from "./styles.js";
 
 export type Amount = { units: string; credits: string; usd: string };
 

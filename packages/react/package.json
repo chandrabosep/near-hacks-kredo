@@ -1,6 +1,6 @@
 {
   "name": "kredo-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Kredo buttons and balance for any React app",
   "license": "MIT",
   "homepage": "https://kredo-omega.vercel.app/docs/react",
