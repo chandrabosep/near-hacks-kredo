@@ -128,8 +128,8 @@ function Hero({ apps, stats }: { apps: DirectoryApp[]; stats?: Stats }) {
   return (
     <section className="relative overflow-hidden border-b border-wc-border-light">
       <div aria-hidden className="bg-plus pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,#000,transparent)]" />
-      <div className="relative">
-        <div className="px-6 pt-section-t pb-12 motion-safe:animate-rise sm:px-8 lg:px-16 lg:pb-16">
+      <div className="relative grid gap-10 px-6 pt-section-t pb-12 sm:px-8 lg:grid-cols-[1fr_auto] lg:gap-16 lg:px-16 lg:pb-16">
+        <div className="motion-safe:animate-rise">
           <p className="inline-flex items-center gap-2 rounded-[20px] border border-wc-border-light bg-wc-surface px-3 py-1 text-[13px] font-medium text-wc-text-2">
             <span className="size-1.5 rounded-full bg-wc-mint-2" />
             {apps.length ? `${apps.length} ${apps.length === 1 ? "app" : "apps"} live on Whitechain` : "Live on Whitechain"}
@@ -147,12 +147,13 @@ function Hero({ apps, stats }: { apps: DirectoryApp[]; stats?: Stats }) {
             </Link>
           </div>
         </div>
-      </div>
-      <div className="relative grid grid-cols-2 border-t border-wc-border-light bg-wc-surface lg:grid-cols-4">
-        <Metric label="Apps" value={stats ? String(stats.apps) : undefined} />
-        <Metric label="People with credits" value={stats ? String(stats.users) : undefined} />
-        <Metric label="Credits spent in apps" value={stats ? fmtCredits(stats.spent, { unit: false }) : undefined} />
-        <Metric label="Paid out to apps" value={stats ? usd(stats.paidOut) : undefined} />
+        {/* Live network numbers, top right. */}
+        <div className="grid grid-cols-2 self-start overflow-hidden rounded-[16px] border border-wc-border-light bg-wc-surface lg:w-[420px]">
+          <Metric label="Apps" value={stats ? String(stats.apps) : undefined} />
+          <Metric label="People with credits" value={stats ? String(stats.users) : undefined} />
+          <Metric label="Credits spent in apps" value={stats ? fmtCredits(stats.spent, { unit: false }) : undefined} />
+          <Metric label="Paid out to apps" value={stats ? usd(stats.paidOut) : undefined} />
+        </div>
       </div>
     </section>
   );
@@ -160,7 +161,7 @@ function Hero({ apps, stats }: { apps: DirectoryApp[]; stats?: Stats }) {
 
 function Metric({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="border-wc-border-light px-6 py-6 not-last:border-r sm:px-8 lg:px-16 lg:py-8 [&:nth-child(2)]:max-lg:border-r-0">
+    <div className="border-wc-border-light px-6 py-5 odd:border-r [&:nth-child(-n+2)]:border-b">
       <p className="text-[28px] leading-none text-wc-text-1">{value ?? <span className="inline-block h-7 w-14 animate-pulse rounded bg-wc-surface-2 align-middle" />}</p>
       <p className="mt-2 text-[14px] text-wc-text-muted">{label}</p>
     </div>
