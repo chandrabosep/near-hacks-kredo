@@ -46,7 +46,7 @@ test("resolves flat, per-unit and explicit amounts", () => {
   });
   assert.deepEqual(resolveAmount({ action: "video.render", quantity: "5" }, prices), {
     units: 400_000n,
-    label: "video.render, 5 second",
+    label: "video.render, 5 seconds",
   });
   assert.deepEqual(resolveAmount({ credits: "1.5" }, prices), { units: 15_000n, label: "1.5 credits" });
 });

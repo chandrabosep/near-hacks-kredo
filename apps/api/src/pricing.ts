@@ -64,8 +64,15 @@ export function resolveAmount(input: AmountInput, prices: PriceList): { units: b
   const each = parse("price" in e ? e.price : e.rate);
   const units = each * BigInt(qty);
   if (units === 0n) throw new PricingError(`"${action}" is free, nothing to charge`);
-  const label = "price" in e ? (qty === 1 ? action : `${action} x${qty}`) : `${action}, ${qty} ${e.unit}`;
+  const label = "price" in e ? (qty === 1 ? action : `${action} x${qty}`) : `${action}, ${qty} ${qty === 1 ? e.unit : plural(e.unit)}`;
   return { units, label };
+}
+
+/** "second" -> "seconds", "query" -> "queries". Units are short English nouns. */
+function plural(unit: string): string {
+  if (/[^aeiou]y$/.test(unit)) return `${unit.slice(0, -1)}ies`;
+  if (/(s|x|z|ch|sh)$/.test(unit)) return `${unit}es`;
+  return `${unit}s`;
 }
 
 function parse(v: string | number): bigint {
