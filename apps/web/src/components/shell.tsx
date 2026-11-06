@@ -27,6 +27,7 @@ export function Logo({ className }: { className?: string }) {
 const NAV = [
   { href: "/wallet", label: "Wallet" },
   { href: "/buy", label: "Buy" },
+  { href: "/send", label: "Send" },
   { href: "/reserves", label: "Reserves" },
   { href: "/dashboard", label: "For companies" },
 ];

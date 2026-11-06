@@ -9,11 +9,9 @@ import type { ActivityItem } from "@/lib/activity";
 import { credits, usd } from "@/lib/format";
 import { useMe } from "@/lib/me";
 import { Activity } from "./activity";
-import { ClaimLinks } from "./claim-links";
 import { Connections } from "./connections";
-import { SendCredits } from "./send";
 
-/** The user's home: balance, connected apps, sending, claim links and everything that happened. */
+/** The user's home: balance, connected apps and everything that happened. */
 export function WalletView() {
   const { me, status, expired, refresh } = useMe();
   const api = useApi();
@@ -87,6 +85,9 @@ export function WalletView() {
         <Link href="/buy" className={buttonVariants({ size: "lg" })}>
           Buy credits
         </Link>
+        <Link href="/send" className={buttonVariants({ size: "lg", variant: "outline" })}>
+          Send credits
+        </Link>
       </PageTitle>
 
       <Tiles className="sm:grid-cols-3">
@@ -104,21 +105,6 @@ export function WalletView() {
       <Section title="Connected apps." lead="Each app can spend only up to the limit you gave it. The vault contract enforces it.">
         <Connections connections={me.connections} onChange={changed} />
       </Section>
-
-      <Tiles className="border-t border-wc-border-light lg:grid-cols-2">
-        <Tile>
-          <h2 className="text-heading-xl text-wc-text-1">Send credits.</h2>
-          <p className="mt-2 text-[15px] leading-[24px] text-wc-text-muted">To anyone who has signed in, by email or address. Free and instant.</p>
-          <SendCredits balance={me.balance} onSent={changed} />
-        </Tile>
-        <Tile>
-          <h2 className="text-heading-xl text-wc-text-1">Share a claim link.</h2>
-          <p className="mt-2 text-[15px] leading-[24px] text-wc-text-muted">
-            For someone who hasn&apos;t signed in yet. Whoever opens the link first gets the credits. Unclaimed links can be cancelled.
-          </p>
-          <ClaimLinks balance={me.balance} claims={me.claims} onChange={changed} />
-        </Tile>
-      </Tiles>
 
       <Section title="Activity." lead="Every credit that moved, straight from the chain.">
         <Activity items={activity} me={me.address} />
