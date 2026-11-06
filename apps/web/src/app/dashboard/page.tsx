@@ -1,16 +1,8 @@
-import type { Metadata } from "next";
-import { Suspense } from "react";
-import { Page } from "@/components/shell";
-import { DashboardView } from "./dashboard-view";
+import { Overview } from "./overview";
 
-export const metadata: Metadata = { title: "Dashboard" };
+// Behind sign-in and rendered on the client: nothing here can be prerendered.
+export const instant = false;
 
 export default function DashboardPage() {
-  return (
-    <Page>
-      <Suspense>
-        <DashboardView />
-      </Suspense>
-    </Page>
-  );
+  return <Overview />;
 }

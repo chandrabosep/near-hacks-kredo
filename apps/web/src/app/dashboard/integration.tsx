@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CopyValue } from "@/components/copy";
-import { Field, Notice, Spinner, Tile, Tiles } from "@/components/shell";
+import { Field, Notice, Spinner } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { ApiError, useApi } from "@/lib/api";
 import { parseCredits } from "@/lib/format";
@@ -42,9 +42,10 @@ export function Integration({ base, info, onChange }: { base: string; info: AppI
     });
 
   return (
-    <section className="border-t border-wc-border-light">
-      <div className="px-6 pt-10 sm:px-8 lg:px-16 lg:pt-14">
-        <h2 className="text-heading-xl text-wc-text-1">Integration.</h2>
+    <section className="border-b border-wc-border-light px-6 py-8 sm:px-8 lg:px-12 lg:py-10">
+      <div>
+        <h2 className="text-[20px] font-semibold text-wc-text-1">Integration</h2>
+        <p className="mt-1 max-w-2xl text-[14px] leading-6 text-wc-text-muted">Get signed events on your server, and sell your own credits for ours.</p>
         {secret && (
           <div className="mt-6 max-w-2xl space-y-3">
             <Notice>{secret.label} Copy it now: it&apos;s shown only once.</Notice>
@@ -57,28 +58,28 @@ export function Integration({ base, info, onChange }: { base: string; info: AppI
           </div>
         )}
       </div>
-      <Tiles className="mt-8 border-t border-wc-border-light lg:grid-cols-2">
-        <Tile className="lg:px-12">
-          <p className="text-heading-lg text-wc-text-1">Webhook</p>
-          <div className="mt-4">
+      <div className="mt-6 grid gap-4 xl:grid-cols-2">
+        <div className="flex flex-col rounded-[16px] border border-wc-border-light bg-wc-surface p-6">
+          <p className="text-[16px] font-semibold text-wc-text-1">Webhook</p>
+          <div className="mt-4 mb-6">
             <Field label="Endpoint URL" placeholder="https://your.app/credits-webhook" value={hook} onChange={(e) => setHook(e.target.value)} hint="Signed POSTs for charges, holds, refunds, connections and payouts." />
           </div>
-          <Button variant="outline" className="mt-6" disabled={busy !== undefined || hook === (info.webhookUrl ?? "")} onClick={saveHook}>
+          <Button variant="outline" className="mt-auto self-start" disabled={busy !== undefined || hook === (info.webhookUrl ?? "")} onClick={saveHook}>
             {busy === "hook" && <Spinner />}
             {hook.trim() ? "Save webhook" : "Turn off"}
           </Button>
-        </Tile>
-        <Tile className="lg:px-12">
-          <p className="text-heading-lg text-wc-text-1">Light mode</p>
-          <div className="mt-4">
+        </div>
+        <div className="flex flex-col rounded-[16px] border border-wc-border-light bg-wc-surface p-6">
+          <p className="text-[16px] font-semibold text-wc-text-1">Light mode</p>
+          <div className="mt-4 mb-6">
             <Field label="Our credits per one of yours" inputMode="decimal" placeholder="2" value={rate} onChange={(e) => setRate(e.target.value)} hint="Keep your own credits, and let users buy them with ours." />
           </div>
-          <Button variant="outline" className="mt-6" disabled={busy !== undefined || (rate.trim() !== "" && !parseCredits(rate)) || rate === (info.exchangeRate ?? "")} onClick={saveRate}>
+          <Button variant="outline" className="mt-auto self-start" disabled={busy !== undefined || (rate.trim() !== "" && !parseCredits(rate)) || rate === (info.exchangeRate ?? "")} onClick={saveRate}>
             {busy === "rate" && <Spinner />}
             {rate.trim() ? "Save rate" : "Turn off"}
           </Button>
-        </Tile>
-      </Tiles>
+        </div>
+      </div>
     </section>
   );
 }
