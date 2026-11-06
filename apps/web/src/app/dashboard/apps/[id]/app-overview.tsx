@@ -71,12 +71,12 @@ export function AppOverview() {
   return (
     <>
       {error && (
-        <div className="px-6 pt-6 sm:px-8 lg:px-12">
+        <div className="px-6 pt-8 sm:px-8 lg:px-12">
           <Notice tone="error">{error}</Notice>
         </div>
       )}
 
-      <div className="grid gap-4 border-b border-wc-border-light px-6 py-8 sm:grid-cols-2 sm:px-8 lg:px-12 xl:grid-cols-4">
+      <div className="grid gap-4 border-b border-wc-border-light px-6 py-8 sm:grid-cols-2 sm:px-8 lg:px-12 lg:py-10 xl:grid-cols-4">
         <StatCard label="Revenue" value={stats ? usd(stats.revenue) : "…"} hint={stats ? `${credits(stats.revenue)} from ${stats.charges} charges` : undefined} />
         <StatCard
           label="You earned"

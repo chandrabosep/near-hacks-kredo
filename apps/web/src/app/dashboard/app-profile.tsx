@@ -41,7 +41,7 @@ export function AppProfileForm({ base, info, onSaved }: { base: string; info: Ap
   }
 
   return (
-    <div className="grid max-w-3xl gap-5 sm:grid-cols-2">
+    <div className="grid max-w-3xl gap-6 sm:grid-cols-2">
       <div className="flex items-center gap-4 sm:col-span-2">
         <BrandLogo src={form.logoUrl || info.logoUrl} name={form.name || info.name} className="size-14" />
         <p className="text-[14px] leading-6 text-wc-text-muted">This is how {form.name || "your app"} appears in the ecosystem and on the connect page.</p>
@@ -59,7 +59,7 @@ export function AppProfileForm({ base, info, onSaved }: { base: string; info: Ap
         </div>
       )}
       <div className="flex items-center gap-4 sm:col-span-2">
-        <Button disabled={busy || form.name.trim().length < 2} onClick={save}>
+        <Button size="lg" className="h-11 px-5" disabled={busy || form.name.trim().length < 2} onClick={save}>
           {busy && <Spinner />}
           Save profile
         </Button>

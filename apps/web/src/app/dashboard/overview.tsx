@@ -93,7 +93,7 @@ export function Overview() {
 function AppCard({ app, stats }: { app: MyApp; stats?: AppStats }) {
   const prices = Object.keys(app.prices).length;
   return (
-    <Link href={`/dashboard/apps/${app.id}`} className="group flex min-h-[220px] flex-col rounded-[16px] border border-wc-border-light bg-wc-surface p-5 transition-colors hover:border-wc-border">
+    <Link href={`/dashboard/apps/${app.id}`} className="group flex min-h-[220px] flex-col rounded-[16px] border border-wc-border-light bg-wc-surface p-6 transition-colors hover:border-wc-border">
       <div className="flex h-12 items-center gap-3">
         <BrandLogo src={app.logoUrl} name={app.name} className="size-12 rounded-[14px] text-[18px]" />
         <div className="min-w-0 flex-1">

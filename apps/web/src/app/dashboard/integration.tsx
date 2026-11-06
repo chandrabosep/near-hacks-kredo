@@ -6,6 +6,7 @@ import { Field, Notice, Spinner } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { ApiError, useApi } from "@/lib/api";
 import { parseCredits } from "@/lib/format";
+import { DashSection, Panel } from "./ui";
 import type { AppInfo } from "./types";
 
 /** Webhooks and light mode. The webhook secret is shown once, right after it's made. */
@@ -42,44 +43,40 @@ export function Integration({ base, info, onChange }: { base: string; info: AppI
     });
 
   return (
-    <section className="border-b border-wc-border-light px-6 py-8 sm:px-8 lg:px-12 lg:py-10">
-      <div>
-        <h2 className="text-[20px] font-semibold text-wc-text-1">Integration</h2>
-        <p className="mt-1 max-w-2xl text-[14px] leading-6 text-wc-text-muted">Get signed events on your server, and sell your own credits for ours.</p>
+    <DashSection title="Integration" lead="Get signed events on your server, and sell your own credits for ours.">
+      <div className="space-y-6">
         {secret && (
-          <div className="mt-6 max-w-2xl space-y-3">
+          <div className="max-w-3xl space-y-3">
             <Notice>{secret.label} Copy it now: it&apos;s shown only once.</Notice>
             <CopyValue value={secret.value} />
           </div>
         )}
         {error && (
-          <div className="mt-6 max-w-2xl">
+          <div className="max-w-3xl">
             <Notice tone="error">{error}</Notice>
           </div>
         )}
-      </div>
-      <div className="mt-6 grid gap-4 xl:grid-cols-2">
-        <div className="flex flex-col rounded-[16px] border border-wc-border-light bg-wc-surface p-6">
-          <p className="text-[16px] font-semibold text-wc-text-1">Webhook</p>
-          <div className="mt-4 mb-6">
-            <Field label="Endpoint URL" placeholder="https://your.app/credits-webhook" value={hook} onChange={(e) => setHook(e.target.value)} hint="Signed POSTs for charges, holds, refunds, connections and payouts." />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Webhook" lead="Signed POSTs for charges, holds, refunds, connections and payouts.">
+          <div className="mb-6">
+            <Field label="Endpoint URL" placeholder="https://your.app/credits-webhook" value={hook} onChange={(e) => setHook(e.target.value)} />
           </div>
-          <Button variant="outline" className="mt-auto self-start" disabled={busy !== undefined || hook === (info.webhookUrl ?? "")} onClick={saveHook}>
+          <Button size="lg" className="mt-auto h-11 self-start px-5" disabled={busy !== undefined || hook === (info.webhookUrl ?? "")} onClick={saveHook}>
             {busy === "hook" && <Spinner />}
             {hook.trim() ? "Save webhook" : "Turn off"}
           </Button>
-        </div>
-        <div className="flex flex-col rounded-[16px] border border-wc-border-light bg-wc-surface p-6">
-          <p className="text-[16px] font-semibold text-wc-text-1">Light mode</p>
-          <div className="mt-4 mb-6">
-            <Field label="Our credits per one of yours" inputMode="decimal" placeholder="2" value={rate} onChange={(e) => setRate(e.target.value)} hint="Keep your own credits, and let users buy them with ours." />
+        </Panel>
+        <Panel title="Light mode" lead="Keep your own credits, and let users buy them with ours.">
+          <div className="mb-6">
+            <Field label="Our credits per one of yours" inputMode="decimal" placeholder="2" value={rate} onChange={(e) => setRate(e.target.value)} />
           </div>
-          <Button variant="outline" className="mt-auto self-start" disabled={busy !== undefined || (rate.trim() !== "" && !parseCredits(rate)) || rate === (info.exchangeRate ?? "")} onClick={saveRate}>
+          <Button size="lg" className="mt-auto h-11 self-start px-5" disabled={busy !== undefined || (rate.trim() !== "" && !parseCredits(rate)) || rate === (info.exchangeRate ?? "")} onClick={saveRate}>
             {busy === "rate" && <Spinner />}
             {rate.trim() ? "Save rate" : "Turn off"}
           </Button>
-        </div>
+        </Panel>
       </div>
-    </section>
+      </div>
+    </DashSection>
   );
 }

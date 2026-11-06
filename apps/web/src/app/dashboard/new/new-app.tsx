@@ -10,7 +10,7 @@ import { ApiError, useApi } from "@/lib/api";
 import { CATEGORIES } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 import { useDashboard } from "../context";
-import { DashHeader } from "../ui";
+import { DashHeader, Panel } from "../ui";
 
 type Made = { id: string; name: string; apiKey: string; testKey?: string; explorer?: string };
 
@@ -70,8 +70,9 @@ export function NewApp() {
     <>
       <DashHeader title="New app" lead={`Registered onchain for ${company.name} in a few seconds. Free: the network pays the gas.`} />
       <div className="grid xl:grid-cols-[1fr_340px]">
-        <div className="px-6 py-8 sm:px-8 lg:px-12">
-          <div className="grid max-w-2xl gap-5 sm:grid-cols-2">
+        <div className="px-6 py-8 sm:px-8 lg:px-12 lg:py-10">
+          <Panel title="App details" lead="You can change everything except the onchain id later.">
+          <div className="grid max-w-2xl gap-6 sm:grid-cols-2">
             <Field className="sm:col-span-2" label="App name" placeholder="Your app" maxLength={60} value={form.name} onChange={(e) => set("name")(e.target.value)} />
             <div className="sm:col-span-2">
               <TextareaField label="What it does" placeholder="One or two sentences for the ecosystem page." maxLength={280} value={form.description} onChange={(e) => set("description")(e.target.value)} />
@@ -92,14 +93,15 @@ export function NewApp() {
               </div>
             )}
             <div className="sm:col-span-2">
-              <Button size="lg" className="h-12 w-full sm:w-auto sm:px-8" disabled={busy || form.name.trim().length < 2} onClick={create}>
+              <Button size="lg" className="h-11 px-5" disabled={busy || form.name.trim().length < 2} onClick={create}>
                 {busy && <Spinner />}
                 {busy ? "Registering onchain" : "Register app"}
               </Button>
             </div>
           </div>
+          </Panel>
         </div>
-        <aside className="border-t border-wc-border-light bg-wc-bg px-6 py-8 sm:px-8 xl:border-t-0 xl:border-l">
+        <aside className="border-t border-wc-border-light bg-wc-bg px-6 py-8 sm:px-8 lg:py-10 xl:border-t-0 xl:border-l">
           <p className="text-[15px] font-semibold text-wc-text-1">What you get</p>
           <ul className="mt-5 space-y-5">
             <Point icon={<Check className="size-4" />} title="An onchain identity">

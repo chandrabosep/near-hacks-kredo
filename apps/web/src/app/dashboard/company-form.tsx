@@ -33,7 +33,7 @@ export function CompanyForm({ company, onSaved, onCancel }: { company?: Company;
   }
 
   return (
-    <div className="grid max-w-3xl gap-5 sm:grid-cols-2">
+    <div className="grid max-w-3xl gap-6 sm:grid-cols-2">
       <Field label="Company name" placeholder="Acme AI" value={form.name} onChange={(e) => set("name")(e.target.value)} />
       <SelectField label="Category" value={form.category} onChange={set("category")} options={CATEGORIES} />
       <Field label="Website" placeholder="https://acme.ai" inputMode="url" value={form.website} onChange={(e) => set("website")(e.target.value)} />
@@ -53,12 +53,12 @@ export function CompanyForm({ company, onSaved, onCancel }: { company?: Company;
         </div>
       )}
       <div className="flex items-center gap-3 sm:col-span-2">
-        <Button disabled={busy || form.name.trim().length < 2} onClick={save}>
+        <Button size="lg" className="h-11 px-5" disabled={busy || form.name.trim().length < 2} onClick={save}>
           {busy && <Spinner />}
           {company ? "Save company" : "Continue"}
         </Button>
         {onCancel && (
-          <Button variant="ghost" onClick={onCancel}>
+          <Button size="lg" variant="ghost" className="h-11 px-5" onClick={onCancel}>
             Cancel
           </Button>
         )}

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Notice, Spinner } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, useApi } from "@/lib/api";
 import { creditsToUsd, parseCredits, usd } from "@/lib/format";
 import type { PriceEntry } from "@/lib/public";
@@ -18,7 +19,9 @@ const toRows = (prices: Record<string, PriceEntry>): Row[] =>
   );
 
 const ACTION = /^[a-z0-9][a-z0-9._-]{0,63}$/;
-const input = "h-10 rounded-control border-wc-border bg-wc-surface px-3 text-[15px] md:text-[15px] focus-visible:border-wc-blue focus-visible:ring-3 focus-visible:ring-wc-blue/20 disabled:bg-wc-bg";
+const MODES = { flat: "Flat", rate: "Per unit" };
+
+const input = "h-12 rounded-control border-wc-border bg-wc-surface px-3 text-[15px] md:text-[15px] focus-visible:border-wc-blue focus-visible:ring-3 focus-visible:ring-wc-blue/20 disabled:bg-wc-bg";
 
 /** Edits the price list. Shows what each price costs the user and what the company keeps. */
 export function PricesEditor({ base, prices, feeBps, onSaved }: { base: string; prices: Record<string, PriceEntry>; feeBps: number; onSaved: () => void }) {
@@ -72,10 +75,18 @@ export function PricesEditor({ base, prices, feeBps, onSaved }: { base: string; 
           return (
             <div key={r.key} className="grid grid-cols-2 gap-3 border-b border-wc-border-light pb-3 md:grid-cols-[1.4fr_0.9fr_0.8fr_0.8fr_1.2fr_32px] md:items-center md:border-0 md:pb-0">
               <Input className={`${input} col-span-2 font-mono text-[14px] md:col-span-1 md:text-[14px]`} placeholder="video.render" value={r.action} onChange={(e) => set(r.key, { action: e.target.value.toLowerCase() })} aria-label="Action" />
-              <select className={`${input} w-full border outline-none`} value={r.mode} onChange={(e) => set(r.key, { mode: e.target.value as Row["mode"] })} aria-label="Type">
-                <option value="flat">Flat</option>
-                <option value="rate">Per unit</option>
-              </select>
+              <Select items={MODES} value={r.mode} onValueChange={(v) => v && set(r.key, { mode: v as Row["mode"] })}>
+                <SelectTrigger aria-label="Type" className={`${input} w-full pr-3 data-[size=default]:h-12`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(MODES).map(([v, label]) => (
+                    <SelectItem key={v} value={v} className="text-[15px]">
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input className={input} inputMode="decimal" placeholder="8" value={r.credits} onChange={(e) => set(r.key, { credits: e.target.value })} aria-label="Credits" />
               <Input
                 className={input}
@@ -95,7 +106,7 @@ export function PricesEditor({ base, prices, feeBps, onSaved }: { base: string; 
       </div>
       <button
         type="button"
-        className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-medium text-wc-blue hover:underline"
+        className="mt-5 inline-flex items-center gap-1.5 text-[14px] font-medium text-wc-blue hover:underline"
         onClick={() => setRows((rs) => [...rs, { key: next++, action: "", mode: "flat", credits: "", unit: "" }])}
       >
         <Plus className="size-4" /> Add a price
@@ -106,7 +117,7 @@ export function PricesEditor({ base, prices, feeBps, onSaved }: { base: string; 
         </div>
       )}
       <div className="mt-6 flex items-center gap-4">
-        <Button disabled={busy || invalid || dupes} onClick={save}>
+        <Button size="lg" className="h-11 px-5" disabled={busy || invalid || dupes} onClick={save}>
           {busy && <Spinner />}
           Save prices
         </Button>

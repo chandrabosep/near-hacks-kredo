@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, useApi } from "@/lib/api";
 import { ago } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { DashSection, Panel } from "./ui";
 
 type ApiKey = {
   id: string;
@@ -74,14 +75,11 @@ export function ApiKeys({ base }: { base: string }) {
   const revoked = keys?.filter((k) => k.revokedAt) ?? [];
 
   return (
-    <section className="border-b border-wc-border-light px-6 py-8 sm:px-8 lg:px-12 lg:py-10">
-      <h2 className="text-[20px] font-semibold text-wc-text-1">API keys</h2>
-      <p className="mt-1 max-w-2xl text-[14px] leading-6 text-wc-text-muted">
-        One key per server or environment, so you can revoke one without touching the rest. Keep live keys on your server, never in a browser.
-      </p>
+    <DashSection title="API keys" lead="One key per server or environment, so you can revoke one without touching the rest. Keep live keys on your server, never in a browser.">
+      <div className="space-y-6">
 
       {made && (
-        <div className="mt-6 max-w-2xl space-y-3">
+        <div className="max-w-3xl space-y-3">
           <Notice>
             {made.name} is ready{made.mode === "test" ? ". Every test user starts with 1,000 credits, and nothing goes onchain" : ""}. Copy it now: it&apos;s shown only once.
           </Notice>
@@ -89,12 +87,13 @@ export function ApiKeys({ base }: { base: string }) {
         </div>
       )}
       {error && (
-        <div className="mt-6 max-w-2xl">
+        <div className="max-w-3xl">
           <Notice tone="error">{error}</Notice>
         </div>
       )}
 
-      <div className="mt-8 grid max-w-3xl items-end gap-4 sm:grid-cols-[1fr_1fr_auto]">
+      <Panel title="Create a key" lead="Name it after where it runs, so you know which one to revoke.">
+      <div className="grid max-w-3xl items-end gap-4 sm:grid-cols-[1fr_1fr_auto]">
         <Field label="Key name" placeholder="Production server" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
         <SelectField label="Mode" value={mode} onChange={(v) => setMode((v || "live") as "live" | "test")} options={MODES} />
         <Button className="h-12" disabled={busy !== undefined || !name.trim()} onClick={create}>
@@ -102,11 +101,13 @@ export function ApiKeys({ base }: { base: string }) {
           Create key
         </Button>
       </div>
+      </Panel>
 
       {!keys ? (
-        <div className="mt-8 h-24 animate-pulse rounded-control bg-wc-surface-2" />
+        <div className="h-24 animate-pulse rounded-control bg-wc-surface-2" />
       ) : (
-        <div className="mt-8 overflow-x-auto rounded-[16px] border border-wc-border-light">
+        <Panel title="Your keys" lead={`${active.length} active${revoked.length ? `, ${revoked.length} revoked` : ""}`} flush>
+        <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-[14px]">
             <thead className="bg-wc-bg text-[13px] text-wc-text-muted">
               <tr className="border-b border-wc-border-light">
@@ -144,7 +145,9 @@ export function ApiKeys({ base }: { base: string }) {
             </tbody>
           </table>
         </div>
+        </Panel>
       )}
-    </section>
+      </div>
+    </DashSection>
   );
 }

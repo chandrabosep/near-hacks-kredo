@@ -34,11 +34,32 @@ export function DashSection({ title, lead, action, children, className }: { titl
 /** One figure in a row of stats. All tiles share one height. */
 export function StatCard({ label, value, hint, children }: { label: string; value: ReactNode; hint?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="flex h-full min-h-[132px] flex-col rounded-[16px] border border-wc-border-light bg-wc-surface p-5">
+    <div className="flex h-full min-h-[140px] flex-col rounded-[16px] border border-wc-border-light bg-wc-surface p-6">
       <p className="text-[13px] font-medium text-wc-text-muted">{label}</p>
       <p className="mt-2 text-[28px] leading-none text-wc-text-1">{value}</p>
       {hint && <p className="mt-2 text-[13px] text-wc-icon-muted">{hint}</p>}
       {children && <div className="mt-auto pt-4">{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * The one container for dashboard content: forms, tables and settings all sit in a panel,
+ * so every tab looks the same. An optional title row sits above the content.
+ */
+export function Panel({ title, lead, action, children, className, flush }: { title?: string; lead?: ReactNode; action?: ReactNode; children: ReactNode; className?: string; flush?: boolean }) {
+  return (
+    <div className={cn("flex flex-col overflow-hidden rounded-[16px] border border-wc-border-light bg-wc-surface", className)}>
+      {title && (
+        <div className="flex items-start justify-between gap-4 border-b border-wc-border-light px-6 py-4">
+          <div>
+            <p className="text-[15px] font-semibold text-wc-text-1">{title}</p>
+            {lead && <p className="mt-0.5 text-[13px] leading-5 text-wc-text-muted">{lead}</p>}
+          </div>
+          {action}
+        </div>
+      )}
+      <div className={cn("flex flex-1 flex-col", !flush && "p-6")}>{children}</div>
     </div>
   );
 }
