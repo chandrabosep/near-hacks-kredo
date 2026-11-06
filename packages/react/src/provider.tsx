@@ -52,7 +52,7 @@ type PageMessage = { type: "credits:connected"; code: string } | { type: "credit
 
 export function CreditsProvider({
   endpoint,
-  pagesUrl = "http://localhost:3000",
+  pagesUrl = "https://kredo-omega.vercel.app",
   pollMs = 10_000,
   children,
 }: {

@@ -2,16 +2,16 @@ export const metadata = { title: "Node SDK" };
 
 # Node SDK
 
-`@credits/sdk` is the server kit. No dependencies, Node 18 or later.
+`kredo` is the server kit. No dependencies, Node 18 or later.
 
 ```bash
-npm install @credits/sdk
+npm install kredo
 ```
 
 ## Setup
 
 ```ts
-import { Credits } from "@credits/sdk";
+import { Credits } from "kredo";
 
 const credits = new Credits({ apiKey: process.env.CREDITS_API_KEY! });
 ```
@@ -19,8 +19,8 @@ const credits = new Credits({ apiKey: process.env.CREDITS_API_KEY! });
 | Option | Default | Meaning |
 |---|---|---|
 | `apiKey` | required | Your app's live (`uc_live_`) or test (`uc_test_`) key |
-| `baseUrl` | `http://localhost:4000` | The network's API |
-| `pagesUrl` | `http://localhost:3000` | The hosted connect, buy and account pages |
+| `baseUrl` | `https://kredo-api.onrender.com` | The network's API |
+| `pagesUrl` | `https://kredo-omega.vercel.app` | The hosted connect, buy and account pages |
 | `retries` | `2` | Extra tries after a network failure or rate limit. Writes are safe to retry: each carries a ref |
 | `timeoutMs` | `60000` | Per request. Long enough for a transaction to confirm |
 
@@ -80,7 +80,7 @@ Failures throw `CreditsError` with `code`, `status`, `isDeclined` and `isRetryab
 `CreditsNetwork` needs no key:
 
 ```ts
-import { CreditsNetwork } from "@credits/sdk";
+import { CreditsNetwork } from "kredo";
 
 const network = new CreditsNetwork({ baseUrl: process.env.CREDITS_API_URL });
 await network.reserves(); // the vault's USDT against what it owes

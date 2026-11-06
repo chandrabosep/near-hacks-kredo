@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const CODE = `import { Credits } from "@credits/sdk";
+const CODE = `import { Credits } from "kredo";
 
 const credits = new Credits({ apiKey: process.env.CREDITS_API_KEY });
 
@@ -48,7 +48,7 @@ export function Terminal() {
       </div>
       <div className="overflow-x-auto p-6 font-mono text-[13px] leading-[1.7]">
         <p>
-          <span className="text-wc-lime">$</span> <span className="text-white">npm i @credits/sdk</span>
+          <span className="text-wc-lime">$</span> <span className="text-white">npm i kredo</span>
         </p>
         <p className="text-wc-navy-mute">│ network  <span className="text-wc-text-dark-2">Whitechain · USDT settled</span></p>
         <p className="text-wc-navy-mute">│ gas      <span className="text-wc-text-dark-2">paid by the relayer, never by users</span></p>

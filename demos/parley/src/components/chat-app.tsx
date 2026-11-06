@@ -1,6 +1,6 @@
 "use client";
 
-import { BuyCreditsButton, CreditsProvider, useCredits } from "@credits/react";
+import { BuyCreditsButton, CreditsProvider, useCredits } from "kredo-react";
 import {
   ArrowUp,
   Brain,

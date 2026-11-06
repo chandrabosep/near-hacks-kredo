@@ -2,7 +2,7 @@
 
 An AI chat app that takes Kredo credits. Each message is a single `charge()`: Parley Pro costs 4 credits ($0.04), Parley Fast costs 1. If the model fails before it answers, or declines, the charge is refunded.
 
-Built only with the public kit: [`@credits/sdk`](../../packages/sdk) on the server and [`@credits/react`](../../packages/react) in the browser.
+Built only with the public kit: [`kredo`](../../packages/sdk) on the server and [`kredo-react`](../../packages/react) in the browser.
 
 ## Run it
 

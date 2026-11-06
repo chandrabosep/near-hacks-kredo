@@ -7,7 +7,7 @@
     "start": "tsx --env-file-if-exists=.env server.ts"
   },
   "dependencies": {
-    "@credits/sdk": "file:../../packages/sdk",
+    "kredo": "file:../../packages/sdk",
     "express": "^5.3.0"
   },
   "devDependencies": {

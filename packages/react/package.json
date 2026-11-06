@@ -1,7 +1,17 @@
 {
-  "name": "@credits/react",
+  "name": "kredo-react",
   "version": "0.1.0",
   "description": "Kredo buttons and balance for any React app",
+  "license": "MIT",
+  "homepage": "https://kredo-omega.vercel.app/docs/react",
+  "keywords": [
+    "kredo",
+    "credits",
+    "payments",
+    "react",
+    "usdt",
+    "whitechain"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,7 +21,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
@@ -23,5 +35,8 @@
     "@types/react": "^19",
     "react": "19.3.0",
     "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

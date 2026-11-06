@@ -1,6 +1,6 @@
 "use client";
 
-import { BuyCreditsButton, ConnectCreditsButton, CreditsBalance, CreditsProvider } from "@credits/react";
+import { BuyCreditsButton, ConnectCreditsButton, CreditsBalance, CreditsProvider } from "kredo-react";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useDirectory } from "@/lib/public";
 import { cn } from "@/lib/utils";

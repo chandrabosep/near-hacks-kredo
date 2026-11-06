@@ -20,7 +20,7 @@ export class CreditsNetwork {
   private readonly fetchFn: typeof fetch;
 
   constructor(opts: { baseUrl?: string; fetch?: typeof fetch } = {}) {
-    this.baseUrl = (opts.baseUrl ?? "http://localhost:4000").replace(/\/+$/, "");
+    this.baseUrl = (opts.baseUrl ?? "https://kredo-api.onrender.com").replace(/\/+$/, "");
     this.fetchFn = opts.fetch ?? globalThis.fetch;
   }
 

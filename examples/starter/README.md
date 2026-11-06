@@ -18,4 +18,4 @@ echo "CREDITS_API_KEY=uc_live_..." > .env     # from the dashboard, or POST /v1/
 npm start                                     # http://localhost:8080
 ```
 
-It needs the network running (`npm run dev:local` from the repo root, or the Whitechain API). For popups and a live balance pill instead of redirects, swap the page for the React kit ([`@credits/react`](../../packages/react)).
+It needs the network running (`npm run dev:local` from the repo root, or the Whitechain API). For popups and a live balance pill instead of redirects, swap the page for the React kit ([`kredo-react`](../../packages/react)).

@@ -33,7 +33,7 @@ cast send "$USDT" "mint(address,uint256)" "$OPERATOR" 1000000000 --private-key "
 echo "  faucet funded with 1000 mock USDT"
 
 echo "building the SDK and React kit"
-npm run build -w @credits/sdk -w @credits/react --silent
+npm run build -w kredo -w kredo-react --silent
 
 echo "starting the API and hosted pages"
 # Explicit env wins over apps/api/.env, so the Whitechain keys there are never used locally.

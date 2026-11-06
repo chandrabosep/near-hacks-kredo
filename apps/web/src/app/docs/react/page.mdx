@@ -7,11 +7,11 @@ export const metadata = { title: "React kit" };
 Drop-in buttons and a live balance for any React app. They open our pages in a popup, so the user never leaves your app.
 
 ```bash
-npm install @credits/react
+npm install kredo-react
 ```
 
 ```tsx
-import { BuyCreditsButton, ConnectCreditsButton, CreditsBalance, CreditsProvider } from "@credits/react";
+import { BuyCreditsButton, ConnectCreditsButton, CreditsBalance, CreditsProvider } from "kredo-react";
 
 <CreditsProvider endpoint="/api/credits" pagesUrl={PAGES_URL}>
   <CreditsBalance />

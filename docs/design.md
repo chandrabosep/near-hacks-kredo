@@ -327,7 +327,7 @@ A row of 112px tall cells, each with `border-r border-wc-border-light` and 32px 
 For our product the terminal shows the 20-line integration:
 
 ```
-$ npm i @credits/sdk
+$ npm i kredo
 │ network  Whitechain · USDT settled
 │ gas      paid by the relayer, never by users
 │ limit    enforced onchain, per app

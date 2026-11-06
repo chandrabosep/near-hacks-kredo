@@ -11,7 +11,7 @@ Save your endpoint URL in your app's **Integration** section in the [dashboard](
 ## Handle an event
 
 ```ts
-import { verifyWebhook } from "@credits/sdk";
+import { verifyWebhook } from "kredo";
 
 app.post("/credits-webhook", express.raw({ type: "application/json" }), (req, res) => {
   const event = verifyWebhook(req.body, req.header("x-credits-signature"), process.env.CREDITS_WEBHOOK_SECRET!);

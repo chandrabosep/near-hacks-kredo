@@ -13,7 +13,7 @@ trap 'kill $(jobs -p) 2>/dev/null' EXIT
 
 grep -q '^CHAIN_ID=1874' apps/api/.env || { echo "apps/api/.env must set CHAIN_ID=1874"; exit 1; }
 
-npm run build -w @credits/sdk -w @credits/react --silent
+npm run build -w kredo -w kredo-react --silent
 npm run dev -w @credits/api >"$LOGS/api.log" 2>&1 &
 for _ in $(seq 1 60); do curl -sf -o /dev/null localhost:4000/v1/health && break; sleep 0.5; done
 curl -s localhost:4000/v1/health | jq -c '{chainId, vault, relayer: .relayer.balance, login}'

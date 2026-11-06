@@ -1,5 +1,5 @@
 {
-  "name": "kredo",
+  "name": "kredo-monorepo",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -20,7 +20,7 @@
     "contracts:fork": "cd contracts && FORK=1 forge test --match-path \"test/fork/*\" -vv",
     "test:api": "npm test -w @credits/api",
     "abi": "npm run abi -w @credits/api",
-    "test:sdk": "npm test -w @credits/sdk",
+    "test:sdk": "npm test -w kredo",
     "dev:local": "scripts/dev-local.sh",
     "fund:local": "scripts/fund-local.sh",
     "deploy:whitechain": "scripts/deploy-whitechain.sh",

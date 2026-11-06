@@ -1,4 +1,4 @@
-# @credits/sdk
+# kredo
 
 Charge Kredo credits from your server. Your users buy credits once and spend them in every app on the network. You're paid in USDT on Whitechain for what they spend with you.
 
@@ -7,7 +7,7 @@ No dependencies. Node 18+.
 ## Quick start
 
 ```ts
-import { Credits } from "@credits/sdk";
+import { Credits } from "kredo";
 
 const credits = new Credits({ apiKey: process.env.CREDITS_API_KEY! });
 
@@ -59,7 +59,7 @@ req.session.creditsUser = user;
 
 Never take a user's address from the browser. The code works once, only for your app, for 10 minutes.
 
-The React kit ([`@credits/react`](../react)) does this in a popup, and `credits.session(user)` returns exactly what the kit renders.
+The React kit ([`kredo-react`](../react)) does this in a popup, and `credits.session(user)` returns exactly what the kit renders.
 
 ## Calls
 
@@ -108,7 +108,7 @@ try {
 ## Webhooks
 
 ```ts
-import { verifyWebhook } from "@credits/sdk";
+import { verifyWebhook } from "kredo";
 
 app.post("/credits-webhook", express.raw({ type: "application/json" }), (req, res) => {
   const event = verifyWebhook(req.body, req.header("x-credits-signature"), process.env.CREDITS_WEBHOOK_SECRET!);
@@ -121,4 +121,4 @@ Events: `charge.succeeded`, `hold.created`, `hold.captured`, `hold.released`, `r
 
 ## Try it
 
-`npm run e2e -w @credits/sdk` runs the whole flow against a local network: register, set prices, connect, charge, hold and capture, release, refund, payout. It prints every transaction.
+`npm run e2e -w kredo` runs the whole flow against a local network: register, set prices, connect, charge, hold and capture, release, refund, payout. It prints every transaction.

@@ -1,7 +1,7 @@
 /**
  * Everything Parley needs from Kredo, on the server. The API key never leaves this file.
  */
-import { Credits, CreditsError } from "@credits/sdk";
+import { Credits, CreditsError } from "kredo";
 import { cookies } from "next/headers";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";

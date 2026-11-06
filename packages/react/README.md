@@ -1,9 +1,9 @@
-# @credits/react
+# kredo-react
 
 Drop-in buttons and a live balance for any React app that takes Kredo credits.
 
 ```tsx
-import { CreditsProvider, CreditsBalance, ConnectCreditsButton, BuyCreditsButton } from "@credits/react";
+import { CreditsProvider, CreditsBalance, ConnectCreditsButton, BuyCreditsButton } from "kredo-react";
 
 <CreditsProvider endpoint="/api/credits" pagesUrl="https://pay.example">
   <CreditsBalance />                       {/* live balance pill with a dropdown */}
@@ -16,7 +16,7 @@ The kit never holds a key or a token. It reads state from your own backend, and 
 
 ## Your backend
 
-Two routes at `endpoint`, both a few lines with [`@credits/sdk`](../sdk):
+Two routes at `endpoint`, both a few lines with [`kredo`](../sdk):
 
 ```ts
 // What the kit shows for this visitor.

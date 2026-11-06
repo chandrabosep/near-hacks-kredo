@@ -51,8 +51,8 @@ A normal payment rail can't stop the operator from over-charging a user or issui
 | [apps/api](apps/api) | REST API, relayer, log indexer, webhooks and a JSON store |
 | [apps/web](apps/web) | Hosted pages (Next.js): landing, connect, buy, wallet, claim, company dashboard, reserves, app directory, ops |
 | [examples/starter](examples/starter) | The smallest integration: one server file, 10 lines about credits |
-| [packages/sdk](packages/sdk) | `@credits/sdk`, the server kit. See its [README](packages/sdk/README.md) |
-| [packages/react](packages/react) | `@credits/react`, buttons and a live balance. See its [README](packages/react/README.md) |
+| [packages/sdk](packages/sdk) | `kredo`, the server kit. See its [README](packages/sdk/README.md) |
+| [packages/react](packages/react) | `kredo-react`, buttons and a live balance. See its [README](packages/react/README.md) |
 | [docs](docs) | Product overview, build plan, design system |
 
 ## Run it
@@ -98,7 +98,7 @@ Tests: `npm run contracts:test`, `npm run test:api`, `npm run test:sdk`.
 ## Integrate
 
 ```ts
-import { Credits } from "@credits/sdk";
+import { Credits } from "kredo";
 const credits = new Credits({ apiKey: process.env.CREDITS_API_KEY });
 
 await credits.charge({ user, action: "chat.message", ref: messageId });

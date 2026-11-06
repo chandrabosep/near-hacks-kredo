@@ -2,7 +2,7 @@
  * One message: charge first, then stream the reply. If the model fails before it says anything,
  * or declines, the charge is refunded. The UI reads newline-delimited JSON events.
  */
-import { CreditsError } from "@credits/sdk";
+import { CreditsError } from "kredo";
 import { generate, MODELS, RefusalError, type ChatTurn, type ModelKey } from "@/lib/ai";
 import { currentUser, errorResponse, kredo } from "@/lib/kredo";
 

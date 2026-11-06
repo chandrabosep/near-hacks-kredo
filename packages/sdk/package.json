@@ -1,7 +1,17 @@
 {
-  "name": "@credits/sdk",
+  "name": "kredo",
   "version": "0.1.0",
   "description": "Server kit for charging Kredo credits from a company backend",
+  "license": "MIT",
+  "homepage": "https://kredo-omega.vercel.app/docs/sdk",
+  "keywords": [
+    "kredo",
+    "credits",
+    "payments",
+    "usdt",
+    "whitechain",
+    "sdk"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -28,5 +38,8 @@
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "viem": "^2.57.16"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

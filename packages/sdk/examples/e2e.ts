@@ -1,8 +1,8 @@
 /**
  * The whole money flow, end to end, through the public SDK.
  *
- *   npm run e2e -w @credits/sdk                       # local: anvil + API running
- *   CHAIN=whitechain USER_KEY=0x... ADMIN_TOKEN=... API_URL=http://localhost:4000 npm run e2e -w @credits/sdk
+ *   npm run e2e -w kredo                       # local: anvil + API running
+ *   CHAIN=whitechain USER_KEY=0x... ADMIN_TOKEN=... API_URL=http://localhost:4000 npm run e2e -w kredo
  *
  * A company registers and sets prices. A user tops up and approves a limit for the app. The
  * company then charges, holds and captures, holds and releases, refunds, and is paid out in USDT.

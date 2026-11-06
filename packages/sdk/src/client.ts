@@ -35,9 +35,9 @@ import type {
 export type CreditsOptions = {
   /** Your app's API key, `uc_live_...`. */
   apiKey: string;
-  /** The network's API. Defaults to http://localhost:4000. */
+  /** The network's API. Defaults to https://kredo-api.onrender.com. */
   baseUrl?: string;
-  /** The network's hosted pages (connect, buy, wallet). Defaults to http://localhost:3000. */
+  /** The network's hosted pages (connect, buy, wallet). Defaults to https://kredo-omega.vercel.app. */
   pagesUrl?: string;
   /** Extra tries after a network failure or a rate limit. Writes are safe to retry: each carries a ref. Default 2. */
   retries?: number;
@@ -64,8 +64,8 @@ export class Credits {
   constructor(opts: CreditsOptions) {
     if (!opts.apiKey) throw new Error("Credits: apiKey is required");
     this.apiKey = opts.apiKey;
-    this.baseUrl = (opts.baseUrl ?? "http://localhost:4000").replace(/\/+$/, "");
-    this.pagesUrl = (opts.pagesUrl ?? "http://localhost:3000").replace(/\/+$/, "");
+    this.baseUrl = (opts.baseUrl ?? "https://kredo-api.onrender.com").replace(/\/+$/, "");
+    this.pagesUrl = (opts.pagesUrl ?? "https://kredo-omega.vercel.app").replace(/\/+$/, "");
     this.retries = opts.retries ?? 2;
     this.timeoutMs = opts.timeoutMs ?? 60_000;
     this.fetchFn = opts.fetch ?? globalThis.fetch;

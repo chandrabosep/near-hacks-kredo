@@ -2,5 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "cd ../.. && npm ci",
-  "buildCommand": "cd ../.. && npm run build -w @credits/sdk -w @credits/react && npm run build -w @credits/web"
+  "buildCommand": "cd ../.. && npm run build -w kredo -w kredo-react && npm run build -w @credits/web"
 }

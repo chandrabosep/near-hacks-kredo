@@ -5,7 +5,7 @@ export const metadata = { title: "Errors" };
 Every error has an HTTP status, a readable `error` message and a stable `code`. The SDK throws them as `CreditsError`.
 
 ```ts
-import { CreditsError } from "@credits/sdk";
+import { CreditsError } from "kredo";
 
 try {
   await credits.charge({ user, action: "chat.message", ref });

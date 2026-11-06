@@ -1,6 +1,6 @@
 // The smallest app that takes Kredo credits. Everything credits-related is marked // ◆.
 import express from "express";
-import { Credits, CreditsError } from "@credits/sdk"; // ◆
+import { Credits, CreditsError } from "kredo"; // ◆
 
 const app = express();
 app.use(express.json(), express.static("public"));
