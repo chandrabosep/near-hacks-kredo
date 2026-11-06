@@ -2,15 +2,21 @@
 
 Drop-in buttons and a live balance for any React app that takes Kredo credits.
 
+```bash
+npm install kredo-react kredo
+```
+
 ```tsx
 import { CreditsProvider, CreditsBalance, ConnectCreditsButton, BuyCreditsButton } from "kredo-react";
 
-<CreditsProvider endpoint="/api/credits" pagesUrl="https://pay.example">
+<CreditsProvider endpoint="/api/credits">
   <CreditsBalance />                       {/* live balance pill with a dropdown */}
   <ConnectCreditsButton credits={200} />    {/* asks for a 200 credit limit */}
   <BuyCreditsButton credits={500} />        {/* opens the buy page */}
 </CreditsProvider>
 ```
+
+`pagesUrl` defaults to the live hosted pages. Set it only to use another network.
 
 The kit never holds a key or a token. It reads state from your own backend, and opens the network's hosted pages in a popup for anything that needs the user's signature.
 

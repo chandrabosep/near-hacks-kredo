@@ -2,7 +2,11 @@
 
 Charge Kredo credits from your server. Your users buy credits once and spend them in every app on the network. You're paid in USDT on Whitechain for what they spend with you.
 
-No dependencies. Node 18+.
+```bash
+npm install kredo
+```
+
+No dependencies. Node 18+. It talks to the live network on Whitechain Sepolia by default: pass `baseUrl` and `pagesUrl` to point it elsewhere.
 
 ## Quick start
 

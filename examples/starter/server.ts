@@ -7,7 +7,12 @@ app.use(express.json(), express.static("public"));
 const users = new Map<string, string>(); // visitor id -> user address (use your real session store)
 const visitor = (req: express.Request) => String(req.headers["x-visitor"] ?? req.query.v ?? "anonymous");
 
-const credits = new Credits({ apiKey: process.env.CREDITS_API_KEY! }); // ◆
+// Talks to the live network unless CREDITS_API_URL and CREDITS_PAGES_URL point elsewhere.
+const credits = new Credits({ // ◆
+  apiKey: process.env.CREDITS_API_KEY!,
+  baseUrl: process.env.CREDITS_API_URL,
+  pagesUrl: process.env.CREDITS_PAGES_URL,
+});
 await credits.setPrices({ "joke.tell": { price: 1 } }); // ◆ 1 credit = $0.01
 
 // Send the user to connect, then back here with a one-time code.

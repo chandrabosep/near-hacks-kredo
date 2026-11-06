@@ -2,7 +2,7 @@
 
 The smallest app that takes Kredo credits: a joke for 1 credit. One server file and one HTML page, no framework.
 
-[server.ts](server.ts) is 40 lines, and only the 10 marked `// ◆` are about credits:
+[server.ts](server.ts) is 45 lines, and only the 10 marked `// ◆` are about credits:
 
 1. Create the client with your API key.
 2. Set a price.
@@ -18,4 +18,11 @@ echo "CREDITS_API_KEY=uc_live_..." > .env     # from the dashboard, or POST /v1/
 npm start                                     # http://localhost:8080
 ```
 
-It needs the network running (`npm run dev:local` from the repo root, or the Whitechain API). For popups and a live balance pill instead of redirects, swap the page for the React kit ([`kredo-react`](../../packages/react)).
+It uses the live network by default, with a key from the [dashboard](https://kredo-omega.vercel.app/dashboard). To run it against `npm run dev:local` instead, add these to `.env`:
+
+```bash
+CREDITS_API_URL=http://localhost:4000
+CREDITS_PAGES_URL=http://localhost:3000
+```
+
+For popups and a live balance pill instead of redirects, swap the page for the React kit ([`kredo-react`](../../packages/react)).

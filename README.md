@@ -6,7 +6,17 @@ Kredo is a shared value network for applications. Users carry one balance across
 - **Companies** add about 20 lines to their server, charge in credits, and withdraw USDT on Whitechain.
 - **Nobody can over-charge.** Each user signs a spending limit per app, and the contract enforces it.
 
-## Live on Whitechain Sepolia (chain ID 1874)
+## Live
+
+| | |
+|---|---|
+| Hosted pages | [kredo-omega.vercel.app](https://kredo-omega.vercel.app) |
+| API | [kredo-api.onrender.com/v1/health](https://kredo-api.onrender.com/v1/health) |
+| Docs | [kredo-omega.vercel.app/docs](https://kredo-omega.vercel.app/docs) |
+| Server SDK | [`kredo`](https://www.npmjs.com/package/kredo) on npm |
+| React kit | [`kredo-react`](https://www.npmjs.com/package/kredo-react) on npm |
+
+## Onchain, on Whitechain Sepolia (chain ID 1874)
 
 | | |
 |---|---|
@@ -26,7 +36,7 @@ A normal payment rail can't stop the operator from over-charging a user or issui
 
 ```
  Partner apps                                Hosted pages (apps/web)
-   React kit  ── popup ───────────────────►  connect · buy · wallet · claim
+   React kit  ── popup ───────────────────►  connect · buy · account · claim
    server + SDK ──┐                                    │ user signs EIP-712
                   ▼                                    ▼
           ┌──────────────────── API (apps/api) ────────────────────┐
@@ -48,8 +58,9 @@ A normal payment rail can't stop the operator from over-charging a user or issui
 | Path | What |
 |---|---|
 | [contracts](contracts) | `CreditVault` in Solidity (Foundry), with unit, fuzz, invariant and fork tests. See its [README](contracts/README.md) |
-| [apps/api](apps/api) | REST API, relayer, log indexer, webhooks and a JSON store |
-| [apps/web](apps/web) | Hosted pages (Next.js): landing, connect, buy, wallet, claim, company dashboard, reserves, app directory, ops |
+| [apps/api](apps/api) | REST API, relayer, log indexer and webhooks, on Postgres |
+| [apps/web](apps/web) | Hosted pages (Next.js): landing, connect, buy, account, send, claim, company dashboard, reserves, app directory, docs, ops |
+| [demos/parley](demos/parley) | Parley, a chat app that charges credits per message |
 | [examples/starter](examples/starter) | The smallest integration: one server file, 10 lines about credits |
 | [packages/sdk](packages/sdk) | `kredo`, the server kit. See its [README](packages/sdk/README.md) |
 | [packages/react](packages/react) | `kredo-react`, buttons and a live balance. See its [README](packages/react/README.md) |
@@ -73,7 +84,7 @@ npm run dev:local                        # anvil, deploy, API and hosted pages
 npm run fund:local -- 0xYourAddress 20   # 20 test USDT for a signed-in user
 ```
 
-Open [localhost:3000](http://localhost:3000) for the hosted pages, and run [examples/starter](examples/starter) to see an app take credits.
+Open [localhost:3000](http://localhost:3000) for the hosted pages, and run [examples/starter](examples/starter) with `CREDITS_API_URL=http://localhost:4000` and `CREDITS_PAGES_URL=http://localhost:3000` to see an app take credits.
 
 **On Whitechain Sepolia**, against the live vault:
 
@@ -87,15 +98,28 @@ Tests: `npm run contracts:test`, `npm run test:api`, `npm run test:sdk`.
 
 ## Deploy
 
-[render.yaml](render.yaml) is a Render Blueprint for the API, its database and the web app. In Render, choose **New, Blueprint** and pick this repo.
+The hosted pages run on Vercel and the API on Render. Both redeploy on every push to `main`.
+
+**Web, on Vercel.** Project root is `apps/web`. [apps/web/vercel.json](apps/web/vercel.json) installs from the repo root and builds `kredo` and `kredo-react` before the app. Env vars: `NEXT_PUBLIC_PRIVY_APP_ID`, `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_CHAIN_ID=1874`.
+
+**API, on Render.** [render.yaml](render.yaml) describes it as a Blueprint: choose **New, Blueprint** and pick this repo.
 
 - **kredo-db** is Render Postgres. The API runs its migrations on start.
-- **kredo-api** runs on the Starter plan. Free services sleep, which would stop the indexer.
-- **kredo-web** runs on the free plan. It stores nothing.
-- Enter the secrets when asked: `OPERATOR_KEY`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET` and `NEXT_PUBLIC_PRIVY_APP_ID`. `ADMIN_TOKEN` is generated.
-- Add the web URL to the allowed origins in the Privy dashboard. If Render gives different URLs, update `WEB_ORIGINS` and `NEXT_PUBLIC_API_URL` to match.
+- **kredo-api** runs on the Starter plan in Singapore. Free services sleep, which would stop the indexer.
+- Enter the secrets when asked: `OPERATOR_KEY`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, and `WEB_ORIGINS` set to the Vercel URL. `ADMIN_TOKEN` is generated.
+
+Add the Vercel URL to the allowed origins in the Privy dashboard, or login fails.
+
+**Packages, on npm.** Bump the version in `packages/sdk` or `packages/react`, then `npm publish -w kredo` or `npm publish -w kredo-react`.
 
 ## Integrate
+
+```bash
+npm install kredo          # server SDK
+npm install kredo-react    # React buttons and balance, optional
+```
+
+Both point at the live network by default. Pass `baseUrl` and `pagesUrl` to use a local one.
 
 ```ts
 import { Credits } from "kredo";
@@ -114,7 +138,7 @@ try {
 
 [examples/starter](examples/starter/server.ts) is the smallest one: connect, swap the code, charge. [packages/sdk/examples/e2e.ts](packages/sdk/examples/e2e.ts) runs every call, including holds, captures, releases, refunds and payouts. The SDK [README](packages/sdk/README.md) covers every call, errors, webhooks and **test mode**: a `uc_test_` key runs the same calls against fake credits, with nothing onchain.
 
-Companies sign up on the dashboard at `/dashboard`: register an app (the network pays the registration gas), get live and test keys, set prices with the dollar value and your cut next to each, and withdraw earnings in USDT.
+Companies sign up on the [dashboard](https://kredo-omega.vercel.app/dashboard): register an app (the network pays the registration gas), get live and test keys, set prices with the dollar value and your cut next to each, and withdraw earnings in USDT.
 
 ## Gas
 
@@ -161,9 +185,9 @@ The relayer guards its gas. Every check runs before sending, so a refused transa
 
 - Testnet only. The vault isn't audited and isn't upgradeable: a fix means a new deployment.
 - One operator key runs the relayer, and it's also the vault owner on testnet. In production the owner would be a multisig.
-- The API keeps its own data in a JSON file. The chain is the source of truth for every balance, so it can be rebuilt from the vault's events, but there's no database or replication yet.
-- Users can't cash credits back out to USDT. Only registered apps are paid out.
+- The API keeps app settings, keys and users in one Postgres database, with no replica. The chain is the source of truth for every balance, so balances can always be rebuilt from the vault's events.
+- Users can't cash credits back out to USDT. They can send credits to another user or as a claim link. Only registered apps are paid out.
 - One charge per transaction. No batching yet, so gas scales with the number of charges.
 - A company can't change its payout address from the dashboard yet. The contract supports it; the page doesn't.
 - Test mode keeps its fake balances in memory, so they reset when the API restarts.
-- Getting test USDT needs the Whitechain booth: there's no USDT faucet.
+- Test USDT comes from a small faucet: each new account gets 0.5 USDT once, from the operator wallet, within a daily cap.
