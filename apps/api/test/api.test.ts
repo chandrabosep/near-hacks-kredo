@@ -195,6 +195,15 @@ describe("api", { skip }, () => {
     assert.equal(u.body.balance.credits, "998");
   });
 
+  test("dust charges and sends are refused before they cost gas", async () => {
+    const charge = await company("POST", "/v1/charges", { user: alice.address, credits: "0.5" });
+    assert.equal(charge.status, 400);
+    assert.equal(charge.body.code, "below_minimum");
+    const send = await call("POST", "/v1/me/sign/send", { user: "alice", body: { to: bob.address, credits: "0.1" } });
+    assert.equal(send.status, 400);
+    assert.equal(send.body.code, "below_minimum");
+  });
+
   test("the contract refuses a charge above the limit, with a clear error", async () => {
     const res = await company("POST", "/v1/charges", { user: alice.address, credits: 500 });
     assert.equal(res.status, 422);

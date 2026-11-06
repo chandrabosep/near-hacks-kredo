@@ -7,7 +7,7 @@ import { after, before, test } from "node:test";
 import { parseEther, parseGwei, type Address } from "viem";
 import { creditVaultAbi } from "../src/abi/CreditVault.js";
 import { openDb, type Db } from "../src/db.js";
-import { createRelayer, RelayerError, type Relayer, type RelayerLimits } from "../src/relayer.js";
+import { createRelayer, RelayerError, transient, type Relayer, type RelayerLimits } from "../src/relayer.js";
 import { skipChainTests as skip, startLocalChain, type LocalChain } from "./localChain.js";
 
 let chain: LocalChain | undefined;
@@ -173,4 +173,38 @@ test("below the minimum balance, only exits go out", { skip }, async () => {
   const { r } = limited({ minBalance: parseEther("1000000") });
   await assert.rejects(registerWith(r, 25), refused("RelayerLowBalance"));
   assert.equal((await r.status()).exitsOnly, true);
+});
+
+// ---------------------------------------------------------------- retries
+
+test("only RPC hiccups and nonce clashes count as retryable", () => {
+  assert.equal(transient(new Error("nonce too low: next nonce 7, tx nonce 6")), "nonce");
+  assert.equal(transient(new Error("replacement transaction underpriced")), "nonce");
+  assert.equal(transient(new Error("The request took too long to respond. Timed out")), "network");
+  assert.equal(transient(new Error("fetch failed")), "network");
+  assert.equal(transient(new Error("execution reverted: OverLimit")), undefined);
+});
+
+test("a send that fails once on the network goes out on the retry", { skip }, async () => {
+  const { walletClient } = chain!.clients;
+  let failures = 1;
+  const flaky = {
+    ...chain!.clients,
+    walletClient: {
+      ...walletClient,
+      writeContract: ((args: Parameters<typeof walletClient.writeContract>[0]) => {
+        if (failures-- > 0) return Promise.reject(new Error("fetch failed"));
+        return walletClient.writeContract(args);
+      }) as typeof walletClient.writeContract,
+    } as typeof walletClient,
+  };
+  const r = createRelayer({ clients: flaky, db: openDb(join(mkdtempSync(join(tmpdir(), "uc-retry-")), "db.json")), txTimeoutMs: 10_000 });
+  const res = await r.write({
+    address: chain!.vault,
+    abi: creditVaultAbi,
+    functionName: "registerApp",
+    args: [appAddr(40), appAddr(140), 500, 0n],
+  });
+  assert.equal(res.tx.status, "success");
+  assert.equal(failures, -1, "the first try failed, the second went out");
 });

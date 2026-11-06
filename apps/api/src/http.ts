@@ -100,14 +100,22 @@ export function requireApiKey(store: Store): RequestHandler {
   };
 }
 
-/** Our hosted pages: the Privy identity token, as the `privy-id-token` cookie or header. */
-export function requireUser(verifier: UserVerifier | undefined, store: Store): RequestHandler {
+/**
+ * Our hosted pages: the Privy identity token, as the `privy-id-token` cookie or header.
+ * New accounts are capped per IP, so one machine can't mint thousands of users to farm claims.
+ */
+export function requireUser(verifier: UserVerifier | undefined, store: Store, signupsPerHour = 20): RequestHandler {
+  const signups = slidingWindow(signupsPerHour, 3_600_000);
   return async (req, res, next) => {
     if (!verifier) return next(new HttpError(503, "User login isn't configured on this server", "login_disabled"));
     const token = req.header("privy-id-token") ?? cookie(req, "privy-id-token");
     if (!token) return next(new HttpError(401, "Sign in first", "unauthenticated"));
     try {
       const user = await verifier(token);
+      if (!store.userByPrivyId(user.privyId)) {
+        const wait = signups(req.ip ?? "unknown");
+        if (wait) return next(tooMany(res, wait, "Too many new accounts from this network."));
+      }
       res.locals.user = { ...user, record: store.upsertUser(user) };
       next();
     } catch (err) {
@@ -127,26 +135,45 @@ export function requireAdmin(token: string | undefined): RequestHandler {
 
 // ---------------------------------------------------------------- rate limit
 
+/** Counts hits per key in a sliding window. Returns 0 when allowed, else seconds to wait. */
+export function slidingWindow(max: number, windowMs: number) {
+  const windows = new Map<string, number[]>();
+  return (key: string, now = Date.now()): number => {
+    const hits = (windows.get(key) ?? []).filter((t) => now - t < windowMs);
+    if (hits.length >= max) {
+      windows.set(key, hits);
+      return Math.ceil((windowMs - (now - hits[0])) / 1000);
+    }
+    hits.push(now);
+    windows.set(key, hits);
+    return 0;
+  };
+}
+
+function tooMany(res: Response, retryAfter: number, message: string): HttpError {
+  res.setHeader("Retry-After", String(retryAfter));
+  return new HttpError(429, `${message} Retry in ${retryAfter}s.`, "rate_limited");
+}
+
+/** A per-IP limit for one route, like claim redemption. */
+export function perIp(max: number, windowMs: number, message: string): RequestHandler {
+  const hit = slidingWindow(max, windowMs);
+  return (req, res, next) => {
+    const wait = hit(req.ip ?? "unknown");
+    next(wait ? tooMany(res, wait, message) : undefined);
+  };
+}
+
 /**
  * Write budget per API key. The contract already caps every charge by the user's signed limit;
  * this stops a leaked key from burning relayer gas on thousands of calls.
  */
 export function rateLimit(perMinute: number): RequestHandler {
-  const windows = new Map<string, number[]>();
+  const hit = slidingWindow(perMinute, 60_000);
   return (req, res, next) => {
     if (req.method === "GET") return next();
-    const key = appOf(res)?.id ?? req.ip ?? "anon";
-    const now = Date.now();
-    const hits = (windows.get(key) ?? []).filter((t) => now - t < 60_000);
-    if (hits.length >= perMinute) {
-      const retryAfter = Math.ceil((60_000 - (now - hits[0])) / 1000);
-      res.setHeader("Retry-After", String(retryAfter));
-      windows.set(key, hits);
-      return next(new HttpError(429, `Too many requests. Retry in ${retryAfter}s.`, "rate_limited"));
-    }
-    hits.push(now);
-    windows.set(key, hits);
-    next();
+    const wait = hit(appOf(res)?.id ?? req.ip ?? "anon");
+    next(wait ? tooMany(res, wait, "Too many requests.") : undefined);
   };
 }
 

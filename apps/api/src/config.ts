@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { getAddress, isAddress, isHex, parseEther, parseGwei, type Address, type Hex } from "viem";
 import { z } from "zod";
 import type { RelayerLimits } from "./relayer.js";
+import { creditsToUnits } from "./units.js";
 
 export const WHITECHAIN_SEPOLIA = 1874;
 export const LOCAL_CHAIN = 31337;
@@ -53,6 +54,12 @@ const envSchema = z.object({
   RELAYER_MIN_BALANCE: wbt.default(parseEther("0.05")),
   MAX_TX_GAS: z.coerce.bigint().positive().default(500_000n),
   MAX_GAS_PRICE_GWEI: z.coerce.number().positive().default(50),
+  /** Smallest charge or hold, and smallest send or claim link, in credits. Dust would only burn gas. */
+  MIN_CHARGE_CREDITS: z.string().regex(/^\d+(\.\d{1,4})?$/).default("1"),
+  MIN_SEND_CREDITS: z.string().regex(/^\d+(\.\d{1,4})?$/).default("1"),
+  /** New accounts and claim-link redemptions allowed per IP, per hour. */
+  SIGNUPS_PER_IP_PER_HOUR: z.coerce.number().int().positive().default(20),
+  CLAIMS_PER_IP_PER_HOUR: z.coerce.number().int().positive().default(10),
   /** How often the indexer reads new blocks, and how many blocks one eth_getLogs call covers. */
   INDEXER_INTERVAL_MS: z.coerce.number().int().min(250).default(2_000),
   LOG_CHUNK: z.coerce.number().int().min(1).max(10_000).default(1_000),
@@ -84,6 +91,11 @@ export type Config = {
   relayerLimits: RelayerLimits;
   indexerIntervalMs: number;
   logChunk: number;
+  /** In USDT units. */
+  minChargeUnits: bigint;
+  minSendUnits: bigint;
+  signupsPerIpPerHour: number;
+  claimsPerIpPerHour: number;
 };
 
 /**
@@ -150,5 +162,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     },
     indexerIntervalMs: e.INDEXER_INTERVAL_MS,
     logChunk: e.LOG_CHUNK,
+    minChargeUnits: creditsToUnits(e.MIN_CHARGE_CREDITS),
+    minSendUnits: creditsToUnits(e.MIN_SEND_CREDITS),
+    signupsPerIpPerHour: e.SIGNUPS_PER_IP_PER_HOUR,
+    claimsPerIpPerHour: e.CLAIMS_PER_IP_PER_HOUR,
   };
 }

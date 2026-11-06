@@ -132,6 +132,7 @@ export function appRoutes(ctx: Context): Router {
     if (earlier) return void res.json(replay(earlier));
 
     const { units, label } = resolveAmount(body, app.prices);
+    atLeast(units, config.minChargeUnits);
     const { hash, receipt } = await relayer.write(
       {
         address: vaultAddress,
@@ -167,6 +168,7 @@ export function appRoutes(ctx: Context): Router {
     if (earlier) return void res.json(replay(earlier));
 
     const { units, label } = resolveAmount(body, app.prices);
+    atLeast(units, config.minChargeUnits);
     const ttl = Math.min(body.ttlSeconds ?? config.holdTtlSeconds, config.holdTtlSeconds);
     const expiry = Math.floor(Date.now() / 1000) + ttl;
     const { hash, receipt } = await relayer.write(
@@ -319,6 +321,7 @@ export function appRoutes(ctx: Context): Router {
     if (earlier) return void res.json(replay(earlier));
 
     const units = creditsToUnits(body.credits);
+    atLeast(units, config.minChargeUnits);
     const rateUnits = creditsToUnits(app.exchangeRate);
     // App credits, exact to 4 decimals: units / rateUnits, scaled back up by UNITS_PER_CREDIT.
     const appCredits = unitsToCreditsString((units * UNITS_PER_CREDIT) / rateUnits);
@@ -421,6 +424,11 @@ export function appRoutes(ctx: Context): Router {
   });
 
   return r;
+}
+
+/** Dust charges would only burn relayer gas. */
+function atLeast(units: bigint, min: bigint) {
+  if (units < min) throw new HttpError(400, `The smallest charge is ${unitsToCreditsString(min)} credits`, "below_minimum");
 }
 
 function formatGas(wei: bigint): string {

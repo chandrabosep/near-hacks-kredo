@@ -12,7 +12,7 @@ import { getAddress, isHex, parseSignature, type Address, type Hex } from "viem"
 import { z } from "zod";
 import { creditVaultAbi } from "../abi/CreditVault.js";
 import type { Context } from "../context.js";
-import { HttpError, requireUser, userOf } from "../http.js";
+import { HttpError, perIp, requireUser, userOf } from "../http.js";
 import { deadlineIn, newNonce, permitTypes, signRequest, usdtDomain, vaultDomain } from "../typedData.js";
 import { amount, creditsToUnits } from "../units.js";
 import { activityFor, addressSchema, creditsSchema, involves, txInfo } from "./shared.js";
@@ -29,7 +29,7 @@ export function userRoutes(ctx: Context): Router {
   const v = config.vault;
 
   // Only these paths need a Privy login. Everything else falls through to the next router.
-  r.use(["/me", "/claims/:claimKey/redeem"], requireUser(ctx.verifier, store));
+  r.use(["/me", "/claims/:claimKey/redeem"], requireUser(ctx.verifier, store, config.signupsPerIpPerHour));
 
   const me = (res: Parameters<typeof userOf>[0]) => userOf(res).address;
 
@@ -154,6 +154,9 @@ export function userRoutes(ctx: Context): Router {
         const to = await resolveRecipient(b.to);
         if (to === address) throw new HttpError(400, "That's your own account", "self_send");
         const units = creditsToUnits(b.credits);
+        if (units < config.minSendUnits) {
+          throw new HttpError(400, `The smallest amount is ${amount(config.minSendUnits).credits} credits`, "below_minimum");
+        }
         return void res.json({
           summary: `Send ${amount(units).credits} credits to ${b.to}`,
           request: signRequest(domain, "Send", { from: address, to, amount: units.toString(), nonce, deadline }),
@@ -162,6 +165,9 @@ export function userRoutes(ctx: Context): Router {
       case "claim": {
         const b = signSchemas.claim.parse(req.body);
         const units = creditsToUnits(b.credits);
+        if (units < config.minSendUnits) {
+          throw new HttpError(400, `The smallest amount is ${amount(config.minSendUnits).credits} credits`, "below_minimum");
+        }
         const expiry = Math.floor(Date.now() / 1000) + (b.expiresInDays ?? 30) * DAY;
         return void res.json({
           summary: `A claim link for ${amount(units).credits} credits`,
@@ -304,7 +310,8 @@ export function userRoutes(ctx: Context): Router {
   // ---------------------------------------------------------------- claim links
 
   /** Redeem a claim link to the logged-in user. The link's key signs this user's address. */
-  r.post("/claims/:claimKey/redeem", async (req, res) => {
+  const claimLimit = perIp(config.claimsPerIpPerHour, 3_600_000, "Too many claims from this network.");
+  r.post("/claims/:claimKey/redeem", claimLimit, async (req, res) => {
     const claimKey = addressSchema.parse(req.params.claimKey);
     const sig = signature.parse(req.body?.signature) as Hex;
     const to = me(res);

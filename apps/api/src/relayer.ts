@@ -62,6 +62,15 @@ export type RelayerLimits = {
 const EXITS = new Set(["release", "payout", "revokeApp", "cancelClaim"]);
 
 const DAY_MS = 86_400_000;
+const SEND_RETRIES = 2;
+
+/** Whether a send failure is worth retrying, and why. Contract reverts never are. */
+export function transient(err: unknown): "nonce" | "network" | undefined {
+  const text = err instanceof BaseError ? `${err.shortMessage} ${err.details ?? ""}` : String((err as Error)?.message ?? err);
+  if (/nonce too low|nonce has already been used|replacement transaction underpriced|already known/i.test(text)) return "nonce";
+  if (/timeout|timed out|ECONNRESET|ECONNREFUSED|socket hang up|fetch failed|HTTP request failed|502|503|504|rate limit/i.test(text)) return "network";
+  return undefined;
+}
 
 export function createRelayer(opts: { clients: Clients; db: Db; txTimeoutMs: number; limits?: RelayerLimits }) {
   const { clients, db, txTimeoutMs, limits } = opts;
@@ -92,6 +101,24 @@ export function createRelayer(opts: { clients: Clients; db: Db; txTimeoutMs: num
     db.data.txs.push(tx);
     db.save();
     return tx;
+  }
+
+  /**
+   * Sends, retrying what's safe to retry: RPC hiccups, and nonce clashes after the local nonce
+   * drifted from the chain (it's reset first). Every relayed call is idempotent onchain (charge,
+   * hold and refund refs; signature nonces), so a resend can never move credits twice.
+   */
+  async function sendWithRetry(prepared: Parameters<typeof walletClient.writeContract>[0]): Promise<Hash> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await walletClient.writeContract(prepared);
+      } catch (err) {
+        const kind = transient(err);
+        if (!kind || attempt >= SEND_RETRIES) throw err;
+        if (kind === "nonce") operator.nonceManager?.reset({ address: operator.address, chainId: clients.chain.id });
+        await new Promise((r) => setTimeout(r, 300 * 2 ** attempt));
+      }
+    }
   }
 
   async function send<abi extends Abi, name extends ContractFunctionName<abi, "nonpayable" | "payable">>(
@@ -145,18 +172,23 @@ export function createRelayer(opts: { clients: Clients; db: Db; txTimeoutMs: num
       } as WriteArgs;
     }
 
-    const hash = await walletClient.writeContract(prepared);
+    const hash = await sendWithRetry(prepared);
     // Recorded before waiting, so a crash mid-flight still leaves the hash in the ledger.
     const tx = record({ hash, fn, app, status: "pending", gasUsed: 0n, l2Fee: 0n, l1Fee: 0n, at: Date.now() });
 
-    let receipt: TransactionReceipt;
-    try {
-      receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: txTimeoutMs });
-    } catch (err) {
-      tx.error = revertReason(err);
-      db.save();
-      throw new RelayerError(`no receipt for ${hash}: ${tx.error}`, hash);
+    let receipt: TransactionReceipt | undefined;
+    // A slow block or a dropped RPC call isn't a failed transaction: wait once more before giving up.
+    for (let attempt = 0; attempt < 2 && !receipt; attempt++) {
+      try {
+        receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: txTimeoutMs });
+      } catch (err) {
+        tx.error = revertReason(err);
+        db.save();
+        if (attempt === 1) throw new RelayerError(`no receipt for ${hash}: ${tx.error}`, hash);
+      }
     }
+    if (!receipt) throw new RelayerError(`no receipt for ${hash}`, hash);
+    tx.error = undefined;
 
     tx.gasUsed = receipt.gasUsed;
     tx.l2Fee = receipt.gasUsed * receipt.effectiveGasPrice;

@@ -211,10 +211,10 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 
 ### Step 3: Backend on Whitechain, gas economics and anti-drain
 - [x] Run the backend against Whitechain; a curl charge appears on the explorer and in the database (tag `m2-charge-end-to-end`)
-- [ ] Relayer retries
+- [x] Relayer retries
 - [ ] Ops panel (hidden route): relayer WBT balance, txs today, WBT spent today, days of runway
 - [x] Daily WBT budget with auto-pause, per-tx gas ceiling
-- [ ] Per-IP limits on signup and claim; minimum amounts on charge and send
+- [x] Per-IP limits on signup and claim; minimum amounts on charge and send
 - [x] README "Relayer security" section, updated with the real numbers
 
 ### Step 4: SDK test mode and starter app

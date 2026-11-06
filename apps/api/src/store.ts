@@ -135,6 +135,8 @@ export function createStore(db: Db) {
 
     userByAddress: (address: string) => data.users.find((u) => same(u.address, address)),
 
+    userByPrivyId: (privyId: string) => data.users.find((u) => u.privyId === privyId),
+
     userByEmail: (email: string) => data.users.find((u) => u.email === email.trim().toLowerCase()),
 
     // ---------------------------------------------------------------- claims
