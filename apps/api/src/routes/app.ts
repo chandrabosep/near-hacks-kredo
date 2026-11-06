@@ -2,7 +2,7 @@
  * Routes a company's backend calls with its API key. Every write accepts the company's own
  * `ref`. Repeating a request with the same ref returns the first result instead of charging again.
  */
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import type { Address, Hex } from "viem";
 import { z } from "zod";
 import { creditVaultAbi } from "../abi/CreditVault.js";
@@ -25,12 +25,16 @@ const captureSchema = z.object({ credits: creditsSchema.optional() });
 const refundSchema = z.object({ user: addressSchema, credits: creditsSchema, ref: refSchema.optional() });
 const convertSchema = z.object({ user: addressSchema, credits: creditsSchema, ref: refSchema.optional() });
 
-export function appRoutes(ctx: Context): Router {
+/**
+ * `auth` decides which app a request is for: the API key by default, or the signed-in owner on
+ * the company dashboard (mounted at /v1/me/apps/:id).
+ */
+export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
   const r = Router();
   const { store, relayer, config } = ctx;
   const vaultAddress = config.vault;
 
-  r.use(requireApiKey(store), rateLimit(config.rateLimitPerMin));
+  r.use(auth ?? requireApiKey(store), rateLimit(config.rateLimitPerMin));
 
   const fee = (units: bigint, feeBps: number) => (units * BigInt(feeBps)) / 10_000n;
 

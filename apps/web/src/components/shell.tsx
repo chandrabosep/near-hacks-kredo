@@ -26,6 +26,7 @@ const NAV = [
   { href: "/wallet", label: "Wallet" },
   { href: "/buy", label: "Buy" },
   { href: "/reserves", label: "Reserves" },
+  { href: "/dashboard", label: "For companies" },
 ];
 
 function Account() {

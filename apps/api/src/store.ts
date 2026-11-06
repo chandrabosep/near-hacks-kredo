@@ -15,6 +15,8 @@ export function sha256(value: string): Hex {
 
 export const hashApiKey = sha256;
 
+const newApiKey = () => `${API_KEY_PREFIX}${randomBytes(24).toString("hex")}`;
+
 const same = (a: string | undefined, b: string | undefined) =>
   a !== undefined && b !== undefined && a.toLowerCase() === b.toLowerCase();
 
@@ -25,8 +27,8 @@ export function createStore(db: Db) {
     // ---------------------------------------------------------------- apps
 
     /** Creates an app record. Returns the API key once; only its hash is stored. */
-    createApp(input: { name: string; payout: Address; feeBps: number }): { app: AppRecord; apiKey: string } {
-      const apiKey = `${API_KEY_PREFIX}${randomBytes(24).toString("hex")}`;
+    createApp(input: { name: string; payout: Address; feeBps: number; owner?: string }): { app: AppRecord; apiKey: string } {
+      const apiKey = newApiKey();
       const app: AppRecord = {
         // A fresh address that only identifies the app onchain. Its key is thrown away.
         id: privateKeyToAccount(generatePrivateKey()).address,
@@ -36,6 +38,7 @@ export function createStore(db: Db) {
         apiKeyHash: hashApiKey(apiKey),
         apiKeyPrefix: apiKey.slice(0, API_KEY_PREFIX.length + 6),
         prices: {},
+        owner: input.owner,
         createdAt: Date.now(),
       };
       data.apps.push(app);
@@ -54,6 +57,17 @@ export function createStore(db: Db) {
     },
 
     appById: (id: string) => data.apps.find((a) => same(a.id, id)),
+
+    appsOwnedBy: (owner: string) => data.apps.filter((a) => a.owner === owner),
+
+    /** Replaces the API key. The old one stops working at once. Returns the new key once. */
+    rotateApiKey(app: AppRecord): string {
+      const apiKey = newApiKey();
+      app.apiKeyHash = hashApiKey(apiKey);
+      app.apiKeyPrefix = apiKey.slice(0, API_KEY_PREFIX.length + 6);
+      db.save();
+      return apiKey;
+    },
 
     listApps: () => data.apps,
 

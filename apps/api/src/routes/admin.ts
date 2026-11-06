@@ -4,9 +4,9 @@
  */
 import { Router } from "express";
 import { z } from "zod";
-import { creditVaultAbi } from "../abi/CreditVault.js";
 import type { Context } from "../context.js";
 import { requireAdmin } from "../http.js";
+import { registerApp } from "../register.js";
 import { amount, creditsToUnits } from "../units.js";
 import { addressSchema, creditsSchema, txInfo } from "./shared.js";
 
@@ -27,32 +27,17 @@ export function adminRoutes(ctx: Context): Router {
   /** Registers an app onchain and returns its API key. The key is shown only here. */
   r.post("/apps", async (req, res) => {
     const body = createAppSchema.parse(req.body);
-    const feeBps = body.feeBps ?? config.networkFeeBps;
     const maxCharge = body.maxCharge === undefined ? 0n : creditsToUnits(body.maxCharge);
-    const { app, apiKey } = store.createApp({ name: body.name, payout: body.payout, feeBps });
-    try {
-      const { hash } = await relayer.write(
-        {
-          address: config.vault,
-          abi: creditVaultAbi,
-          functionName: "registerApp",
-          args: [app.id, app.payout, feeBps, maxCharge],
-        },
-        { app: app.id },
-      );
-      res.status(201).json({
-        id: app.id,
-        name: app.name,
-        payout: app.payout,
-        feeBps,
-        maxCharge: maxCharge === 0n ? null : amount(maxCharge),
-        apiKey,
-        ...txInfo(ctx, hash),
-      });
-    } catch (err) {
-      store.removeApp(app.id);
-      throw err;
-    }
+    const { app, apiKey, hash } = await registerApp(ctx, { name: body.name, payout: body.payout, feeBps: body.feeBps, maxCharge });
+    res.status(201).json({
+      id: app.id,
+      name: app.name,
+      payout: app.payout,
+      feeBps: app.feeBps,
+      maxCharge: maxCharge === 0n ? null : amount(maxCharge),
+      apiKey,
+      ...txInfo(ctx, hash),
+    });
   });
 
   r.get("/apps", (_req, res) => {

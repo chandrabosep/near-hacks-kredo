@@ -438,4 +438,42 @@ describe("api", { skip }, () => {
     const notYet = await call("POST", "/v1/me/connect-code", { user: "bob", body: { app: appId } });
     assert.equal(notYet.status, 409);
   });
+
+  // ---------------------------------------------------------------- company dashboard
+
+  test("a signed-in owner registers an app and manages it without an API key", async () => {
+    const made = await call("POST", "/v1/me/apps", { user: "bob", body: { name: "Bob's Chat" } });
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    assert.match(made.body.apiKey, /^uc_live_/);
+    assert.equal(made.body.payout, bob.address, "payout defaults to the owner's wallet");
+    const id: string = made.body.id;
+
+    const mine = await call("GET", "/v1/me/apps", { user: "bob" });
+    assert.deepEqual(mine.body.map((a: Json) => a.name), ["Bob's Chat"]);
+    assert.equal((await call("GET", "/v1/me/apps", { user: "alice" })).body.length, 0);
+
+    // Every company route works under /me/apps/:id, for the owner only.
+    const prices = await call("PUT", `/v1/me/apps/${id}/prices`, { user: "bob", body: { prices: { "chat.message": { price: 1 } } } });
+    assert.equal(prices.status, 200, JSON.stringify(prices.body));
+    const info = await call("GET", `/v1/me/apps/${id}/app`, { user: "bob" });
+    assert.equal(info.body.name, "Bob's Chat");
+    assert.equal((await call("GET", `/v1/me/apps/${id}/app`, { user: "alice" })).status, 404);
+
+    const stats = await call("GET", `/v1/me/apps/${id}/stats`, { user: "bob" });
+    assert.equal(stats.body.charges, 0);
+    assert.equal(stats.body.revenue.units, "0");
+  });
+
+  test("rotating the key turns the old one off", async () => {
+    const [app] = (await call("GET", "/v1/me/apps", { user: "bob" })).body;
+    const made = await call("POST", "/v1/me/apps", { user: "bob", body: { name: "Second" } });
+    const oldKey: string = made.body.apiKey;
+    assert.equal((await call("GET", "/v1/app", { key: oldKey })).status, 200);
+
+    const rotated = await call("POST", `/v1/me/apps/${made.body.id}/key`, { user: "bob" });
+    assert.equal(rotated.status, 200);
+    assert.equal((await call("GET", "/v1/app", { key: oldKey })).status, 401);
+    assert.equal((await call("GET", "/v1/app", { key: rotated.body.apiKey })).body.name, "Second");
+    assert.ok(app, "first app still listed");
+  });
 });

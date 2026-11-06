@@ -225,13 +225,13 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 
 ### Step 5: Company dashboard
 - [ ] Register an app, get test and live API keys
-- [ ] Price list in credits with the dollar value next to each price (flat or per-unit)
-- [ ] "What you earn" preview: dollar value and payout after fee
-- [ ] Light mode: set the rate from the company's own credits
-- [ ] Revenue, charges and unpaid earnings
-- [ ] **Withdraw** button that pays USDT on Whitechain
-- [ ] Gas line: "Your charges cost N WBT in gas this period, covered by your network fee"
-- [ ] CSV export of charges, refunds and payouts
+- [x] Price list in credits with the dollar value next to each price (flat or per-unit)
+- [x] "What you earn" preview: dollar value and payout after fee
+- [x] Light mode: set the rate from the company's own credits
+- [x] Revenue, charges and unpaid earnings
+- [x] **Withdraw** button that pays USDT on Whitechain
+- [x] Gas line: "Your charges cost N WBT in gas this period, covered by your network fee"
+- [x] CSV export of charges, refunds and payouts
 
 **Done when:** a company can register, set prices, see a charge arrive and withdraw USDT. Tag `m3-dashboard-payouts`.
 
