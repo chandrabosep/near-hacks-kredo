@@ -147,7 +147,7 @@ Never commit secrets, local data or build output. Commit example env files inste
 **React kit**
 - [x] provider and `useCredits()`
 - [x] `<ConnectCreditsButton/>`, `<BuyCreditsButton/>`
-- [ ] `<CreditsBalance/>` dropdown
+- [x] `<CreditsBalance/>` dropdown
 
 **Video app**
 - [ ] app scaffold (Vite, server)
