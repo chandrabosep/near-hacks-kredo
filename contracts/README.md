@@ -2,6 +2,18 @@
 
 `CreditVault` holds the USDT behind every credit, and every balance, app limit, hold, claim link and payout. It runs on Whitechain Sepolia (chain ID 1874) against the official test USDT.
 
+## Deployed
+
+| | |
+|---|---|
+| Network | Whitechain Sepolia, chain ID 1874 |
+| CreditVault | [`0xaaA19C7160FDe7532F5f4Fbd698b549A884c664A`](https://explorer.testnet.whitechain.io/address/0xaaA19C7160FDe7532F5f4Fbd698b549A884c664A?tab=contract), verified on Blockscout (Solidity 0.8.30) |
+| USDT | [`0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7`](https://explorer.testnet.whitechain.io/address/0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7), the official test token |
+| Deploy block | 12322125 |
+| Owner, operator, fee recipient | [`0xA81acADf1D474d14B98b0499E727ebdB1600e3EF`](https://explorer.testnet.whitechain.io/address/0xA81acADf1D474d14B98b0499E727ebdB1600e3EF) |
+
+The same values are in [deployments/1874.json](deployments/1874.json). USDT payments through the vault, with explorer links, are listed in the [main README](../README.md#onchain-on-whitechain-sepolia-chain-id-1874).
+
 ## Units
 
 - 1 credit = $0.01 = **10,000 USDT units** (USDT has 6 decimals).
@@ -80,7 +92,9 @@ Each run writes `deployments/<chainId>.json` with the vault, USDT, roles and dep
 
 ## Current limitations
 
+- Testnet only, and not audited.
 - One vault per deployment, not upgradeable. A fix means a new deployment.
+- On testnet one key is owner, operator and fee recipient. In production the owner would be a multisig and the operator a separate relayer key.
 - Users can't cash credits out to USDT. Only registered apps are paid out.
 - Charges are one per transaction. No batching yet.
 - `MockUSDT` is for local tests only and must never be deployed to Whitechain.

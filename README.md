@@ -17,6 +17,7 @@ Kredo is a shared value network for applications. Users carry one balance across
 | Docs | [kredo-omega.vercel.app/docs](https://kredo-omega.vercel.app/docs) |
 | Server SDK | [`kredo`](https://www.npmjs.com/package/kredo) on npm |
 | React kit | [`kredo-react`](https://www.npmjs.com/package/kredo-react) on npm |
+| Demo video | link to be added |
 
 ## Onchain, on Whitechain Sepolia (chain ID 1874)
 
@@ -30,9 +31,45 @@ Kredo is a shared value network for applications. Users carry one balance across
 | Light mode: an app sells 5 of its own credits for 10 of ours | [`0xed0557c3…2507`](https://explorer.testnet.whitechain.io/tx/0xed0557c3e8ad850463d7748c9a6ccaac4741b7767c6fffc0cedb82aaf5c32507) |
 | App is paid out 0.1425 USDT | [`0xf69cd025…ae50`](https://explorer.testnet.whitechain.io/tx/0xf69cd025c9a3c49414df0a39c48f8cc0743af07ca80b68f642cf684a9cf1ae50) |
 
-## Why onchain settlement
+Every payment above uses the official Whitechain test USDT. The deploy script refuses any other token on chain 1874.
 
-A normal payment rail can't stop the operator from over-charging a user or issuing credits that aren't backed. The vault does: every credit exists only because USDT arrived, every charge stays inside a limit the user signed, and `checkBacking()` proves the vault's USDT covers every balance at any moment. Companies are paid in USDT by the contract itself, on a chain where a payment costs a fraction of a cent.
+## Why this needs onchain stablecoin settlement on Whitechain
+
+**One balance shared by many companies only works if no single company, and not even us, can touch it.** A card or bank rail runs on trust in whoever runs the ledger. It can't stop that party from over-charging a user, issuing credits with no money behind them, or holding back an app's earnings. The vault can.
+
+- Every credit exists only because USDT arrived in the vault, and `checkBacking()` proves the USDT covers every balance at any moment.
+- Every charge stays inside a limit the user signed for that app. The contract rejects anything above it, even from our own operator key.
+- Apps are paid in USDT by the contract itself, to their own address, with no payout schedule and no chargebacks.
+
+Whitechain makes the per-use part possible. A charge costs about 0.00047 WBT, so a 1 cent chat message settles onchain at a profit. Card rails charge around 30 cents a transaction, so they can't take a single 1 cent payment at all.
+
+## Hackathon
+
+Built at ETHGlobal Mumbai, 5 to 8 November 2026, for the Whitechain tracks. The first commit is [`562ee84`](https://github.com/chandrabosep/ethglobal-mumbai/commit/562ee84) on 5 November, and the history shows each slice landing through the event.
+
+**Operate: Stablecoin Payments for Business**
+
+- Drop in: [`kredo`](packages/sdk) on the server and [`kredo-react`](packages/react) in the browser. [examples/starter](examples/starter/server.ts) adds credits to an app in one file, and [Parley](demos/parley) and [Lumen](demos/lumen) are separate apps built on it.
+- Customer view: connect, buy, approve a limit, spend, then see every connected app and its limit on the account page, disconnect any of them, and send credits to someone or as a claim link.
+- Merchant view: the dashboard registers an app, issues live and test keys, sets prices, and shows revenue, fees and every charge with its transaction.
+- After the first payment: holds with capture or release, refunds capped onchain at what the user spent, USDT payouts, signed webhooks, and a CSV export of every charge, refund and payout for the accountant.
+
+**Scale: Payments Nobody Notices**
+
+- The payer sees no crypto: email login, a Privy embedded wallet that only the user signs with, no seed phrase, no WBT, no chain picker.
+- Deposits use the USDT `permit` (EIP-2612), and the vault also accepts `receiveWithAuthorization` (EIP-3009). Limits, sends and claims are EIP-712 signatures. Our relayer submits all of them and pays the gas.
+- The 5% network fee pays for the gas. The relayer is funded with WBT from the Whitechain faucet, and the guards in [Relayer security](#relayer-security) stop anyone draining it.
+
+**Qualification**
+
+| Requirement | Where |
+|---|---|
+| Contracts on Whitechain Sepolia (1874), verified | [`CreditVault`](https://explorer.testnet.whitechain.io/address/0xaaA19C7160FDe7532F5f4Fbd698b549A884c664A?tab=contract), see [contracts](contracts/README.md#deployed) |
+| A USDT payment settled in the main flow | [Onchain, on Whitechain Sepolia](#onchain-on-whitechain-sepolia-chain-id-1874) |
+| Why onchain stablecoin settlement | [the section above](#why-this-needs-onchain-stablecoin-settlement-on-whitechain) |
+| Setup, architecture, limitations | [Run it](#run-it), [How it works](#how-it-works), [Current limitations](#current-limitations) |
+| Demo video, 2 to 4 minutes, every party | [Live](#live) |
+| Whitechain feedback | [WHITECHAIN_FEEDBACK.md](WHITECHAIN_FEEDBACK.md) |
 
 ## How it works
 
@@ -67,7 +104,8 @@ A normal payment rail can't stop the operator from over-charging a user or issui
 | [examples/starter](examples/starter) | The smallest integration: one server file, 10 lines about credits |
 | [packages/sdk](packages/sdk) | `kredo`, the server kit. See its [README](packages/sdk/README.md) |
 | [packages/react](packages/react) | `kredo-react`, buttons and a live balance. See its [README](packages/react/README.md) |
-| [docs](docs) | Product overview, build plan, design system |
+| [docs](docs) | Product overview, build plan, design system, Whitechain notes |
+| [WHITECHAIN_FEEDBACK.md](WHITECHAIN_FEEDBACK.md) | What worked on Whitechain, where we got stuck, and what the docs were missing |
 
 ## Run it
 
