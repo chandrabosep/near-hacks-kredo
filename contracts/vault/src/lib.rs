@@ -321,9 +321,12 @@ impl Vault {
     /// over an app's charges.
     pub fn set_app_payout(&mut self, app: String, payout: AccountId) {
         let caller = env::predecessor_account_id();
+        let mark = self.storage_mark();
         let a = self.app_mut(&app);
         require!(caller == a.payout, "Not authorized");
         a.payout = payout.clone();
+        // A longer account id makes the app's record bigger: the payout account pays for it.
+        self.pay_storage(&caller, mark);
         emit("app_payout_set", json!({ "app": app, "payout": payout }));
     }
 
@@ -331,9 +334,11 @@ impl Vault {
     /// payout account, never the owner or an operator, so Kredo can't take over an app's charges.
     pub fn set_app_signer(&mut self, app: String, signer: AccountId) {
         let caller = env::predecessor_account_id();
+        let mark = self.storage_mark();
         let a = self.app_mut(&app);
         require!(caller == a.payout, "Not authorized");
         a.signer = signer.clone();
+        self.pay_storage(&caller, mark);
         emit("app_signer_set", json!({ "app": app, "signer": signer }));
     }
 

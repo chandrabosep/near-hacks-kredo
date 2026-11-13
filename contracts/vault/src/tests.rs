@@ -720,6 +720,7 @@ fn operator_cannot_change_an_apps_signer() {
 #[should_panic(expected = "Not app signer")]
 fn payout_account_rotates_the_signer_and_the_old_one_stops_working() {
     let mut v = funded();
+    register(&mut v, &payout_acc());
     let new_signer = acc("parley2.apps.testnet");
     ctx(payout_acc(), T0);
     v.set_app_signer(APP.into(), new_signer.clone());
@@ -775,4 +776,22 @@ fn owner_cannot_take_over_an_app_through_its_payout() {
     let mut v = setup();
     ctx(owner(), T0);
     v.set_app_payout(APP.into(), owner());
+}
+
+#[test]
+#[should_panic(expected = "Not registered")]
+fn a_longer_signer_is_paid_for_by_the_payout_account() {
+    let mut v = setup();
+    ctx(payout_acc(), T0);
+    v.set_app_signer(APP.into(), acc("a-much-longer-signer-account-name-for-this-app.apps.testnet"));
+}
+
+#[test]
+fn a_registered_payout_account_can_move_to_a_longer_signer() {
+    let mut v = setup();
+    register(&mut v, &payout_acc());
+    let before = v.storage_balance_of(payout_acc()).unwrap().available;
+    ctx(payout_acc(), T0);
+    v.set_app_signer(APP.into(), acc("a-much-longer-signer-account-name-for-this-app.apps.testnet"));
+    assert!(v.storage_balance_of(payout_acc()).unwrap().available < before);
 }
