@@ -1,0 +1,17 @@
+[package]
+name = "kredo-vault"
+version = "1.0.0"
+edition = "2021"
+license = "MIT"
+description = "Kredo credit vault: USDT-backed balances, per-app spending limits, charges, holds, claims and payouts"
+repository = "https://github.com/chandrabosep/near-hacks-kredo"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }
+ed25519-dalek = "2"

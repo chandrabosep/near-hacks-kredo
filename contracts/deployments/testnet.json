@@ -1,0 +1,15 @@
+{
+  "network": "testnet",
+  "rpc": "https://test.rpc.fastnear.com",
+  "explorer": "https://testnet.nearblocks.io",
+  "vault": "vault.kredo-network.testnet",
+  "usdt": "usdt.kredo-network.testnet",
+  "owner": "kredo-network.testnet",
+  "operator": "relayer.kredo-network.testnet",
+  "feeRecipient": "kredo-network.testnet",
+  "deployTx": {
+    "usdt": "6i6ZaUXg4KwtFpn6FQkkQPvfkhvJPDzPEoSB3tYmoMeb",
+    "vault": "7fd62FuSFSDY6huZzcCZX1tPza75ZRuBrwczZLBqoegw"
+  },
+  "firstDepositTx": "DxmvWk9DPp1L46ezLuFD968v1sk9BABj13MrHSoraTdX"
+}

@@ -1,0 +1,16 @@
+[package]
+name = "kredo-test-usdt"
+version = "1.0.0"
+edition = "2021"
+license = "MIT"
+description = "Test USDT for NEAR testnet: NEP-141 with 6 decimals and an owner mint"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+near-contract-standards = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }
