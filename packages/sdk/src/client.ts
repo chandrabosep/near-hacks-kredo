@@ -9,7 +9,7 @@
  *   // ...run the job...
  *   await credits.capture(hold.holdId);        // or credits.release(hold.holdId)
  */
-import { createPrivateKey, randomUUID, sign as ed25519Sign } from "node:crypto";
+import { createHash, createPrivateKey, randomUUID, sign as ed25519Sign } from "node:crypto";
 import { CreditsError } from "./errors.js";
 import type {
   ActivityItem,
@@ -125,12 +125,14 @@ export class Credits {
    * the user's limit or balance doesn't cover it.
    */
   charge(input: { user: string; ref?: string } & AmountInput): Promise<Operation> {
-    return this.request("POST", "/v1/charges", { body: withRef(input) });
+    const body = withRef(input);
+    return this.request("POST", "/v1/charges", { body, expect: write("charge", "charge", body) });
   }
 
   /** Reserves credits at the start of a long job. The price is locked now. Capture or release it when the job ends. */
   hold(input: { user: string; ref?: string; ttlSeconds?: number } & AmountInput): Promise<Hold> {
-    return this.request("POST", "/v1/holds", { body: withRef(input) });
+    const body = withRef(input);
+    return this.request("POST", "/v1/holds", { body, expect: write("hold", "hold", body) });
   }
 
   getHold(holdId: string): Promise<HoldStatus> {
@@ -139,7 +141,10 @@ export class Credits {
 
   /** The job succeeded. Charges the whole hold, or only `credits` of it, and returns the rest to the user. */
   capture(holdId: string, opts: { credits?: CreditAmount } = {}): Promise<Capture> {
-    return this.request("POST", `/v1/holds/${encodeURIComponent(holdId)}/capture`, { body: opts });
+    return this.request("POST", `/v1/holds/${encodeURIComponent(holdId)}/capture`, {
+      body: opts,
+      expect: { method: "capture", args: { hold_id: holdId, ...(opts.credits === undefined ? {} : { actual: unitsOf(opts.credits) }) } },
+    });
   }
 
   /** The job failed. Everything held goes back to the user. */
@@ -149,7 +154,8 @@ export class Credits {
 
   /** Gives credits back, up to what this user has spent with you. Comes out of your unpaid earnings. */
   refund(input: { user: string; credits: CreditAmount; ref?: string }): Promise<Operation> {
-    return this.request("POST", "/v1/refunds", { body: withRef(input) });
+    const body = withRef(input);
+    return this.request("POST", "/v1/refunds", { body, expect: write("refund", "refund", body) });
   }
 
   // ---------------------------------------------------------------- light mode
@@ -161,7 +167,8 @@ export class Credits {
 
   /** Light mode: spends `credits` of ours. Add the returned `appCredits` to the user's balance in your own system. */
   convert(input: { user: string; credits: CreditAmount; ref?: string }): Promise<Conversion> {
-    return this.request("POST", "/v1/convert", { body: withRef(input) });
+    const body = withRef(input);
+    return this.request("POST", "/v1/convert", { body, expect: write("charge", "convert", body) });
   }
 
   // ---------------------------------------------------------------- connecting users
@@ -256,7 +263,7 @@ export class Credits {
   }
 
   /** @internal Shared by every call. Retries network failures and rate limits; throws CreditsError. */
-  async request<T>(method: string, path: string, opts: { query?: Query; body?: unknown; raw?: boolean } = {}): Promise<T> {
+  async request<T>(method: string, path: string, opts: { query?: Query; body?: unknown; raw?: boolean; expect?: Expected } = {}): Promise<T> {
     const url = new URL(this.baseUrl + path);
     for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, String(v));
 
@@ -296,12 +303,14 @@ export class Credits {
       const data = text ? safeJson(text) : undefined;
       // The API prepared this write as a transaction from your app's signer: sign its hash and
       // send the same request again. The body and ref are unchanged, so it matches what was prepared.
-      const sign = data as { code?: string; hash?: string } | undefined;
-      if (res.status === 428 && sign?.code === "signature_required" && sign.hash && signature === undefined) {
-        if (!this.signerKey) {
+      const toSign = data as { code?: string; hash?: string; delegate?: string } | undefined;
+      if (res.status === 428 && toSign?.code === "signature_required" && toSign.hash && signature === undefined) {
+        if (!this.signerKey || !this.signerPublicKey) {
           throw new CreditsError("This app signs its own charges: pass signerKey (your app's ed25519 key) to Credits", 428, "missing_signer");
         }
-        signature = `${sign.hash}:${signHash(this.signerKey, sign.hash)}`;
+        // Never sign blind: the bytes must hash to what we sign, and say exactly what we asked for.
+        checkBeforeSigning(toSign.hash, toSign.delegate, this.signerPublicKey, opts.expect);
+        signature = `${toSign.hash}:${signHash(this.signerKey, toSign.hash)}`;
         attempt--;
         continue;
       }
@@ -320,6 +329,90 @@ function amountQuery(input: AmountInput): Query {
     quantity: input.quantity === undefined ? undefined : String(input.quantity),
     credits: input.credits === undefined ? undefined : String(input.credits),
   };
+}
+
+// ---------------------------------------------------------------- checking what we sign
+
+/** The one vault call a write should turn into, and the args it must carry. */
+type Expected = { method: string; args: Record<string, string | undefined> };
+
+/** What a charge, hold, refund or convert must look like on chain. The amount is checked when given in credits. */
+function write(method: string, kind: string, body: { user: string; ref: string; credits?: CreditAmount }): Expected {
+  const refId = createHash("sha256").update(`${kind}:${body.ref}`).digest("hex");
+  return { method, args: { user: body.user, ref_id: refId, amount: body.credits === undefined ? undefined : unitsOf(body.credits) } };
+}
+
+/** Credits to USDT units (1 credit = 10,000), exactly. Undefined when it isn't a plain decimal. */
+function unitsOf(credits: CreditAmount): string | undefined {
+  const m = /^(\d+)(?:\.(\d{1,4}))?$/.exec(String(credits));
+  if (!m) return undefined;
+  return (BigInt(m[1]) * 10_000n + BigInt((m[2] ?? "").padEnd(4, "0"))).toString();
+}
+
+const mismatch = (why: string) =>
+  new CreditsError(`Not signing: the transaction Kredo prepared ${why}`, 0, "signature_mismatch");
+
+/**
+ * Checks a prepared delegate action (NEP-366) before the app's key signs it: the hash is the hash
+ * of these bytes, the key is ours, and it is exactly one vault call with the method and args this
+ * request asked for. A compromised or buggy API can't get the key to sign anything else.
+ */
+function checkBeforeSigning(hash: string, delegateB64: string | undefined, publicKey: string, expected: Expected | undefined): void {
+  if (!expected) throw mismatch("isn't for a write this SDK makes");
+  if (!delegateB64) throw mismatch("came without its bytes");
+  const bytes = Buffer.from(delegateB64, "base64");
+  if (`0x${createHash("sha256").update(bytes).digest("hex")}` !== hash.toLowerCase()) throw mismatch("doesn't match its hash");
+
+  const d = decodeDelegate(bytes);
+  if (d.publicKey !== publicKey) throw mismatch("is for a different key");
+  if (d.actions.length !== 1) throw mismatch("has more than one action");
+  const call = d.actions[0];
+  if (call.method !== expected.method) throw mismatch(`calls ${call.method}, not ${expected.method}`);
+  if (call.deposit !== 0n) throw mismatch("attaches NEAR");
+  let args: Record<string, unknown>;
+  try {
+    args = JSON.parse(call.args.toString("utf8"));
+  } catch {
+    throw mismatch("has unreadable args");
+  }
+  for (const [k, want] of Object.entries(expected.args)) {
+    if (want !== undefined && String(args[k]) !== want) throw mismatch(`has ${k} ${String(args[k])}, not ${want}`);
+  }
+}
+
+/** The NEP-461 prefix on a signable delegate action: 2^30 + 366, little-endian. */
+const DELEGATE_PREFIX = 1_073_742_190;
+
+/** Decodes the borsh bytes of a signable DelegateAction, only as far as checking it needs. */
+function decodeDelegate(bytes: Buffer): { actions: { method: string; args: Buffer; deposit: bigint }[]; publicKey: string } {
+  let at = 0;
+  const need = (n: number) => {
+    if (at + n > bytes.length) throw mismatch("is cut short");
+  };
+  const u8 = () => (need(1), bytes[at++]);
+  const u32 = () => (need(4), (at += 4), bytes.readUInt32LE(at - 4));
+  const u64 = () => (need(8), (at += 8), bytes.readBigUInt64LE(at - 8));
+  const u128 = () => u64() + (u64() << 64n);
+  const raw = (n: number) => (need(n), (at += n), bytes.subarray(at - n, at));
+  const str = () => raw(u32()).toString("utf8");
+
+  if (u32() !== DELEGATE_PREFIX) throw mismatch("isn't a delegate action");
+  str(); // sender_id: the app's signer. The vault checks it.
+  str(); // receiver_id: the key itself only works on the vault.
+  const actions = [];
+  for (let i = 0, n = u32(); i < n; i++) {
+    if (u8() !== 2) throw mismatch("has an action that isn't a function call");
+    const method = str();
+    const args = raw(u32());
+    u64(); // gas
+    actions.push({ method, args, deposit: u128() });
+  }
+  u64(); // nonce
+  u64(); // max_block_height
+  if (u8() !== 0) throw mismatch("isn't signed with an ed25519 key");
+  const publicKey = `ed25519:${base58Encode(raw(32))}`;
+  if (at !== bytes.length) throw mismatch("has trailing bytes");
+  return { actions, publicKey };
 }
 
 /** Every write carries a ref, so a retry after a dropped connection can never charge twice. */

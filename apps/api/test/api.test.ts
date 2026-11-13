@@ -461,6 +461,17 @@ describe("api", () => {
     assert.deepEqual(relayedSince(since), ["charge"]);
   });
 
+  test("the real SDK, holding the app's key, checks and signs its charges through the API", async () => {
+    const { Credits } = await import("kredo");
+    const credits = new Credits({ apiKey, baseUrl: base, signerKey: signerKey.toString(), retries: 0 });
+    const op = await credits.charge({ user: alice.account, credits: 1, ref: "via-sdk" });
+    assert.equal(op.kind, "charge");
+    assert.equal(op.amount.credits, "1");
+    const hold = await credits.hold({ user: alice.account, credits: 2, ref: "via-sdk-hold" });
+    const cap = await credits.capture(hold.holdId, { credits: 1 });
+    assert.equal(cap.amount.credits, "1");
+  });
+
   test("the sweeper releases an expired hold back to the user", async () => {
     const before = (await call("GET", "/v1/me", { user: "alice" })).body.balance.units;
     const held = await company("POST", "/v1/holds", { user: alice.account, credits: 4 });
