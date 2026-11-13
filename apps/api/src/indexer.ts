@@ -1,32 +1,54 @@
 /**
- * Reads the vault's events into the database and keeps the off-chain copy honest.
+ * Turns the vault's events into the database and keeps the off-chain copy honest.
+ *
+ * Every transaction the network sends goes through the relayer, and every one comes back with
+ * its receipts' logs. The vault writes a NEP-297 event (`EVENT_JSON:{"standard":"kredo",...}`)
+ * for each balance change, so the indexer reads them straight from those outcomes: no block
+ * scanning, and nothing missed for anything the network sent.
  *
  * Every tick:
- *   - read new logs with eth_getLogs, at most `logChunk` blocks per call (Whitechain's RPC
- *     allows 1,000), and move the cursor only after a page is stored
- *   - keep hold records in step with Captured and Released events
  *   - release holds past their expiry, so reserved credits always go back to the user
  *   - deliver signed webhooks, retrying with backoff
- *   - check the backing invariant, and raise an alarm the moment it breaks
+ *   - check the backing (the vault's USDT against everything it owes), and raise an alarm the
+ *     moment it breaks
  */
 import { createHmac } from "node:crypto";
-import { parseEventLogs, type Address, type Chain, type Hex, type Log, type PublicClient, type Transport } from "viem";
-import { creditVaultAbi } from "./abi/CreditVault.js";
-import { explorerTx } from "./chain.js";
 import type { Config } from "./config.js";
 import type { ActivityEvent, Db, WebhookDelivery } from "./db.js";
-import type { Relayer } from "./relayer.js";
+import { explorerTx, type Chain, type ChainEvent } from "./near.js";
+import type { Relayer, RelayResult } from "./relayer.js";
 import type { Store } from "./store.js";
 import { amount } from "./units.js";
+import type { Vault } from "./vault.js";
 
 type Deps = {
-  config: Pick<Config, "vault" | "startBlock" | "logChunk" | "indexerIntervalMs">;
-  publicClient: PublicClient<Transport, Chain>;
+  config: Pick<Config, "explorerUrl" | "indexerIntervalMs">;
   chain: Chain;
+  vault: Vault;
   db: Db;
   store: Store;
   relayer: Relayer;
   now?: () => number;
+};
+
+/** The vault's event names, as the API and webhooks show them. */
+const EVENT_NAMES: Record<string, string> = {
+  deposited: "Deposited",
+  app_registered: "AppRegistered",
+  app_approved: "AppApproved",
+  app_revoked: "AppRevoked",
+  charged: "Charged",
+  held: "Held",
+  captured: "Captured",
+  released: "Released",
+  refunded: "Refunded",
+  sent: "Sent",
+  claim_created: "ClaimCreated",
+  claimed: "Claimed",
+  claim_cancelled: "ClaimCancelled",
+  paid_out: "PaidOut",
+  payout_failed: "PayoutFailed",
+  fees_withdrawn: "FeesWithdrawn",
 };
 
 /** Event name to webhook type. Only app events are sent to apps. */
@@ -43,8 +65,6 @@ const WEBHOOK_TYPES: Record<string, string> = {
 
 const MAX_ATTEMPTS = 6;
 const WEBHOOK_TIMEOUT_MS = 5_000;
-const HOLD_OPEN = 1;
-const HOLD_CAPTURED = 2;
 
 /** Signs a webhook body: `t=<unix seconds>,v1=<hex HMAC-SHA256 of "t.body">`. */
 export function signWebhook(secret: string, body: string, t: number): string {
@@ -52,11 +72,13 @@ export function signWebhook(secret: string, body: string, t: number): string {
   return `t=${t},v1=${v1}`;
 }
 
+const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+const units = (v: unknown) => (typeof v === "string" || typeof v === "number" ? BigInt(v) : undefined);
+
 export function createIndexer(deps: Deps) {
-  const { config, publicClient, chain, db, store, relayer } = deps;
+  const { config, chain, vault, db, store, relayer } = deps;
   const now = deps.now ?? Date.now;
   const seen = new Set(db.data.events.map((e) => e.id));
-  const blockTimes = new Map<bigint, number>();
 
   const state = {
     head: 0,
@@ -65,76 +87,58 @@ export function createIndexer(deps: Deps) {
     lastError: undefined as string | undefined,
   };
 
-  async function blockTime(n: bigint): Promise<number> {
-    let t = blockTimes.get(n);
-    if (t === undefined) {
-      t = Number((await publicClient.getBlock({ blockNumber: n })).timestamp) * 1000;
-      if (blockTimes.size > 5_000) blockTimes.clear();
-      blockTimes.set(n, t);
-    }
-    return t;
-  }
-
   /** Captured and Released don't name the user or app; the hold does. */
-  async function holdParties(holdId: Hex): Promise<{ user?: Address; app?: Address }> {
+  async function holdParties(holdId: string): Promise<{ user?: string; app?: string }> {
     const h = store.hold(holdId);
     if (h) return { user: h.user, app: h.app };
-    const onchain = await deps.publicClient.readContract({
-      address: config.vault,
-      abi: creditVaultAbi,
-      functionName: "getHold",
-      args: [holdId],
-    });
-    return { user: onchain.user, app: onchain.app };
+    const onchain = await vault.getHold(holdId);
+    return { user: onchain?.user, app: onchain?.app };
   }
 
-  async function toEvent(log: ReturnType<typeof parseEventLogs<typeof creditVaultAbi>>[number]): Promise<ActivityEvent | undefined> {
-    const base = {
-      id: `${log.transactionHash}:${log.logIndex}`,
-      event: log.eventName,
-      block: Number(log.blockNumber),
-      logIndex: log.logIndex,
-      txHash: log.transactionHash,
-      at: await blockTime(log.blockNumber),
-    };
-    switch (log.eventName) {
+  async function toEvent(e: ChainEvent, r: RelayResult): Promise<ActivityEvent | undefined> {
+    const name = EVENT_NAMES[e.event];
+    if (!name) return undefined;
+    const d = e.data;
+    const base = { id: `${r.hash}:${e.index}`, event: name, block: r.outcome.block, logIndex: e.index, txHash: r.hash, at: r.outcome.at };
+    switch (name) {
       case "Deposited":
-        return { ...base, user: log.args.user, from: log.args.payer, units: log.args.amount };
+        return { ...base, user: str(d.user), from: str(d.payer), units: units(d.amount) };
       case "AppRegistered":
-        return { ...base, app: log.args.app };
+        return { ...base, app: str(d.app) };
       case "AppApproved":
-        return { ...base, user: log.args.user, app: log.args.app, units: log.args.limit };
+        return { ...base, user: str(d.user), app: str(d.app), units: units(d.limit) };
       case "AppRevoked":
-        return { ...base, user: log.args.user, app: log.args.app };
+        return { ...base, user: str(d.user), app: str(d.app) };
       case "Charged":
-        return { ...base, user: log.args.user, app: log.args.app, units: log.args.amount, fee: log.args.fee };
+        return { ...base, user: str(d.user), app: str(d.app), units: units(d.amount), fee: units(d.fee) };
       case "Held":
-        return { ...base, user: log.args.user, app: log.args.app, units: log.args.amount, holdId: log.args.holdId };
+        return { ...base, user: str(d.user), app: str(d.app), units: units(d.amount), holdId: str(d.hold_id) };
       case "Captured":
         return {
           ...base,
-          ...(await holdParties(log.args.holdId)),
-          units: log.args.actual,
-          fee: log.args.fee,
-          returned: log.args.returned,
-          holdId: log.args.holdId,
+          ...(await holdParties(String(d.hold_id))),
+          units: units(d.actual),
+          fee: units(d.fee),
+          returned: units(d.returned),
+          holdId: str(d.hold_id),
         };
       case "Released":
-        return { ...base, ...(await holdParties(log.args.holdId)), units: log.args.amount, holdId: log.args.holdId };
+        return { ...base, ...(await holdParties(String(d.hold_id))), units: units(d.amount), holdId: str(d.hold_id) };
       case "Refunded":
-        return { ...base, user: log.args.user, app: log.args.app, units: log.args.amount };
+        return { ...base, user: str(d.user), app: str(d.app), units: units(d.amount) };
       case "Sent":
-        return { ...base, from: log.args.from, to: log.args.to, units: log.args.amount };
+        return { ...base, from: str(d.from), to: str(d.to), units: units(d.amount) };
       case "ClaimCreated":
-        return { ...base, from: log.args.from, units: log.args.amount, claimKey: log.args.claimKey };
+        return { ...base, from: str(d.from), units: units(d.amount), claimKey: str(d.claim_key) };
       case "Claimed":
-        return { ...base, to: log.args.to, units: log.args.amount, claimKey: log.args.claimKey };
+        return { ...base, to: str(d.to), units: units(d.amount), claimKey: str(d.claim_key) };
       case "ClaimCancelled":
-        return { ...base, units: log.args.amount, claimKey: log.args.claimKey };
+        return { ...base, units: units(d.amount), claimKey: str(d.claim_key) };
       case "PaidOut":
-        return { ...base, app: log.args.app, to: log.args.to, units: log.args.amount };
+      case "PayoutFailed":
+        return { ...base, app: str(d.app), to: str(d.to), units: units(d.amount) };
       case "FeesWithdrawn":
-        return { ...base, to: log.args.to, units: log.args.amount };
+        return { ...base, to: str(d.to), units: units(d.amount) };
       default:
         return undefined;
     }
@@ -151,37 +155,37 @@ export function createIndexer(deps: Deps) {
     const type = WEBHOOK_TYPES[e.event];
     const app = e.app ? store.appById(e.app) : undefined;
     if (!type || !app?.webhookUrl || !app.webhookSecret) return;
-    const body = JSON.stringify({ id: e.id, type, createdAt: new Date(e.at).toISOString(), data: present(e) });
-    db.data.deliveries.push({ id: e.id, app: app.id, type, body, status: "pending", attempts: 0, nextAt: now() });
+    // The body is written at the first delivery, once the route has recorded the app's ref.
+    db.data.deliveries.push({ id: e.id, app: app.id, type, body: "", status: "pending", attempts: 0, nextAt: now() });
   }
 
-  /** Reads new logs, page by page. Returns how many events were stored. */
-  async function scan(): Promise<number> {
-    // No cache: viem otherwise reuses the block number for a few seconds.
-    const head = Number(await publicClient.getBlockNumber({ cacheTime: 0 }));
-    state.head = head;
-    let from = (db.data.cursor ?? config.startBlock - 1) + 1;
+  /** Stores the vault events of one relayed transaction. Returns how many were new. */
+  async function ingest(r: RelayResult): Promise<number> {
     let added = 0;
-    while (from <= head) {
-      const to = Math.min(from + config.logChunk - 1, head);
-      const logs: Log[] = await publicClient.getLogs({ address: config.vault, fromBlock: BigInt(from), toBlock: BigInt(to) });
-      for (const log of parseEventLogs({ abi: creditVaultAbi, logs })) {
-        const id = `${log.transactionHash}:${log.logIndex}`;
-        if (seen.has(id)) continue;
-        const e = await toEvent(log);
-        if (!e) continue;
-        seen.add(id);
-        db.data.events.push(e);
-        apply(e);
-        queueWebhook(e);
-        added++;
-      }
-      db.data.cursor = to;
-      db.save();
-      from = to + 1;
+    for (const ev of r.events) {
+      const e = await toEvent(ev, r);
+      if (!e || seen.has(e.id)) continue;
+      seen.add(e.id);
+      db.data.events.push(e);
+      apply(e);
+      queueWebhook(e);
+      added++;
     }
+    if (r.outcome.block > (db.data.cursor ?? 0)) db.data.cursor = r.outcome.block;
+    if (added) db.save();
     return added;
   }
+
+  // Events land as soon as the relayer has the outcome, before the route answers.
+  const inflight = new Set<Promise<unknown>>();
+  relayer.onResult((r) => {
+    const p = ingest(r).catch((err) => console.warn(`[indexer] ${(err as Error).message}`));
+    inflight.add(p);
+    void p.finally(() => inflight.delete(p));
+  });
+
+  /** Waits for every outcome handed over so far to be stored. */
+  const settled = () => Promise.all([...inflight]);
 
   /** Releases holds past their expiry. Release is an exit, so it goes out even when the budget is spent. */
   async function sweep(): Promise<number> {
@@ -189,18 +193,13 @@ export function createIndexer(deps: Deps) {
     let released = 0;
     for (const h of store.openHolds()) {
       if (h.expiry > nowSec) continue;
-      const onchain = await publicClient.readContract({
-        address: config.vault,
-        abi: creditVaultAbi,
-        functionName: "getHold",
-        args: [h.holdId],
-      });
-      if (onchain.status !== HOLD_OPEN) {
-        store.setHoldStatus(h.holdId, onchain.status === HOLD_CAPTURED ? "captured" : "released");
+      const onchain = await vault.getHold(h.holdId);
+      if (!onchain || onchain.status !== "Open") {
+        store.setHoldStatus(h.holdId, onchain?.status === "Captured" ? "captured" : "released");
         continue;
       }
       try {
-        await relayer.write({ address: config.vault, abi: creditVaultAbi, functionName: "release", args: [h.holdId] }, { app: h.app });
+        await relayer.write({ method: "release", args: { hold_id: h.holdId } }, { app: h.app });
         store.setHoldStatus(h.holdId, "released");
         released++;
       } catch (err) {
@@ -216,6 +215,10 @@ export function createIndexer(deps: Deps) {
       d.status = "failed";
       d.lastError = "webhook removed";
       return;
+    }
+    if (!d.body) {
+      const e = db.data.events.find((x) => x.id === d.id);
+      d.body = JSON.stringify({ id: d.id, type: d.type, createdAt: new Date(e?.at ?? now()).toISOString(), data: e ? present(e) : {} });
     }
     d.attempts++;
     try {
@@ -255,16 +258,15 @@ export function createIndexer(deps: Deps) {
     return due.length;
   }
 
+  /** The vault's USDT must cover everything it owes. */
   async function checkBacking() {
-    const [backed, held, owed] = await publicClient.readContract({
-      address: config.vault,
-      abi: creditVaultAbi,
-      functionName: "checkBacking",
-    });
-    if (!backed && state.backed) console.error(`[backing] ALARM: vault holds ${held} USDT units but owes ${owed}`);
+    const [totals, held] = await Promise.all([vault.totals(), vault.usdtBalanceOf(vault.id)]);
+    const backed = held >= totals.liabilities;
+    if (!backed && state.backed) console.error(`[backing] ALARM: vault holds ${held} USDT units but owes ${totals.liabilities}`);
     if (backed && !state.backed) console.log("[backing] restored");
     state.backed = backed;
     state.lastBackingCheck = now();
+    return { backed, held, owed: totals.liabilities, totals };
   }
 
   let running: Promise<unknown> | undefined;
@@ -274,7 +276,7 @@ export function createIndexer(deps: Deps) {
   function tick() {
     running ??= (async () => {
       try {
-        await scan();
+        state.head = (await chain.head()).height;
         await sweep();
         await deliverDue();
         await checkBacking();
@@ -304,21 +306,23 @@ export function createIndexer(deps: Deps) {
       amount: e.units === undefined ? undefined : amount(e.units),
       fee: e.fee === undefined ? undefined : amount(e.fee),
       returned: e.returned === undefined ? undefined : amount(e.returned),
-      ref: op && op.app.toLowerCase() === e.app?.toLowerCase() ? op.ref : undefined,
+      ref: op && op.app === e.app ? op.ref : undefined,
       label: op?.label,
       holdId: e.holdId,
       claimKey: e.claimKey,
       block: e.block,
       txHash: e.txHash,
-      explorer: explorerTx(chain, e.txHash),
+      explorer: explorerTx(config.explorerUrl, e.txHash),
     };
   }
 
   return {
     tick,
-    scan,
+    ingest,
+    settled,
     sweep,
     deliverDue,
+    checkBacking,
     present,
 
     start() {
@@ -333,11 +337,10 @@ export function createIndexer(deps: Deps) {
     },
 
     status() {
-      const cursor = db.data.cursor ?? config.startBlock - 1;
       return {
-        block: cursor,
+        /** Height of the newest block with events we stored. */
+        block: db.data.cursor ?? 0,
         head: state.head,
-        lag: Math.max(0, state.head - cursor),
         backed: state.backed,
         lastBackingCheck: state.lastBackingCheck ? new Date(state.lastBackingCheck).toISOString() : null,
         events: db.data.events.length,

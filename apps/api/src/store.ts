@@ -1,7 +1,6 @@
 /** Typed accessors over the JSON database. */
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { getAddress, type Address, type Hex } from "viem";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import type { AccountId } from "./near.js";
 import type { ActivityEvent, ApiKeyRecord, AppRecord, ClaimRecord, CompanyRecord, Db, HoldRecord, OpRecord, UserRecord, WebhookDelivery } from "./db.js";
 import type { PriceList } from "./pricing.js";
 import type { AppProfileInput, CompanyInput } from "./profile.js";
@@ -11,8 +10,8 @@ export type { ActivityEvent, ApiKeyRecord, AppRecord, ClaimRecord, CompanyRecord
 const API_KEY_PREFIX = "uc_live_";
 const TEST_KEY_PREFIX = "uc_test_";
 
-export function sha256(value: string): Hex {
-  return `0x${createHash("sha256").update(value).digest("hex")}`;
+export function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 export const hashApiKey = sha256;
@@ -58,12 +57,12 @@ export function createStore(db: Db) {
     // ---------------------------------------------------------------- apps
 
     /** Creates an app record with a first live key. Returns the key once; only its hash is stored. */
-    createApp(input: { name: string; payout: Address; feeBps: number; owner?: string; companyId?: string; profile?: AppProfileInput }): { app: AppRecord; apiKey: string } {
+    createApp(input: { name: string; payout: AccountId; feeBps: number; owner?: string; companyId?: string; profile?: AppProfileInput }): { app: AppRecord; apiKey: string } {
       const app: AppRecord = {
-        // A fresh address that only identifies the app onchain. Its key is thrown away.
-        id: privateKeyToAccount(generatePrivateKey()).address,
+        // Only identifies the app in the vault: letters, digits and dashes, at most 64.
+        id: `app-${randomBytes(8).toString("hex")}`,
         name: input.name,
-        payout: getAddress(input.payout),
+        payout: input.payout,
         feeBps: input.feeBps,
         prices: {},
         owner: input.owner,
@@ -79,7 +78,7 @@ export function createStore(db: Db) {
       return { app, apiKey: key };
     },
 
-    removeApp(id: Address) {
+    removeApp(id: string) {
       data.apps = data.apps.filter((a) => !same(a.id, id));
       data.apiKeys = data.apiKeys.filter((k) => !same(k.appId, id));
       db.save();
@@ -203,10 +202,10 @@ export function createStore(db: Db) {
     },
 
     /** An earlier op with this app's own ref, so a retried request returns the first result. */
-    opByRef: (app: Address, kind: OpRecord["kind"], ref: string) =>
+    opByRef: (app: string, kind: OpRecord["kind"], ref: string) =>
       data.ops.find((o) => same(o.app, app) && o.kind === kind && o.ref === ref),
 
-    opsForApp: (app: Address) => data.ops.filter((o) => same(o.app, app)),
+    opsForApp: (app: string) => data.ops.filter((o) => same(o.app, app)),
 
     /** The op a transaction belongs to, so events can carry the app's own ref. */
     opByTx: (txHash: string) => data.ops.find((o) => o.txHash.toLowerCase() === txHash.toLowerCase()),
@@ -233,10 +232,10 @@ export function createStore(db: Db) {
     // ---------------------------------------------------------------- users
 
     /** Records a Privy user the first time we see them, and keeps their email current. */
-    upsertUser(input: { privyId: string; address: Address; email?: string }): UserRecord {
+    upsertUser(input: { privyId: string; address: AccountId; email?: string }): UserRecord {
       let u = data.users.find((x) => x.privyId === input.privyId);
       if (!u) {
-        u = { privyId: input.privyId, address: getAddress(input.address), email: input.email, createdAt: Date.now() };
+        u = { privyId: input.privyId, address: input.address, email: input.email, createdAt: Date.now() };
         data.users.push(u);
         db.save();
       } else if (input.email && u.email !== input.email) {
@@ -269,7 +268,7 @@ export function createStore(db: Db) {
 
     claim: (claimKey: string) => data.claims.find((c) => same(c.claimKey, claimKey)),
 
-    claimsFrom: (from: Address) => data.claims.filter((c) => same(c.from, from)),
+    claimsFrom: (from: AccountId) => data.claims.filter((c) => same(c.from, from)),
 
     setClaimStatus(claimKey: string, status: ClaimRecord["status"]) {
       const c = data.claims.find((x) => same(x.claimKey, claimKey));

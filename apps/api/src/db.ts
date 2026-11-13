@@ -19,7 +19,7 @@ import type { PgColumn, PgDatabase, PgQueryResultHKT, PgTable } from "drizzle-or
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import pg from "pg";
-import type { Address, Hash, Hex } from "viem";
+import type { AccountId, TxHash } from "./near.js";
 import type { PriceList } from "./pricing.js";
 import * as schema from "./schema.js";
 
@@ -37,8 +37,8 @@ export type CompanyRecord = {
 };
 
 export type AppRecord = {
-  /** The app's id address onchain. Only an identifier: nobody holds its key. */
-  id: Address;
+  /** The app's id in the vault, such as "app-3f9c2a1b". Only an identifier: nobody holds a key for it. */
+  id: string;
   name: string;
   companyId?: string;
   /** Profile. Logo, website and category fall back to the company's. */
@@ -46,7 +46,7 @@ export type AppRecord = {
   logoUrl?: string;
   website?: string;
   category?: string;
-  payout: Address;
+  payout: AccountId;
   feeBps: number;
   /** Deep mode: what each action costs, in credits. */
   prices: PriceList;
@@ -63,11 +63,11 @@ export type AppRecord = {
 /** One API key. Live keys move real credits; test keys work against fake credits only. */
 export type ApiKeyRecord = {
   id: string;
-  appId: Address;
+  appId: string;
   mode: "live" | "test";
   name: string;
   /** sha256 of the key. The key itself is shown once, at creation. */
-  hash: Hex;
+  hash: string;
   /** First characters of the key, so the dashboard can show which key is which. */
   prefix: string;
   createdAt: number;
@@ -77,23 +77,24 @@ export type ApiKeyRecord = {
 
 /** Every credit-moving action the API performed for an app. Feeds idempotency, CSV and gas. */
 export type OpRecord = {
-  app: Address;
+  app: string;
   kind: "charge" | "hold" | "capture" | "release" | "refund" | "payout" | "convert";
   /** The app's own reference, as it sent it. Unique per app and kind. */
   ref?: string;
-  user?: Address;
+  user?: AccountId;
   units: bigint;
   fee?: bigint;
   label?: string;
-  holdId?: Hex;
-  txHash: Hash;
+  holdId?: string;
+  txHash: TxHash;
   at: number;
 };
 
 /** A user, as first seen through Privy. Balances live onchain. */
 export type UserRecord = {
   privyId: string;
-  address: Address;
+  /** The user's NEAR account: the implicit account of their Privy NEAR wallet. */
+  address: AccountId;
   email?: string;
   createdAt: number;
   /** When this user took test USDT from the faucet. Once per account. */
@@ -102,68 +103,70 @@ export type UserRecord = {
 
 /** Claim links a user created, so the wallet can list and cancel them. */
 export type ClaimRecord = {
-  claimKey: Address;
-  from: Address;
+  /** The link's ed25519 public key, "ed25519:...". */
+  claimKey: string;
+  from: AccountId;
   units: bigint;
   expiry: number;
   status: "open" | "claimed" | "cancelled";
-  txHash: Hash;
+  txHash: TxHash;
   createdAt: number;
 };
 
 export type HoldRecord = {
-  holdId: Hex;
-  app: Address;
-  user: Address;
+  holdId: string;
+  app: string;
+  user: AccountId;
   units: bigint;
-  ref: Hex;
+  ref: string;
   label: string;
   expiry: number;
   status: "open" | "captured" | "released";
-  txHash: Hash;
+  txHash: TxHash;
 };
 
-/** What the relayer paid for one transaction, in wei of the gas token. */
+/** What the relayer paid for one transaction, in yoctoNEAR. */
 export type RelayerTx = {
-  hash?: Hash;
+  hash?: TxHash;
   fn: string;
   /** The app this transaction was for, when there is one. */
-  app?: Address;
+  app?: string;
   status: "pending" | "success" | "reverted" | "failed";
+  /** Gas units burnt across every receipt. */
   gasUsed: bigint;
-  l2Fee: bigint;
-  l1Fee: bigint;
+  /** NEAR burnt for that gas, in yoctoNEAR. */
+  fee: bigint;
   error?: string;
   at: number;
 };
 
 /** One decoded vault event. Read models (activity, stats, webhooks) are built from these. */
 export type ActivityEvent = {
-  /** txHash:logIndex, unique per event. */
+  /** txHash:index of the event in that transaction, unique per event. */
   id: string;
   event: string;
   block: number;
   logIndex: number;
-  txHash: Hash;
+  txHash: TxHash;
   /** Block time, ms. */
   at: number;
-  user?: Address;
-  app?: Address;
-  from?: Address;
-  to?: Address;
+  user?: AccountId;
+  app?: string;
+  from?: AccountId;
+  to?: AccountId;
   units?: bigint;
   fee?: bigint;
   /** Credits a partial capture handed back. */
   returned?: bigint;
-  holdId?: Hex;
-  claimKey?: Address;
+  holdId?: string;
+  claimKey?: string;
 };
 
 /** A webhook waiting to be delivered, or already delivered. Retried with backoff. */
 export type WebhookDelivery = {
   /** eventId, so each event is delivered to its app once. */
   id: string;
-  app: Address;
+  app: string;
   type: string;
   body: string;
   status: "pending" | "delivered" | "failed";
@@ -174,8 +177,8 @@ export type WebhookDelivery = {
 };
 
 export type Data = {
-  /** Hash of block 0. A local chain restarts with a new genesis, which makes the data stale. */
-  genesis?: Hash;
+  /** The network and vault this data belongs to, such as "testnet:vault.kredo-network.testnet". */
+  genesis?: string;
   companies: CompanyRecord[];
   apps: AppRecord[];
   apiKeys: ApiKeyRecord[];
@@ -185,7 +188,7 @@ export type Data = {
   claims: ClaimRecord[];
   txs: RelayerTx[];
   events: ActivityEvent[];
-  /** Last block the indexer has fully read. */
+  /** Height of the last block whose events were stored. */
   cursor?: number;
   deliveries: WebhookDelivery[];
 };
@@ -209,8 +212,6 @@ export type DbOptions = {
   url?: string;
   /** Folder for the embedded Postgres. Without one (and no url), data is kept in memory. */
   dir?: string;
-  /** An older JSON data file, imported once into an empty database. */
-  legacyFile?: string;
   debounceMs?: number;
 };
 
@@ -388,7 +389,7 @@ export async function openDb(opts: DbOptions = {}): Promise<Db> {
     written.set(c, snapshot(c));
   }
   for (const { key, value } of await orm.select().from(schema.meta)) {
-    if (key === "genesis") data.genesis = value as Hash;
+    if (key === "genesis") data.genesis = value;
     if (key === "cursor") data.cursor = Number(value);
   }
   writtenMeta = metaNow();
@@ -471,43 +472,19 @@ export async function openDb(opts: DbOptions = {}): Promise<Db> {
     },
   };
 
-  // First start on an older JSON file: bring its data over once.
-  const blank = COLLECTIONS.every((c) => data[c].length === 0) && data.cursor === undefined;
-  if (blank && opts.legacyFile && existsSync(opts.legacyFile)) {
-    const old = JSON.parse(readFileSync(opts.legacyFile, "utf8"), reviver) as Partial<Data>;
-    Object.assign(data, empty(), old);
-    // Older files kept one live and one test key on each app.
-    for (const app of data.apps as (AppRecord & { apiKeyHash?: Hex; apiKeyPrefix?: string; testKeyHash?: Hex; testKeyPrefix?: string })[]) {
-      const at = app.createdAt;
-      if (app.apiKeyHash) data.apiKeys.push({ id: randomUUID(), appId: app.id, mode: "live", name: "Default", hash: app.apiKeyHash, prefix: app.apiKeyPrefix ?? "", createdAt: at });
-      if (app.testKeyHash) data.apiKeys.push({ id: randomUUID(), appId: app.id, mode: "test", name: "Test", hash: app.testKeyHash, prefix: app.testKeyPrefix ?? "", createdAt: at });
-      delete app.apiKeyHash;
-      delete app.apiKeyPrefix;
-      delete app.testKeyHash;
-      delete app.testKeyPrefix;
-    }
-    await db.flush();
-    console.log(`[db] imported ${opts.legacyFile}`);
-  }
-
   return db;
 }
 
-/** The older JSON file for a chain and vault, imported on first start. */
-export function dbFileFor(dataDir: string, chainId: number, vault: Address): string {
-  return join(dataDir, `db-${chainId}-${vault.slice(2, 10).toLowerCase()}.json`);
+/** The embedded Postgres folder for a network and vault, so a new vault starts clean. */
+export function pgDirFor(dataDir: string, network: string, vault: AccountId): string {
+  return join(dataDir, `pg-${network}-${vault.replace(/[^a-z0-9]+/g, "-")}`);
 }
 
-/** The embedded Postgres folder for a chain and vault, so a fresh local deploy starts clean. */
-export function pgDirFor(dataDir: string, chainId: number, vault: Address): string {
-  return join(dataDir, `pg-${chainId}-${vault.slice(2, 10).toLowerCase()}`);
-}
-
-/** Clears data that belongs to an earlier local chain with a different genesis block. */
-export async function bindToGenesis(db: Db, genesis: Hash): Promise<boolean> {
-  const stale = db.data.genesis !== undefined && db.data.genesis !== genesis;
+/** Clears data that belongs to another network or vault. */
+export async function bindToVault(db: Db, key: string): Promise<boolean> {
+  const stale = db.data.genesis !== undefined && db.data.genesis !== key;
   if (stale) await db.reset();
-  db.data.genesis = genesis;
+  db.data.genesis = key;
   await db.flush();
   return stale;
 }

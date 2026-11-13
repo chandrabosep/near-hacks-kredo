@@ -4,21 +4,21 @@
  * response. Requests with a live key skip this router entirely.
  */
 import { Router, type RequestHandler } from "express";
-import { getAddress, isAddress, type Address } from "viem";
 import { z } from "zod";
 import type { Context } from "../context.js";
 import { HttpError, appOf } from "../http.js";
 import { amountInputSchema, resolveAmount } from "../pricing.js";
 import { createSandbox } from "../sandbox.js";
 import { amount, creditsToUnits } from "../units.js";
-import { addressSchema, creditsSchema, newRef, onchainRef, refSchema } from "./shared.js";
+import { isAccountId } from "../near.js";
+import { accountIdSchema, creditsSchema, newRef, onchainRef, refSchema } from "./shared.js";
 
 const TEST_PREFIX = "uc_test_";
 
-const chargeSchema = z.intersection(amountInputSchema, z.object({ user: addressSchema, ref: refSchema.optional() }));
+const chargeSchema = z.intersection(amountInputSchema, z.object({ user: accountIdSchema, ref: refSchema.optional() }));
 const holdSchema = z.intersection(
   amountInputSchema,
-  z.object({ user: addressSchema, ref: refSchema.optional(), ttlSeconds: z.number().int().min(60).optional() }),
+  z.object({ user: accountIdSchema, ref: refSchema.optional(), ttlSeconds: z.number().int().min(60).optional() }),
 );
 
 export function testRoutes(ctx: Context): Router {
@@ -42,7 +42,7 @@ export function testRoutes(ctx: Context): Router {
   const at = () => new Date().toISOString();
   const op = (kind: string, fields: Record<string, unknown>, hash: string) => ({ kind, ...fields, at: at(), txHash: hash, test: true });
 
-  function once<T>(app: Address, kind: string, ref: string, run: () => T): T | (T & { replayed: true }) {
+  function once<T>(app: string, kind: string, ref: string, run: () => T): T | (T & { replayed: true }) {
     const k = `${app}:${kind}:${ref}`;
     if (results.has(k)) return { ...(results.get(k) as T), replayed: true };
     const value = run();
@@ -72,8 +72,8 @@ export function testRoutes(ctx: Context): Router {
     res.json({ label, price: amount(units), networkFee: amount(fee), youEarn: amount(units - fee), test: true });
   });
 
-  r.get("/users/:address", (req, res) => {
-    const user = addressSchema.parse(req.params.address);
+  r.get("/users/:account", (req, res) => {
+    const user = accountIdSchema.parse(req.params.account);
     const { balance, limit } = sandbox.user(appOf(res).id, user);
     res.json({
       user,
@@ -86,12 +86,11 @@ export function testRoutes(ctx: Context): Router {
     });
   });
 
-  /** In test mode any `cc_test_<address>` code connects that address, with no hosted page. */
+  /** In test mode any `cc_test_<account>` code connects that NEAR account, with no hosted page. */
   r.post("/connect/exchange", (req, res) => {
     const code = String(req.body?.code ?? "");
-    const address = code.startsWith("cc_test_") ? code.slice(8) : "";
-    if (!isAddress(address)) throw new HttpError(400, "In test mode, use the code cc_test_<address>", "bad_code");
-    const user = getAddress(address);
+    const user = code.startsWith("cc_test_") ? code.slice(8).toLowerCase() : "";
+    if (!isAccountId(user)) throw new HttpError(400, "In test mode, use the code cc_test_<account>, like cc_test_alice.testnet", "bad_code");
     res.json({ user, email: null, limit: amount(sandbox.user(appOf(res).id, user).limit), test: true });
   });
 
@@ -155,7 +154,7 @@ export function testRoutes(ctx: Context): Router {
 
   r.post("/refunds", (req, res) => {
     const app = appOf(res);
-    const body = z.object({ user: addressSchema, credits: creditsSchema, ref: refSchema.optional() }).parse(req.body);
+    const body = z.object({ user: accountIdSchema, credits: creditsSchema, ref: refSchema.optional() }).parse(req.body);
     const ref = body.ref ?? newRef();
     const result = once(app.id, "refund", ref, () => {
       const units = creditsToUnits(body.credits);

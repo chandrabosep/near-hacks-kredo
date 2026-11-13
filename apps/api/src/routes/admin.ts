@@ -4,16 +4,16 @@
  */
 import { Router } from "express";
 import { z } from "zod";
-import { creditVaultAbi } from "../abi/CreditVault.js";
 import type { Context } from "../context.js";
 import { HttpError, requireAdmin } from "../http.js";
 import { registerApp } from "../register.js";
 import { amount, creditsToUnits } from "../units.js";
-import { addressSchema, creditsSchema, txInfo } from "./shared.js";
+import { accountIdSchema, appIdSchema, creditsSchema, txInfo } from "./shared.js";
+import { formatNear } from "../near.js";
 
 const createAppSchema = z.object({
   name: z.string().trim().min(2).max(60),
-  payout: addressSchema,
+  payout: accountIdSchema,
   feeBps: z.number().int().min(0).max(2_000).optional(),
   /** Largest single charge or hold, in credits. Omit for no cap. */
   maxCharge: creditsSchema.optional(),
@@ -48,10 +48,10 @@ export function adminRoutes(ctx: Context): Router {
    * still work onchain.
    */
   r.delete("/apps/:id", async (req, res) => {
-    const id = addressSchema.parse(req.params.id);
+    const id = appIdSchema.parse(req.params.id);
     const app = store.appById(id);
     if (!app) throw new HttpError(404, "No app with that id", "unknown_app");
-    const { hash } = await relayer.write({ address: config.vault, abi: creditVaultAbi, functionName: "setAppActive", args: [app.id, false] }, { app: app.id });
+    const { hash } = await relayer.write({ method: "set_app_active", args: { app: app.id, active: false } }, { app: app.id });
     store.removeApp(app.id);
     res.json({ id: app.id, name: app.name, removed: true, ...txInfo(ctx, hash) });
   });
@@ -69,25 +69,25 @@ export function adminRoutes(ctx: Context): Router {
     );
   });
 
-  /** The relayer's gas position: balance, spend today and transaction count. */
+  /** The relayer's gas position in NEAR: balance, spend today and transaction count. */
   r.get("/ops", async (_req, res) => {
     const { balance, today, limits, budgetLeft, exitsOnly } = await relayer.status();
     const all = relayer.spent();
     res.json({
       relayer: relayer.operator,
-      balanceWei: balance.toString(),
-      last24h: { transactions: today.count, wei: today.wei.toString() },
-      allTime: { transactions: all.count, wei: all.wei.toString() },
-      daysOfRunway: today.wei === 0n ? null : Number(balance / today.wei),
+      balanceYocto: balance.toString(),
+      balance: formatNear(balance),
+      last24h: { transactions: today.count, yocto: today.yocto.toString() },
+      allTime: { transactions: all.count, yocto: all.yocto.toString() },
+      daysOfRunway: today.yocto === 0n ? null : Number(balance / today.yocto),
       exitsOnly,
       indexer: ctx.indexer.status(),
       limits: limits && {
-        dailyBudgetWei: limits.dailyBudget.toString(),
-        budgetLeftWei: budgetLeft?.toString(),
-        appDailyBudgetWei: limits.appDailyBudget.toString(),
-        minBalanceWei: limits.minBalance.toString(),
+        dailyBudgetYocto: limits.dailyBudget.toString(),
+        budgetLeftYocto: budgetLeft?.toString(),
+        appDailyBudgetYocto: limits.appDailyBudget.toString(),
+        minBalanceYocto: limits.minBalance.toString(),
         maxTxGas: limits.maxTxGas.toString(),
-        maxGasPriceWei: limits.maxGasPrice.toString(),
       },
     });
   });

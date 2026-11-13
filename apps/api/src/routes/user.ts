@@ -2,45 +2,35 @@
  * Routes our hosted pages call for a logged-in user (Privy identity token).
  *
  * Every credit-moving action takes two calls:
- *   POST /v1/me/sign/:action    -> an EIP-712 message with a fresh nonce and deadline
- *   POST /v1/me/submit/:action  -> { message, signature }, relayed onchain
- * The user signs with their Privy wallet in the browser. The signer is always the logged-in
- * user, and the contract checks every field, so the relayer can't change anything.
+ *   POST /v1/me/sign/:action    -> the hash of a NEAR delegate action (NEP-366) for the user's account
+ *   POST /v1/me/submit/:action  -> { hash, signature }, relayed onchain
+ * The user signs with their Privy NEAR wallet in the browser. The vault sees the user as the
+ * caller, and the relayer only pays the gas: it can't change what was signed.
  */
 import { Router } from "express";
-import { getAddress, isHex, parseSignature, type Address, type Hex } from "viem";
 import { z } from "zod";
-import { creditVaultAbi } from "../abi/CreditVault.js";
-import { usdtAbi, type Context } from "../context.js";
+import type { Context } from "../context.js";
 import { HttpError, perIp, requireUser, userOf } from "../http.js";
-import { deadlineIn, newNonce, permitTypes, signRequest, usdtDomain, vaultDomain } from "../typedData.js";
+import { MetaError, type UserCall } from "../meta.js";
+import { ONE_YOCTO, TGAS, toPublicKey, type AccountId } from "../near.js";
+import { RelayerError } from "../relayer.js";
+import type { UserRecord } from "../store.js";
 import { amount, creditsToUnits } from "../units.js";
-import { activityFor, addressSchema, creditsSchema, involves, txInfo } from "./shared.js";
+import { accountIdSchema, activityFor, appIdSchema, claimKeySchema, creditsSchema, involves, txInfo } from "./shared.js";
 
-const uint = z.string().regex(/^\d+$/, "must be a whole number");
-const bytes32 = z.string().refine((v) => isHex(v) && v.length === 66, "must be 32 bytes");
-const signature = z.string().refine((v) => isHex(v) && v.length >= 130, "must be a signature");
+const hex = (bytes: number) => z.string().regex(new RegExp(`^(0x)?[0-9a-fA-F]{${bytes * 2}}$`), `must be ${bytes} bytes of hex`);
 const DAY = 86_400;
 
 export function userRoutes(ctx: Context): Router {
   const r = Router();
-  const { store, relayer, config } = ctx;
-  const domain = vaultDomain(config.chainId, config.vault);
-  const v = config.vault;
+  const { store, relayer, config, vault, meta, chain } = ctx;
 
   // Only these paths need a Privy login. Everything else falls through to the next router.
   r.use(["/me", "/claims/:claimKey/redeem"], requireUser(ctx.verifier, store, config.signupsPerIpPerHour));
 
   const me = (res: Parameters<typeof userOf>[0]) => userOf(res).address;
 
-  function requireSigner(message: { user?: string; from?: string; owner?: string }, address: Address) {
-    const signer = message.user ?? message.from ?? message.owner;
-    if (!signer || getAddress(signer) !== address) {
-      throw new HttpError(403, "That message is for a different account", "wrong_signer");
-    }
-  }
-
-  async function resolveRecipient(to: string): Promise<Address> {
+  async function resolveRecipient(to: string): Promise<AccountId> {
     if (to.includes("@")) {
       const u = store.userByEmail(to);
       if (!u) {
@@ -48,8 +38,32 @@ export function userRoutes(ctx: Context): Router {
       }
       return u.address;
     }
-    return addressSchema.parse(to);
+    return accountIdSchema.parse(to);
   }
+
+  /**
+   * A new user's implicit account doesn't exist onchain until it receives NEAR. The relayer sends
+   * a little, so the account can sign, and registers it with the USDT token so it can hold USDT.
+   */
+  async function ensureAccount(user: { address: AccountId; publicKey: string }) {
+    const nonce = await chain.accessKeyNonce(user.address, toPublicKey(user.publicKey));
+    if (nonce === undefined) {
+      await relayer.send(user.address, [{ kind: "transfer", amount: config.userAccountYocto }], { fn: "activate_account" });
+    }
+    if (!(await vault.usdtRegistered(user.address))) {
+      await relayer.write({
+        receiver: config.usdt,
+        method: "storage_deposit",
+        args: { account_id: user.address, registration_only: true },
+        deposit: await vault.usdtStorageCost(),
+      });
+    }
+  }
+
+  const limitView = (limit: { remaining: bigint; expiry: number }) => {
+    const expired = limit.expiry !== 0 && limit.expiry <= Math.floor(Date.now() / 1000);
+    return { remaining: expired ? 0n : limit.remaining, expired, expiresAt: limit.expiry === 0 ? null : new Date(limit.expiry * 1000).toISOString() };
+  };
 
   // ---------------------------------------------------------------- profile
 
@@ -57,26 +71,19 @@ export function userRoutes(ctx: Context): Router {
     const u = userOf(res);
     const apps = store.listApps();
     const [balance, wallet, limits] = await Promise.all([
-      ctx.vault.read.balanceOf([u.address]),
-      ctx.usdt.read.balanceOf([u.address]),
-      Promise.all(apps.map((a) => ctx.vault.read.limitOf([u.address, a.id]))),
+      vault.balanceOf(u.address),
+      vault.usdtBalanceOf(u.address),
+      Promise.all(apps.map((a) => vault.limitOf(u.address, a.id))),
     ]);
-    const now = Math.floor(Date.now() / 1000);
     const connections = apps
       .map((a, i) => ({ app: a, limit: limits[i] }))
       .filter(({ limit }) => limit.version > 0)
       .map(({ app, limit }) => {
-        const expired = limit.expiry !== 0n && Number(limit.expiry) <= now;
-        return {
-          app: app.id,
-          name: app.name,
-          connected: !expired && limit.remaining > 0n,
-          limit: amount(expired ? 0n : limit.remaining),
-          expiresAt: limit.expiry === 0n ? null : new Date(Number(limit.expiry) * 1000).toISOString(),
-        };
+        const l = limitView(limit);
+        return { app: app.id, name: app.name, connected: !l.expired && l.remaining > 0n, limit: amount(l.remaining), expiresAt: l.expiresAt };
       });
     res.json({
-      address: u.address,
+      account: u.address,
       email: u.email ?? null,
       balance: amount(balance),
       walletUsdt: amount(wallet),
@@ -108,7 +115,7 @@ export function userRoutes(ctx: Context): Router {
   const faucetLimit = config.faucet ? perIp(config.faucet.perIpPerHour, 3_600_000, "Too many test USDT requests from this network.") : undefined;
 
   /**
-   * Test USDT from the operator wallet, so anyone can try the network without the booth.
+   * Test USDT from the relayer's account, so anyone can try the network without hunting for a faucet.
    * Once per account, only while their wallet is nearly empty, under per-IP and daily caps.
    */
   r.post("/me/faucet", (req, res, next) => (faucetLimit ? faucetLimit(req, res, next) : next()), async (_req, res) => {
@@ -116,19 +123,25 @@ export function userRoutes(ctx: Context): Router {
     if (!f) throw new HttpError(404, "The test USDT faucet is off", "faucet_off");
     const u = userOf(res);
     if (u.record.faucetAt !== undefined) throw new HttpError(409, "You've already had test USDT on this account", "faucet_claimed");
-    const wallet = await ctx.usdt.read.balanceOf([u.address]);
+    const wallet = await vault.usdtBalanceOf(u.address);
     if (wallet >= f.units) throw new HttpError(409, "Your wallet already holds test USDT", "faucet_not_needed");
     if (claimsToday() >= f.dailyLimit) throw new HttpError(503, "Today's test USDT is all handed out. Try again tomorrow.", "faucet_daily_limit");
-    const left = await ctx.usdt.read.balanceOf([ctx.relayer.operator]);
+    const left = await vault.usdtBalanceOf(relayer.operator);
     if (left < f.units) throw new HttpError(503, "The faucet is out of test USDT", "faucet_empty");
 
     // Mark first, so a double click can't send twice. Undo if the transfer fails.
-    store.setFaucetAt(u.record, Date.now());
+    store.setFaucetAt(u.record as UserRecord, Date.now());
     try {
-      const { hash } = await ctx.relayer.write({ address: config.usdt, abi: usdtAbi, functionName: "transfer", args: [u.address, f.units] });
+      await ensureAccount(u);
+      const { hash } = await relayer.write({
+        receiver: config.usdt,
+        method: "ft_transfer",
+        args: { receiver_id: u.address, amount: f.units.toString(), memo: "Kredo test USDT" },
+        deposit: ONE_YOCTO,
+      });
       res.json({ usdt: f.usdt, ...txInfo(ctx, hash) });
     } catch (err) {
-      store.setFaucetAt(u.record, undefined);
+      store.setFaucetAt(u.record as UserRecord, undefined);
       throw err;
     }
   });
@@ -140,246 +153,183 @@ export function userRoutes(ctx: Context): Router {
 
   /** Already connected: a fresh code to hand back to the app, with no new signature. */
   r.post("/me/connect-code", async (req, res) => {
-    const app = addressSchema.parse(req.body?.app);
+    const app = appIdSchema.parse(req.body?.app);
     if (!store.appById(app)) throw new HttpError(404, "No such app", "not_found");
-    const limit = await ctx.vault.read.limitOf([me(res), app]);
-    const expired = limit.expiry !== 0n && Number(limit.expiry) <= Math.floor(Date.now() / 1000);
-    if (limit.remaining === 0n || expired) throw new HttpError(409, "Connect this app first", "not_connected");
+    const l = limitView(await vault.limitOf(me(res), app));
+    if (l.remaining === 0n) throw new HttpError(409, "Connect this app first", "not_connected");
     res.json({ code: ctx.codes.issue(app, me(res)) });
   });
 
   // ---------------------------------------------------------------- sign
 
   const signSchemas = {
-    connect: z.object({ app: addressSchema, credits: creditsSchema, expiresInDays: z.number().int().min(1).max(365).optional() }),
-    disconnect: z.object({ app: addressSchema }),
-    send: z.object({ to: z.string().min(3), credits: creditsSchema }),
-    claim: z.object({ claimKey: addressSchema, credits: creditsSchema, expiresInDays: z.number().int().min(1).max(90).optional() }),
+    connect: z.object({ app: appIdSchema, credits: creditsSchema, expiresInDays: z.number().int().min(1).max(365).optional() }),
+    disconnect: z.object({ app: appIdSchema }),
+    send: z.object({ to: z.string().min(2), credits: creditsSchema }),
+    claim: z.object({ claimKey: claimKeySchema, credits: creditsSchema, expiresInDays: z.number().int().min(1).max(90).optional() }),
     buy: z.object({ credits: creditsSchema }),
   };
   type Action = keyof typeof signSchemas;
   const isAction = (a: string): a is Action => a in signSchemas;
 
+  const minimum = (units: bigint) => {
+    if (units < config.minSendUnits) {
+      throw new HttpError(400, `The smallest amount is ${amount(config.minSendUnits).credits} credits`, "below_minimum");
+    }
+  };
+
+  /** What one action calls, what the user is told, and what the submit step needs to remember. */
+  async function build(action: Action, body: unknown, account: AccountId): Promise<{ call: UserCall; summary?: string; meta: Record<string, unknown> }> {
+    switch (action) {
+      case "connect": {
+        const b = signSchemas.connect.parse(body);
+        const app = store.appById(b.app);
+        if (!app) throw new HttpError(404, "No such app", "not_found");
+        const expiry = b.expiresInDays ? Math.floor(Date.now() / 1000) + b.expiresInDays * DAY : null;
+        const limit = creditsToUnits(b.credits);
+        return {
+          summary: `${app.name} can spend up to ${amount(limit).credits} credits ($${amount(limit).usd})`,
+          call: { receiver: config.vault, method: "approve_app", args: { app: app.id, limit: limit.toString(), expiry } },
+          meta: { app: app.id, limit: limit.toString() },
+        };
+      }
+      case "disconnect": {
+        const b = signSchemas.disconnect.parse(body);
+        return { call: { receiver: config.vault, method: "revoke_app", args: { app: b.app } }, meta: { app: b.app } };
+      }
+      case "send": {
+        const b = signSchemas.send.parse(body);
+        const to = await resolveRecipient(b.to);
+        if (to === account) throw new HttpError(400, "That's your own account", "self_send");
+        const units = creditsToUnits(b.credits);
+        minimum(units);
+        return {
+          summary: `Send ${amount(units).credits} credits to ${b.to}`,
+          call: { receiver: config.vault, method: "send", args: { to, amount: units.toString() } },
+          meta: { to, amount: units.toString() },
+        };
+      }
+      case "claim": {
+        const b = signSchemas.claim.parse(body);
+        const units = creditsToUnits(b.credits);
+        minimum(units);
+        const expiry = Math.floor(Date.now() / 1000) + (b.expiresInDays ?? 30) * DAY;
+        return {
+          summary: `A claim link for ${amount(units).credits} credits`,
+          call: { receiver: config.vault, method: "create_claim", args: { amount: units.toString(), claim_key: b.claimKey, expiry } },
+          meta: { claimKey: b.claimKey, amount: units.toString(), expiry },
+        };
+      }
+      case "buy": {
+        const b = signSchemas.buy.parse(body);
+        const units = creditsToUnits(b.credits);
+        const wallet = await vault.usdtBalanceOf(account);
+        if (wallet < units) throw new HttpError(400, `Your wallet holds ${amount(wallet).usd} USDT`, "insufficient_usdt");
+        return {
+          summary: `Buy ${amount(units).credits} credits for ${amount(units).usd} USDT`,
+          // NEP-141: the token moves USDT to the vault and calls its ft_on_transfer, which credits the sender.
+          call: {
+            receiver: config.usdt,
+            method: "ft_transfer_call",
+            args: { receiver_id: config.vault, amount: units.toString(), msg: "" },
+            gas: 100n * TGAS,
+            deposit: ONE_YOCTO,
+          },
+          meta: { amount: units.toString() },
+        };
+      }
+    }
+  }
+
   r.post("/me/sign/:action", async (req, res) => {
     const action = req.params.action;
     if (!isAction(action)) throw new HttpError(404, `Unknown action "${action}"`, "not_found");
-    const address = me(res);
-    const deadline = String(deadlineIn());
-    const nonce = newNonce();
-
-    switch (action) {
-      case "connect": {
-        const b = signSchemas.connect.parse(req.body);
-        const app = store.appById(b.app);
-        if (!app) throw new HttpError(404, "No such app", "not_found");
-        const expiry = b.expiresInDays ? Math.floor(Date.now() / 1000) + b.expiresInDays * DAY : 0;
-        const limit = creditsToUnits(b.credits);
-        return void res.json({
-          summary: `${app.name} can spend up to ${amount(limit).credits} credits ($${amount(limit).usd})`,
-          request: signRequest(domain, "ApproveApp", {
-            user: address,
-            app: app.id,
-            limit: limit.toString(),
-            expiry: String(expiry),
-            nonce,
-            deadline,
-          }),
-        });
-      }
-      case "disconnect": {
-        const b = signSchemas.disconnect.parse(req.body);
-        return void res.json({
-          request: signRequest(domain, "RevokeApp", { user: address, app: b.app, nonce, deadline }),
-        });
-      }
-      case "send": {
-        const b = signSchemas.send.parse(req.body);
-        const to = await resolveRecipient(b.to);
-        if (to === address) throw new HttpError(400, "That's your own account", "self_send");
-        const units = creditsToUnits(b.credits);
-        if (units < config.minSendUnits) {
-          throw new HttpError(400, `The smallest amount is ${amount(config.minSendUnits).credits} credits`, "below_minimum");
-        }
-        return void res.json({
-          summary: `Send ${amount(units).credits} credits to ${b.to}`,
-          request: signRequest(domain, "Send", { from: address, to, amount: units.toString(), nonce, deadline }),
-        });
-      }
-      case "claim": {
-        const b = signSchemas.claim.parse(req.body);
-        const units = creditsToUnits(b.credits);
-        if (units < config.minSendUnits) {
-          throw new HttpError(400, `The smallest amount is ${amount(config.minSendUnits).credits} credits`, "below_minimum");
-        }
-        const expiry = Math.floor(Date.now() / 1000) + (b.expiresInDays ?? 30) * DAY;
-        return void res.json({
-          summary: `A claim link for ${amount(units).credits} credits`,
-          request: signRequest(domain, "CreateClaim", {
-            from: address,
-            amount: units.toString(),
-            claimKey: b.claimKey,
-            expiry: String(expiry),
-            nonce,
-            deadline,
-          }),
-        });
-      }
-      case "buy": {
-        const b = signSchemas.buy.parse(req.body);
-        const value = creditsToUnits(b.credits);
-        const tokenNonce = await ctx.usdt.read.nonces([address]);
-        return void res.json({
-          summary: `Buy ${amount(value).credits} credits for ${amount(value).usd} USDT`,
-          request: {
-            domain: usdtDomain(config.chainId, config.usdt, ctx.usdtName),
-            types: permitTypes,
-            primaryType: "Permit",
-            message: { owner: address, spender: v, value: value.toString(), nonce: tokenNonce.toString(), deadline },
-          },
-        });
-      }
-    }
+    const u = userOf(res);
+    const { call, summary, meta: m } = await build(action, req.body, u.address);
+    await ensureAccount(u);
+    const prepared = await meta.prepare(u.address, u.publicKey, call, { ...m, action });
+    res.json({ summary, request: { account: u.address, ...prepared } });
   });
 
   // ---------------------------------------------------------------- submit
 
-  const submitSchemas = {
-    connect: z.object({
-      user: addressSchema,
-      app: addressSchema,
-      limit: uint,
-      expiry: uint,
-      nonce: bytes32,
-      deadline: uint,
-    }),
-    disconnect: z.object({ user: addressSchema, app: addressSchema, nonce: bytes32, deadline: uint }),
-    send: z.object({ from: addressSchema, to: addressSchema, amount: uint, nonce: bytes32, deadline: uint }),
-    claim: z.object({
-      from: addressSchema,
-      amount: uint,
-      claimKey: addressSchema,
-      expiry: uint,
-      nonce: bytes32,
-      deadline: uint,
-    }),
-    buy: z.object({ owner: addressSchema, spender: addressSchema, value: uint, nonce: uint, deadline: uint }),
-  };
+  const submitSchema = z.object({ hash: hex(32), signature: hex(64) });
 
   r.post("/me/submit/:action", async (req, res) => {
     const action = req.params.action;
     if (!isAction(action)) throw new HttpError(404, `Unknown action "${action}"`, "not_found");
-    const address = me(res);
-    const sig = signature.parse(req.body?.signature) as Hex;
+    const u = userOf(res);
+    const body = submitSchema.parse(req.body);
+    let p;
+    try {
+      p = meta.take(u.address, body.hash, body.signature);
+    } catch (err) {
+      if (err instanceof MetaError) throw new HttpError(err.status, err.message, err.code);
+      throw err;
+    }
+    if (p.meta.action !== action) throw new HttpError(400, `That request is for "${String(p.meta.action)}"`, "wrong_action");
+    const app = typeof p.meta.app === "string" ? p.meta.app : undefined;
+    const result = await relayer.send(u.address, [{ kind: "delegate", delegate: p.delegate, signature: p.signature }], {
+      fn: String(p.meta.method),
+      app,
+    });
+    const { hash } = result;
 
     switch (action) {
       case "connect": {
-        const m = submitSchemas.connect.parse(req.body?.message);
-        requireSigner(m, address);
-        const { hash } = await relayer.write(
-          {
-            address: v,
-            abi: creditVaultAbi,
-            functionName: "approveApp",
-            args: [m.user, m.app, BigInt(m.limit), BigInt(m.expiry), m.nonce as Hex, BigInt(m.deadline), sig],
-          },
-          { app: m.app },
-        );
-        // The app gets a one-time code, never the address itself. Its server swaps it with its API key.
-        const code = ctx.codes.issue(m.app, address);
-        return void res.status(201).json({ app: m.app, limit: amount(BigInt(m.limit)), code, ...txInfo(ctx, hash) });
+        // The app gets a one-time code, never the account itself. Its server swaps it with its API key.
+        const code = ctx.codes.issue(app!, u.address);
+        return void res.status(201).json({ app, limit: amount(BigInt(String(p.meta.limit))), code, ...txInfo(ctx, hash) });
       }
-      case "disconnect": {
-        const m = submitSchemas.disconnect.parse(req.body?.message);
-        requireSigner(m, address);
-        const { hash } = await relayer.write(
-          {
-            address: v,
-            abi: creditVaultAbi,
-            functionName: "revokeApp",
-            args: [m.user, m.app, m.nonce as Hex, BigInt(m.deadline), sig],
-          },
-          { app: m.app },
-        );
-        return void res.json({ app: m.app, ...txInfo(ctx, hash) });
-      }
-      case "send": {
-        const m = submitSchemas.send.parse(req.body?.message);
-        requireSigner(m, address);
-        const { hash } = await relayer.write({
-          address: v,
-          abi: creditVaultAbi,
-          functionName: "send",
-          args: [m.from, m.to, BigInt(m.amount), m.nonce as Hex, BigInt(m.deadline), sig],
-        });
-        return void res.status(201).json({ to: m.to, amount: amount(BigInt(m.amount)), ...txInfo(ctx, hash) });
-      }
+      case "disconnect":
+        return void res.json({ app, ...txInfo(ctx, hash) });
+      case "send":
+        return void res.status(201).json({ to: p.meta.to, amount: amount(BigInt(String(p.meta.amount))), ...txInfo(ctx, hash) });
       case "claim": {
-        const m = submitSchemas.claim.parse(req.body?.message);
-        requireSigner(m, address);
-        const { hash } = await relayer.write({
-          address: v,
-          abi: creditVaultAbi,
-          functionName: "createClaim",
-          args: [m.from, BigInt(m.amount), m.claimKey, BigInt(m.expiry), m.nonce as Hex, BigInt(m.deadline), sig],
-        });
-        store.putClaim({
-          claimKey: m.claimKey,
-          from: m.from,
-          units: BigInt(m.amount),
-          expiry: Number(m.expiry),
-          status: "open",
-          txHash: hash,
-          createdAt: Date.now(),
-        });
-        return void res.status(201).json({ claimKey: m.claimKey, amount: amount(BigInt(m.amount)), ...txInfo(ctx, hash) });
+        const claimKey = String(p.meta.claimKey);
+        const units = BigInt(String(p.meta.amount));
+        store.putClaim({ claimKey, from: u.address, units, expiry: Number(p.meta.expiry), status: "open", txHash: hash, createdAt: Date.now() });
+        return void res.status(201).json({ claimKey, amount: amount(units), ...txInfo(ctx, hash) });
       }
       case "buy": {
-        const m = submitSchemas.buy.parse(req.body?.message);
-        requireSigner(m, address);
-        if (m.spender !== v) throw new HttpError(400, "That permit isn't for this vault", "wrong_spender");
-        const { r: rr, s, v: vv, yParity } = parseSignature(sig);
-        const vByte = Number(vv ?? BigInt(yParity + 27));
-        const { hash } = await relayer.write({
-          address: v,
-          abi: creditVaultAbi,
-          functionName: "depositWithPermit",
-          args: [m.owner, BigInt(m.value), BigInt(m.deadline), vByte, rr, s],
-        });
-        return void res.status(201).json({ amount: amount(BigInt(m.value)), ...txInfo(ctx, hash) });
+        // If the vault turned the deposit down, the token refunds it, and there's no deposited event.
+        if (!result.events.some((e) => e.event === "deposited")) throw new RelayerError("DepositRefunded", hash);
+        return void res.status(201).json({ amount: amount(BigInt(String(p.meta.amount))), ...txInfo(ctx, hash) });
       }
     }
   });
 
   // ---------------------------------------------------------------- claim links
 
-  /** Redeem a claim link to the logged-in user. The link's key signs this user's address. */
-  const claimLimit = perIp(config.claimsPerIpPerHour, 3_600_000, "Too many claims from this network.");
-  r.post("/claims/:claimKey/redeem", claimLimit, async (req, res) => {
-    const claimKey = addressSchema.parse(req.params.claimKey);
-    const sig = signature.parse(req.body?.signature) as Hex;
-    const to = me(res);
-    const { hash } = await relayer.write({
-      address: v,
-      abi: creditVaultAbi,
-      functionName: "claim",
-      args: [claimKey, to, sig],
-    });
-    store.setClaimStatus(claimKey, "claimed");
-    const c = await ctx.vault.read.getClaim([claimKey]);
-    res.json({ claimKey, to, amount: amount(c.amount), ...txInfo(ctx, hash) });
+  /** The exact text a claim link's key signs to redeem it to the logged-in user. */
+  r.get("/me/claims/:claimKey/message", async (req, res) => {
+    const claimKey = claimKeySchema.parse(req.params.claimKey);
+    res.json({ claimKey, to: me(res), message: await vault.claimMessage(claimKey, me(res)) });
   });
 
-  /** Cancel a link the user created. The operator submits it; credits return to the creator. */
-  r.post("/me/claims/:claimKey/cancel", async (req, res) => {
-    const claimKey = addressSchema.parse(req.params.claimKey);
-    const c = await ctx.vault.read.getClaim([claimKey]);
-    if (getAddress(c.from) !== me(res)) throw new HttpError(403, "That link isn't yours", "not_yours");
+  /** Redeems a claim link to the logged-in user. The link's key signed this user's account. */
+  const claimLimit = perIp(config.claimsPerIpPerHour, 3_600_000, "Too many claims from this network.");
+  r.post("/claims/:claimKey/redeem", claimLimit, async (req, res) => {
+    const claimKey = claimKeySchema.parse(req.params.claimKey);
+    const sig = hex(64).parse(req.body?.signature);
+    const to = me(res);
+    const before = await vault.getClaim(claimKey);
+    if (!before || before.status !== "Open") throw new RelayerError("ClaimNotOpen");
     const { hash } = await relayer.write({
-      address: v,
-      abi: creditVaultAbi,
-      functionName: "cancelClaim",
-      args: [claimKey],
+      method: "claim",
+      args: { claim_key: claimKey, to, signature: Buffer.from(sig.replace(/^0x/, ""), "hex").toString("base64") },
     });
+    store.setClaimStatus(claimKey, "claimed");
+    res.json({ claimKey, to, amount: amount(before.amount), ...txInfo(ctx, hash) });
+  });
+
+  /** Cancels a link the user created. The relayer submits it; credits return to the creator. */
+  r.post("/me/claims/:claimKey/cancel", async (req, res) => {
+    const claimKey = claimKeySchema.parse(req.params.claimKey);
+    const c = await vault.getClaim(claimKey);
+    if (!c) throw new HttpError(404, "No such claim link", "not_found");
+    if (c.from !== me(res)) throw new HttpError(403, "That link isn't yours", "not_yours");
+    const { hash } = await relayer.write({ method: "cancel_claim", args: { claim_key: claimKey } });
     store.setClaimStatus(claimKey, "cancelled");
     res.json({ claimKey, amount: amount(c.amount), ...txInfo(ctx, hash) });
   });

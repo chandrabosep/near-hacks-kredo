@@ -1,81 +1,91 @@
 /**
- * The relayer submits every operator transaction and pays its gas. Users and companies never
- * hold the gas token.
+ * The relayer signs every transaction the network sends and pays its gas in NEAR. Users and
+ * companies never hold NEAR.
  *
- * - One queue: transactions go out one at a time, so nonces never collide.
- * - Simulate first: a call that would revert fails here for free, with the contract's error name,
- *   instead of costing gas onchain.
- * - Wait for the receipt before the next transaction, and record what it cost: the L2 execution
- *   fee plus the L1 data fee that OP Stack chains charge on every transaction.
+ * - One queue: transactions go out one at a time, so the relayer key's nonce never collides.
+ * - Budgets first: the most a transaction can cost (its prepaid gas at today's gas price) is
+ *   checked against the daily budgets and the balance floor before anything is sent.
+ * - Wait until final, then record what it cost (every receipt's burnt tokens) and hand back the
+ *   vault's events. A failed receipt becomes a RelayerError named after the contract's panic.
  */
-import {
-  BaseError,
-  ContractFunctionRevertedError,
-  type Abi,
-  type Address,
-  type ContractFunctionArgs,
-  type ContractFunctionName,
-  type Hash,
-  type TransactionReceipt,
-} from "viem";
-import type { Clients } from "./chain.js";
 import type { Db, RelayerTx } from "./db.js";
+import { TGAS, type AccountId, type Chain, type ChainEvent, type Outcome, type TxAction, type TxHash } from "./near.js";
 
 export class RelayerError extends Error {
   constructor(
-    /** The contract's custom error name, such as "OverLimit", or a short message. */
+    /** The contract's error, as a code such as "OverLimit", or a short message. */
     readonly reason: string,
-    readonly hash?: Hash,
+    readonly hash?: TxHash,
   ) {
     super(reason);
     this.name = "RelayerError";
   }
 }
 
-export type WriteRequest<
-  abi extends Abi,
-  name extends ContractFunctionName<abi, "nonpayable" | "payable">,
-> = {
-  address: Address;
-  abi: abi;
-  functionName: name;
-  args: ContractFunctionArgs<abi, "nonpayable" | "payable", name>;
-};
-
-export type RelayResult = { hash: Hash; receipt: TransactionReceipt; tx: RelayerTx };
+export type RelayResult = { hash: TxHash; outcome: Outcome; events: ChainEvent[]; tx: RelayerTx };
 
 /** What stops a drain. Every check runs before sending, so a refused transaction costs nothing. */
 export type RelayerLimits = {
-  /** Most gas one transaction may use. */
+  /** Most gas one transaction may attach, in gas units. */
   maxTxGas: bigint;
-  /** Highest gas price we pay, in wei. */
-  maxGasPrice: bigint;
-  /** Most WBT the relayer spends in any rolling 24 hours, in wei. */
+  /** Most the relayer spends in any rolling 24 hours, in yoctoNEAR. */
   dailyBudget: bigint;
-  /** Most WBT spent on one app's transactions in any rolling 24 hours, in wei. */
+  /** Most spent on one app's transactions in any rolling 24 hours, in yoctoNEAR. */
   appDailyBudget: bigint;
   /** Below this balance, only exits go out, so users can always get their credits back. */
   minBalance: bigint;
 };
 
 /** Calls that give users or companies their money back. They skip the budgets, never the gas ceiling. */
-const EXITS = new Set(["release", "payout", "revokeApp", "cancelClaim"]);
+const EXITS = new Set(["release", "payout", "revoke_app", "cancel_claim"]);
 
 const DAY_MS = 86_400_000;
 const SEND_RETRIES = 2;
 
-/** Whether a send failure is worth retrying, and why. Contract reverts never are. */
-export function transient(err: unknown): "nonce" | "network" | undefined {
-  const text = err instanceof BaseError ? `${err.shortMessage} ${err.details ?? ""}` : String((err as Error)?.message ?? err);
-  if (/nonce too low|nonce has already been used|replacement transaction underpriced|already known/i.test(text)) return "nonce";
-  if (/timeout|timed out|ECONNRESET|ECONNREFUSED|socket hang up|fetch failed|HTTP request failed|502|503|504|rate limit/i.test(text)) return "network";
-  return undefined;
+/** Contract panics that map to their own error codes. Everything else is PascalCased. */
+const RENAMED: Record<string, string> = {
+  Paused: "EnforcedPause",
+  DelegateActionExpired: "SignatureExpired",
+  DelegateActionInvalidNonce: "NonceUsed",
+  DelegateActionInvalidSignature: "BadSignature",
+  DelegateActionSenderDoesNotMatchTxReceiver: "BadSignature",
+};
+
+/** "Over limit" -> "OverLimit". */
+export function reasonCode(failure: string): string {
+  const code = /^[A-Z][A-Za-z]+$/.test(failure)
+    ? failure
+    : failure
+        .split(/[^A-Za-z0-9]+/)
+        .filter(Boolean)
+        .map((w) => w[0].toUpperCase() + w.slice(1))
+        .join("");
+  return RENAMED[code] ?? code;
 }
 
-export function createRelayer(opts: { clients: Clients; db: Db; txTimeoutMs: number; limits?: RelayerLimits }) {
-  const { clients, db, txTimeoutMs, limits } = opts;
-  const { publicClient, walletClient, operator } = clients;
+/** Whether a send failure is worth retrying. Failed receipts never are: they come back as outcomes. */
+export function transient(err: unknown): boolean {
+  const text = String((err as Error)?.message ?? err);
+  return /timeout|timed out|ECONNRESET|ECONNREFUSED|socket hang up|fetch failed|502|503|504|rate limit|TooManyRequests|InvalidNonce|Expired/i.test(text);
+}
+
+/** The gas a transaction attaches: its function calls, plus those inside a delegate. */
+export function prepaidGas(actions: TxAction[]): bigint {
+  let gas = 0n;
+  for (const a of actions) {
+    if (a.kind === "call") gas += a.gas;
+    if (a.kind === "transfer") gas += 1n * TGAS;
+    if (a.kind === "delegate") {
+      for (const inner of a.delegate.actions) gas += BigInt(inner.functionCall?.gas ?? 0n) + 1n * TGAS;
+    }
+  }
+  return gas;
+}
+
+export function createRelayer(opts: { chain: Chain; db: Db; vault: AccountId; limits?: RelayerLimits }) {
+  const { chain, db, vault, limits } = opts;
   let tail: Promise<unknown> = Promise.resolve();
+  const listeners: ((r: RelayResult) => void)[] = [];
 
   /** Runs `job` after every earlier job has finished, whether it succeeded or not. */
   function enqueue<T>(job: () => Promise<T>): Promise<T> {
@@ -84,17 +94,17 @@ export function createRelayer(opts: { clients: Clients; db: Db; txTimeoutMs: num
     return run;
   }
 
-  /** Gas spent on sent transactions since `since` (ms timestamp), in wei. Optionally for one app. */
-  function spent(since = 0, app?: Address) {
+  /** NEAR spent on sent transactions since `since` (ms timestamp), in yoctoNEAR. Optionally for one app. */
+  function spent(since = 0, app?: string) {
     let total = 0n;
     let count = 0;
     for (const t of db.data.txs) {
       if (t.at < since || t.status === "failed") continue;
-      if (app && t.app?.toLowerCase() !== app.toLowerCase()) continue;
-      total += t.l2Fee + t.l1Fee;
+      if (app && t.app !== app) continue;
+      total += t.fee;
       count++;
     }
-    return { count, wei: total };
+    return { count, yocto: total };
   }
 
   function record(tx: RelayerTx): RelayerTx {
@@ -103,148 +113,106 @@ export function createRelayer(opts: { clients: Clients; db: Db; txTimeoutMs: num
     return tx;
   }
 
-  /**
-   * Sends, retrying what's safe to retry: RPC hiccups, and nonce clashes after the local nonce
-   * drifted from the chain (it's reset first). Every relayed call is idempotent onchain (charge,
-   * hold and refund refs; signature nonces), so a resend can never move credits twice.
-   */
-  async function sendWithRetry(prepared: Parameters<typeof walletClient.writeContract>[0]): Promise<Hash> {
+  async function sendWithRetry(receiver: AccountId, actions: TxAction[]): Promise<Outcome> {
     for (let attempt = 0; ; attempt++) {
       try {
-        return await walletClient.writeContract(prepared);
+        return await chain.send(receiver, actions);
       } catch (err) {
-        const kind = transient(err);
-        if (!kind || attempt >= SEND_RETRIES) throw err;
-        if (kind === "nonce") operator.nonceManager?.reset({ address: operator.address, chainId: clients.chain.id });
+        if (!transient(err) || attempt >= SEND_RETRIES) throw err;
         await new Promise((r) => setTimeout(r, 300 * 2 ** attempt));
       }
     }
   }
 
-  async function send<abi extends Abi, name extends ContractFunctionName<abi, "nonpayable" | "payable">>(
-    request: WriteRequest<abi, name>,
-    app?: Address,
-  ): Promise<RelayResult> {
-    const fn = request.functionName as string;
-
-    // The public write() signature is fully typed; inside, viem's generics are erased once here.
-    type SimulateArgs = Parameters<typeof publicClient.simulateContract>[0];
-    type WriteArgs = Parameters<typeof walletClient.writeContract>[0];
-
+  async function send(receiver: AccountId, actions: TxAction[], fn: string, app?: string): Promise<RelayResult> {
     const refuse = (reason: string): never => {
-      record({ fn, app, status: "failed", gasUsed: 0n, l2Fee: 0n, l1Fee: 0n, error: reason, at: Date.now() });
+      record({ fn, app, status: "failed", gasUsed: 0n, fee: 0n, error: reason, at: Date.now() });
       throw new RelayerError(reason);
     };
 
-    let prepared: WriteArgs;
-    try {
-      const simulated = await publicClient.simulateContract({ ...request, account: operator } as unknown as SimulateArgs);
-      prepared = simulated.request as unknown as WriteArgs;
-    } catch (err) {
-      return refuse(revertReason(err));
-    }
-
     if (limits) {
-      const [gas, fees, balance] = await Promise.all([
-        publicClient.estimateContractGas({ ...request, account: operator } as unknown as Parameters<
-          typeof publicClient.estimateContractGas
-        >[0]),
-        publicClient.estimateFeesPerGas(),
-        publicClient.getBalance({ address: operator.address }),
-      ]);
+      const gas = prepaidGas(actions);
       if (gas > limits.maxTxGas) refuse("GasTooHigh");
-      if (fees.maxFeePerGas > limits.maxGasPrice) refuse("GasPriceTooHigh");
-
-      // A 20% buffer over the estimate, never above the ceiling. The most this transaction can cost.
-      const gasLimit = min((gas * 12n) / 10n, limits.maxTxGas);
-      const worst = gasLimit * fees.maxFeePerGas;
       if (!EXITS.has(fn)) {
+        const [price, balance] = await Promise.all([chain.gasPrice(), chain.balanceOf(chain.relayerId)]);
+        // The most this transaction can cost: all its prepaid gas burnt at today's price.
+        const worst = gas * price;
         const since = Date.now() - DAY_MS;
-        if (balance - worst < limits.minBalance) refuse("RelayerLowBalance");
-        if (spent(since).wei + worst > limits.dailyBudget) refuse("DailyBudgetReached");
-        if (app && spent(since, app).wei + worst > limits.appDailyBudget) refuse("AppBudgetReached");
-      }
-      prepared = {
-        ...prepared,
-        gas: gasLimit,
-        maxFeePerGas: fees.maxFeePerGas,
-        maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
-      } as WriteArgs;
-    }
-
-    const hash = await sendWithRetry(prepared);
-    // Recorded before waiting, so a crash mid-flight still leaves the hash in the ledger.
-    const tx = record({ hash, fn, app, status: "pending", gasUsed: 0n, l2Fee: 0n, l1Fee: 0n, at: Date.now() });
-
-    let receipt: TransactionReceipt | undefined;
-    // A slow block or a dropped RPC call isn't a failed transaction: wait once more before giving up.
-    for (let attempt = 0; attempt < 2 && !receipt; attempt++) {
-      try {
-        receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: txTimeoutMs });
-      } catch (err) {
-        tx.error = revertReason(err);
-        db.save();
-        if (attempt === 1) throw new RelayerError(`no receipt for ${hash}: ${tx.error}`, hash);
+        if ((balance ?? 0n) - worst < limits.minBalance) refuse("RelayerLowBalance");
+        if (spent(since).yocto + worst > limits.dailyBudget) refuse("DailyBudgetReached");
+        if (app && spent(since, app).yocto + worst > limits.appDailyBudget) refuse("AppBudgetReached");
       }
     }
-    if (!receipt) throw new RelayerError(`no receipt for ${hash}`, hash);
-    tx.error = undefined;
 
-    tx.gasUsed = receipt.gasUsed;
-    tx.l2Fee = receipt.gasUsed * receipt.effectiveGasPrice;
-    tx.l1Fee = (receipt as { l1Fee?: bigint | null }).l1Fee ?? 0n;
-    tx.status = receipt.status === "success" ? "success" : "reverted";
-    db.save();
-    if (receipt.status !== "success") throw new RelayerError("reverted onchain", hash);
-    return { hash, receipt, tx };
+    const outcome = await sendWithRetry(receiver, actions);
+    const ok = !outcome.failure;
+    const tx = record({
+      hash: outcome.hash,
+      fn,
+      app,
+      status: ok ? "success" : "reverted",
+      gasUsed: outcome.gasBurnt,
+      fee: outcome.burnt,
+      error: outcome.failure,
+      at: Date.now(),
+    });
+    const events = outcome.events.filter((e) => e.standard === "kredo" && e.executor === vault);
+    const result = { hash: outcome.hash, outcome, events, tx };
+    // The indexer reads every outcome, failed ones included: a failed transaction can still have
+    // moved credits in an earlier receipt.
+    for (const l of listeners) l(result);
+    if (!ok) throw new RelayerError(reasonCode(outcome.failure!), outcome.hash);
+    return result;
   }
 
   return {
-    operator: operator.address,
+    operator: chain.relayerId,
 
-    /** Simulates, sends and waits for one contract call, in queue order. `app` tags its gas. */
-    write<abi extends Abi, name extends ContractFunctionName<abi, "nonpayable" | "payable">>(
-      request: WriteRequest<abi, name>,
-      opts: { app?: Address } = {},
+    /** Calls one vault method as the relayer, in queue order. `app` tags its gas. */
+    write(
+      call: { method: string; args: Record<string, unknown>; gas?: bigint; deposit?: bigint; receiver?: AccountId },
+      opts: { app?: string } = {},
     ): Promise<RelayResult> {
-      return enqueue(() => send(request, opts.app));
+      const action: TxAction = { kind: "call", method: call.method, args: call.args, gas: call.gas ?? 30n * TGAS, deposit: call.deposit ?? 0n };
+      return enqueue(() => send(call.receiver ?? vault, [action], call.method, opts.app));
     },
 
-    /** The relayer's gas balance, in wei. */
-    balance: () => publicClient.getBalance({ address: operator.address }),
+    /** Sends any actions to any receiver: user account set-up, token transfers, signed delegates. */
+    send(receiver: AccountId, actions: TxAction[], opts: { fn: string; app?: string }): Promise<RelayResult> {
+      return enqueue(() => send(receiver, actions, opts.fn, opts.app));
+    },
+
+    /** Called with every outcome the relayer gets back. */
+    onResult(listener: (r: RelayResult) => void) {
+      listeners.push(listener);
+    },
+
+    /** The relayer's NEAR balance, in yoctoNEAR. */
+    balance: async () => (await chain.balanceOf(chain.relayerId)) ?? 0n,
 
     spent,
 
     /** The limits, today's spend against them, and whether only exits can go out. */
     async status() {
-      const balance = await publicClient.getBalance({ address: operator.address });
+      const balance = (await chain.balanceOf(chain.relayerId)) ?? 0n;
       const today = spent(Date.now() - DAY_MS);
       if (!limits) return { balance, today, limits: undefined, exitsOnly: false };
       return {
         balance,
         today,
         limits,
-        budgetLeft: limits.dailyBudget > today.wei ? limits.dailyBudget - today.wei : 0n,
-        exitsOnly: today.wei >= limits.dailyBudget || balance < limits.minBalance,
+        budgetLeft: limits.dailyBudget > today.yocto ? limits.dailyBudget - today.yocto : 0n,
+        exitsOnly: today.yocto >= limits.dailyBudget || balance < limits.minBalance,
       };
     },
   };
 }
 
-function min(a: bigint, b: bigint): bigint {
-  return a < b ? a : b;
+/** The first vault event of a kind in a relayed transaction. */
+export function vaultEvent(result: Pick<RelayResult, "events" | "hash">, event: string): Record<string, unknown> {
+  const e = result.events.find((x) => x.event === event);
+  if (!e) throw new Error(`no ${event} event in ${result.hash}`);
+  return e.data;
 }
 
 export type Relayer = ReturnType<typeof createRelayer>;
-
-/** Turns a viem error into a short reason: the contract's custom error name when there is one. */
-export function revertReason(err: unknown): string {
-  if (err instanceof BaseError) {
-    const reverted = err.walk((e) => e instanceof ContractFunctionRevertedError);
-    if (reverted instanceof ContractFunctionRevertedError) {
-      return reverted.data?.errorName ?? reverted.reason ?? reverted.shortMessage;
-    }
-    return err.shortMessage;
-  }
-  return err instanceof Error ? err.message : String(err);
-}

@@ -1,26 +1,20 @@
 import { randomUUID } from "node:crypto";
-import {
-  getAddress,
-  isAddress,
-  keccak256,
-  parseEventLogs,
-  stringToHex,
-  type ContractEventName,
-  type GetEventArgs,
-  type Hex,
-  type TransactionReceipt,
-} from "viem";
 import { z } from "zod";
-import { creditVaultAbi } from "../abi/CreditVault.js";
-import { explorerTx } from "../chain.js";
 import type { Context } from "../context.js";
-import type { AppRecord } from "../store.js";
 import type { ActivityEvent } from "../db.js";
+import { accountIdSchema, explorerTx, sha256Hex, type TxHash } from "../near.js";
+import type { AppRecord } from "../store.js";
 
-export const addressSchema = z
+export { accountIdSchema };
+
+/** An app's id in the vault. */
+export const appIdSchema = z
   .string()
-  .refine((v) => isAddress(v), "must be an address")
-  .transform((v) => getAddress(v));
+  .trim()
+  .regex(/^[A-Za-z0-9_-]{1,64}$/, "must be an app id");
+
+/** A claim link's ed25519 public key, "ed25519:<base58>". */
+export const claimKeySchema = z.string().regex(/^ed25519:[1-9A-HJ-NP-Za-km-z]{32,44}$/, "must be an ed25519 public key");
 
 export const refSchema = z
   .string()
@@ -34,8 +28,8 @@ export const creditsSchema = z.union([z.string(), z.number()]);
  * Onchain ref for an app's own ref. Namespaced by kind, so an app can reuse "job-42" for the
  * hold and the refund of the same job without colliding in the contract's ref space.
  */
-export function onchainRef(kind: string, ref: string): Hex {
-  return keccak256(stringToHex(`${kind}:${ref}`));
+export function onchainRef(kind: string, ref: string): string {
+  return sha256Hex(`${kind}:${ref}`);
 }
 
 export function newRef(): string {
@@ -53,25 +47,13 @@ export function activityFor(ctx: Context, match: (e: ActivityEvent) => boolean, 
   return rows.map(ctx.indexer.present);
 }
 
-export const involves = (address: string) => (e: ActivityEvent) =>
-  same(e.user, address) || same(e.from, address) || same(e.to, address);
+export const involves = (account: string) => (e: ActivityEvent) =>
+  same(e.user, account) || same(e.from, account) || same(e.to, account);
 
 export const forApp = (app: string) => (e: ActivityEvent) => same(e.app, app);
 
-export function txInfo(ctx: Context, hash: Hex) {
-  return { txHash: hash, explorer: explorerTx(ctx.chain, hash) };
-}
-
-type VaultAbi = typeof creditVaultAbi;
-
-/** The first vault event of a kind in a receipt. */
-export function vaultEvent<E extends ContractEventName<VaultAbi>>(
-  receipt: TransactionReceipt,
-  eventName: E,
-): GetEventArgs<VaultAbi, E, { EnableUnion: false; IndexedOnly: false; Required: true }> {
-  const [log] = parseEventLogs({ abi: creditVaultAbi, logs: receipt.logs, eventName: eventName as ContractEventName<VaultAbi> });
-  if (!log) throw new Error(`no ${eventName} event in ${receipt.transactionHash}`);
-  return log.args as never;
+export function txInfo(ctx: Context, hash: TxHash) {
+  return { txHash: hash, explorer: explorerTx(ctx.config.explorerUrl, hash) };
 }
 
 /** What users see about an app: its own profile, falling back to its company's. */

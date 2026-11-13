@@ -7,11 +7,10 @@
  * anyone but that app, once, for 10 minutes.
  */
 import { createHash, randomBytes } from "node:crypto";
-import type { Address } from "viem";
 
 const TTL_MS = 10 * 60_000;
 
-type Entry = { app: Address; user: Address; expires: number };
+type Entry = { app: string; user: string; expires: number };
 
 const hash = (code: string) => createHash("sha256").update(code).digest("hex");
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
@@ -26,7 +25,7 @@ export function createCodes(now: () => number = Date.now) {
 
   return {
     /** A fresh code for this user and app. Only its hash is kept. */
-    issue(app: Address, user: Address): string {
+    issue(app: string, user: string): string {
       sweep();
       const code = `cc_${randomBytes(24).toString("hex")}`;
       codes.set(hash(code), { app, user, expires: now() + TTL_MS });
@@ -34,7 +33,7 @@ export function createCodes(now: () => number = Date.now) {
     },
 
     /** The user behind a code, if it's this app's, unexpired and unused. Burns the code either way. */
-    redeem(app: Address, code: string): Address | undefined {
+    redeem(app: string, code: string): string | undefined {
       const key = hash(code);
       const entry = codes.get(key);
       codes.delete(key);

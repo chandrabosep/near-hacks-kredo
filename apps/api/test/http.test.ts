@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { NextFunction, Request, Response } from "express";
 import { HttpError, perIp, rateLimit, slidingWindow } from "../src/http.js";
 
-function run(limit: ReturnType<typeof rateLimit>, method = "POST", app = "0xapp") {
+function run(limit: ReturnType<typeof rateLimit>, method = "POST", app = "app-1") {
   const headers: Record<string, string> = {};
   const res = { locals: { app: { id: app } }, setHeader: (k: string, v: string) => (headers[k] = v) } as unknown as Response;
   let error: unknown = "not called";
@@ -20,7 +20,7 @@ test("allows the budget per API key, then answers 429 with Retry-After", () => {
   assert.equal((blocked.error as HttpError).status, 429);
   assert.ok(Number(blocked.headers["Retry-After"]) > 0);
 
-  assert.equal(run(limit, "POST", "0xother").error, undefined, "each key has its own budget");
+  assert.equal(run(limit, "POST", "app-2").error, undefined, "each key has its own budget");
   assert.equal(run(limit, "GET").error, undefined, "reads are not limited");
 });
 

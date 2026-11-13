@@ -135,9 +135,10 @@ export const relayerTxs = pgTable("relayer_txs", {
   fn: text("fn").notNull(),
   app: text("app"),
   status: text("status").notNull(),
+  /** Gas units burnt across every receipt. */
   gasUsed: amount("gas_used").notNull(),
-  l2Fee: amount("l2_fee").notNull(),
-  l1Fee: amount("l1_fee").notNull(),
+  /** NEAR burnt for that gas, in yoctoNEAR. */
+  fee: amount("fee").notNull(),
   error: text("error"),
   at: time("at").notNull(),
 });

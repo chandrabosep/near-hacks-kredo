@@ -1,8 +1,8 @@
 /**
- * End to end over HTTP against a throwaway anvil chain: a company registers, a user buys,
- * connects and spends, and the company holds, captures, refunds and gets paid out.
- * Privy is replaced by a fake verifier; users sign with local keys, exactly as their Privy
- * wallet would sign the same EIP-712 messages in the browser.
+ * End to end over HTTP against an in-memory NEAR chain (fakeChain.ts): a company registers, a user
+ * buys, connects and spends, and the company holds, captures, refunds and gets paid out.
+ * Privy is replaced by a fake verifier; users sign with local ed25519 keys, exactly as their Privy
+ * NEAR wallet signs the same delegate-action hashes in the browser.
  */
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
@@ -11,41 +11,38 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
-import type { Address, Hex } from "viem";
-import { generatePrivateKey, privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
-import { mockUSDTAbi } from "../src/abi/MockUSDT.js";
+import { KeyPair } from "near-api-js";
 import { AuthError, type UserVerifier } from "../src/auth.js";
 import { loadConfig } from "../src/config.js";
 import { createContext, type Context } from "../src/context.js";
 import { signWebhook } from "../src/indexer.js";
 import { createServer } from "../src/server.js";
-import { ANVIL_KEY, skipChainTests as skip, startLocalChain, type LocalChain } from "./localChain.js";
-import { vaultTypes } from "../src/typedData.js";
+import { createFakeChain, newUserKey } from "./fakeChain.js";
 
 type Json = Record<string, any>;
 
-let chain: LocalChain | undefined;
+const chain = createFakeChain();
 let ctx: Context;
 let base: string;
 let close: () => void;
 let apiKey: string;
-let appId: Address;
+let appId: string;
 
-const alice = privateKeyToAccount(generatePrivateKey());
-const bob = privateKeyToAccount(generatePrivateKey());
-const dana = privateKeyToAccount(generatePrivateKey());
-const payout = privateKeyToAccount(generatePrivateKey()).address;
+const alice = newUserKey();
+const bob = newUserKey();
+const dana = newUserKey();
+const payout = "payout.kredo.test";
 
 /** Fake Privy: the token is the user's name. */
-const users: Record<string, { account: PrivateKeyAccount; email: string }> = {
-  alice: { account: alice, email: "alice@example.com" },
-  bob: { account: bob, email: "bob@example.com" },
-  dana: { account: dana, email: "dana@example.com" },
+const users: Record<string, { user: ReturnType<typeof newUserKey>; email: string }> = {
+  alice: { user: alice, email: "alice@example.com" },
+  bob: { user: bob, email: "bob@example.com" },
+  dana: { user: dana, email: "dana@example.com" },
 };
 const verifier: UserVerifier = async (token) => {
   const u = users[token];
   if (!u) throw new AuthError("bad token");
-  return { privyId: `did:privy:${token}`, address: u.account.address, email: u.email };
+  return { privyId: `did:privy:${token}`, address: u.user.account, publicKey: u.user.publicKey, email: u.email };
 };
 
 async function call(method: string, path: string, opts: { body?: unknown; key?: string; user?: string; admin?: string } = {}) {
@@ -61,59 +58,48 @@ async function call(method: string, path: string, opts: { body?: unknown; key?: 
 
 const company = (method: string, path: string, body?: unknown) => call(method, path, { key: apiKey, body });
 
-/** What the browser does: sign the returned EIP-712 request with the user's wallet. */
-async function sign(account: PrivateKeyAccount, request: Json): Promise<Hex> {
-  const fields: { name: string; type: string }[] = request.types[request.primaryType];
-  const message: Json = {};
-  for (const f of fields) {
-    const v = request.message[f.name];
-    message[f.name] = f.type.startsWith("uint") ? BigInt(v) : v;
-  }
-  return account.signTypedData({ domain: request.domain, types: request.types, primaryType: request.primaryType, message });
+/** What the browser does: the user's NEAR wallet signs the delegate action's hash. */
+function sign(key: KeyPair, hash: string): string {
+  return `0x${Buffer.from(key.sign(Buffer.from(hash.replace(/^0x/, ""), "hex")).signature).toString("hex")}`;
 }
 
 /** sign/:action then submit/:action, as our hosted pages do. */
 async function act(user: string, action: string, input: Json) {
   const prepared = await call("POST", `/v1/me/sign/${action}`, { user, body: input });
   assert.equal(prepared.status, 200, JSON.stringify(prepared.body));
-  const signature = await sign(users[user].account, prepared.body.request);
-  return call("POST", `/v1/me/submit/${action}`, { user, body: { message: prepared.body.request.message, signature } });
+  const { hash } = prepared.body.request;
+  return call("POST", `/v1/me/submit/${action}`, { user, body: { hash, signature: sign(users[user].user.key, hash) } });
 }
 
+const usdtOf = (account: string) => chain.view<string>(chain.usdt, "ft_balance_of", { account_id: account });
+
 before(async () => {
-  if (skip) return;
-  chain = await startLocalChain();
   const config = loadConfig({
-    RPC_URL: chain.rpcUrl,
-    VAULT_ADDRESS: chain.vault,
-    USDT_ADDRESS: chain.usdt,
-    DATA_DIR: mkdtempSync(join(tmpdir(), "uc-api-")),
-    OPERATOR_KEY: ANVIL_KEY,
+    VAULT_ACCOUNT_ID: chain.vault,
+    USDT_ACCOUNT_ID: chain.usdt,
+    RELAYER_ACCOUNT_ID: chain.relayerId,
+    RELAYER_PRIVATE_KEY: KeyPair.fromRandom("ed25519").toString(),
+    ADMIN_TOKEN: "dev-admin",
+    DATA_DIR: mkdtempSync(join(tmpdir(), "kredo-api-")),
   });
-  ctx = await createContext(config, { verifier, memoryDb: true });
+  ctx = await createContext(config, { verifier, memoryDb: true, chain });
   const server = createServer(ctx).listen(0);
   await new Promise((r) => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   close = () => server.close();
 
-  // Alice holds $20 of test USDT in her wallet, as if from the Whitechain booth.
-  const hash = await chain.clients.walletClient.writeContract({
-    address: chain.usdt,
-    abi: mockUSDTAbi,
-    functionName: "mint",
-    args: [alice.address, 20_000_000n],
-  });
-  await chain.clients.publicClient.waitForTransactionReceipt({ hash });
+  // Alice holds $20 of test USDT in her wallet, as if from a faucet. The payout account can hold USDT.
+  chain.mint(alice.account, 20_000_000n);
+  chain.mint(payout, 0n);
 });
 
 after(async () => {
   close?.();
   ctx?.indexer.stop();
   await ctx?.db.close();
-  chain?.stop();
 });
 
-describe("api", { skip }, () => {
+describe("api", () => {
   test("health and reserves", async () => {
     const h = await call("GET", "/v1/health");
     assert.equal(h.status, 200);
@@ -173,7 +159,7 @@ describe("api", { skip }, () => {
     assert.equal((await call("GET", "/v1/me", { user: "mallory" })).status, 401);
   });
 
-  test("alice buys credits with a gasless permit", async () => {
+  test("alice buys credits with ft_transfer_call, relayed as a meta transaction", async () => {
     const res = await act("alice", "buy", { credits: 1000 });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     const me = await call("GET", "/v1/me", { user: "alice" });
@@ -185,53 +171,53 @@ describe("api", { skip }, () => {
   test("alice connects the app with a 200 credit limit", async () => {
     const res = await act("alice", "connect", { app: appId, credits: 200 });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    const u = await company("GET", `/v1/users/${alice.address}`);
+    const u = await company("GET", `/v1/users/${alice.account}`);
     assert.equal(u.body.connected, true);
     assert.equal(u.body.limit.credits, "200");
   });
 
-  test("a signed message can't be submitted by another account", async () => {
+  test("a signed action can't be submitted by another account, or with someone else's signature", async () => {
     const prepared = await call("POST", "/v1/me/sign/connect", { user: "alice", body: { app: appId, credits: 999 } });
-    const signature = await sign(alice, prepared.body.request);
-    const res = await call("POST", "/v1/me/submit/connect", {
-      user: "bob",
-      body: { message: prepared.body.request.message, signature },
-    });
-    assert.equal(res.status, 403);
+    const { hash } = prepared.body.request;
+    const asBob = await call("POST", "/v1/me/submit/connect", { user: "bob", body: { hash, signature: sign(alice.key, hash) } });
+    assert.equal(asBob.status, 404);
+    const forged = await call("POST", "/v1/me/submit/connect", { user: "alice", body: { hash, signature: sign(bob.key, hash) } });
+    assert.equal(forged.status, 400);
+    assert.equal(forged.body.code, "BadSignature");
   });
 
   test("company charges by action, and a retried ref doesn't charge twice", async () => {
-    const first = await company("POST", "/v1/charges", { user: alice.address, action: "chat.message", ref: "msg-1" });
+    const first = await company("POST", "/v1/charges", { user: alice.account, action: "chat.message", ref: "msg-1" });
     assert.equal(first.status, 201, JSON.stringify(first.body));
     assert.equal(first.body.amount.credits, "2");
     assert.equal(first.body.fee.credits, "0.1");
 
-    const again = await company("POST", "/v1/charges", { user: alice.address, action: "chat.message", ref: "msg-1" });
+    const again = await company("POST", "/v1/charges", { user: alice.account, action: "chat.message", ref: "msg-1" });
     assert.equal(again.status, 200);
     assert.equal(again.body.replayed, true);
     assert.equal(again.body.txHash, first.body.txHash);
 
-    const u = await company("GET", `/v1/users/${alice.address}`);
+    const u = await company("GET", `/v1/users/${alice.account}`);
     assert.equal(u.body.balance.credits, "998");
   });
 
   test("dust charges and sends are refused before they cost gas", async () => {
-    const charge = await company("POST", "/v1/charges", { user: alice.address, credits: "0.5" });
+    const charge = await company("POST", "/v1/charges", { user: alice.account, credits: "0.5" });
     assert.equal(charge.status, 400);
     assert.equal(charge.body.code, "below_minimum");
-    const send = await call("POST", "/v1/me/sign/send", { user: "alice", body: { to: bob.address, credits: "0.1" } });
+    const send = await call("POST", "/v1/me/sign/send", { user: "alice", body: { to: bob.account, credits: "0.1" } });
     assert.equal(send.status, 400);
     assert.equal(send.body.code, "below_minimum");
   });
 
   test("the contract refuses a charge above the limit, with a clear error", async () => {
-    const res = await company("POST", "/v1/charges", { user: alice.address, credits: 500 });
+    const res = await company("POST", "/v1/charges", { user: alice.account, credits: 500 });
     assert.equal(res.status, 422);
     assert.equal(res.body.code, "OverLimit");
   });
 
   test("hold, then capture part of it", async () => {
-    const h = await company("POST", "/v1/holds", { user: alice.address, action: "video.render", quantity: 10, ref: "job-1" });
+    const h = await company("POST", "/v1/holds", { user: alice.account, action: "video.render", quantity: 10, ref: "job-1" });
     assert.equal(h.status, 201, JSON.stringify(h.body));
     assert.equal(h.body.amount.credits, "80");
 
@@ -241,31 +227,30 @@ describe("api", { skip }, () => {
     const again = await company("POST", `/v1/holds/${h.body.holdId}/capture`, {});
     assert.equal(again.body.replayed, true);
 
-    const u = await company("GET", `/v1/users/${alice.address}`);
+    const u = await company("GET", `/v1/users/${alice.account}`);
     assert.equal(u.body.balance.credits, "958");
   });
 
   test("hold, then release returns everything", async () => {
-    const h = await company("POST", "/v1/holds", { user: alice.address, credits: 30, ref: "job-2" });
+    const h = await company("POST", "/v1/holds", { user: alice.account, credits: 30, ref: "job-2" });
     const r = await company("POST", `/v1/holds/${h.body.holdId}/release`);
     assert.equal(r.status, 200, JSON.stringify(r.body));
-    const u = await company("GET", `/v1/users/${alice.address}`);
+    const u = await company("GET", `/v1/users/${alice.account}`);
     assert.equal(u.body.balance.credits, "958");
   });
 
   test("refund, light-mode convert and payout", async () => {
-    const refund = await company("POST", "/v1/refunds", { user: alice.address, credits: 2, ref: "msg-1" });
+    const refund = await company("POST", "/v1/refunds", { user: alice.account, credits: 2, ref: "msg-1" });
     assert.equal(refund.status, 201, JSON.stringify(refund.body));
 
     await company("PUT", "/v1/exchange-rate", { rate: 2 });
-    const conv = await company("POST", "/v1/convert", { user: alice.address, credits: 10 });
+    const conv = await company("POST", "/v1/convert", { user: alice.account, credits: 10 });
     assert.equal(conv.status, 201, JSON.stringify(conv.body));
     assert.equal(conv.body.appCredits, "5");
 
     const p = await company("POST", "/v1/payout");
     assert.equal(p.status, 200, JSON.stringify(p.body));
-    const paid = await ctx.usdt.read.balanceOf([payout]);
-    assert.equal(paid.toString(), p.body.amount.units);
+    assert.equal(await usdtOf(payout), p.body.amount.units);
   });
 
   test("send to a friend by email, then by claim link", async () => {
@@ -273,30 +258,28 @@ describe("api", { skip }, () => {
     const sent = await act("alice", "send", { to: "bob@example.com", credits: 50 });
     assert.equal(sent.status, 201, JSON.stringify(sent.body));
 
-    const linkKey = privateKeyToAccount(generatePrivateKey());
-    const created = await act("alice", "claim", { claimKey: linkKey.address, credits: 25 });
+    const linkKey = KeyPair.fromRandom("ed25519");
+    const claimKey = linkKey.getPublicKey().toString();
+    const created = await act("alice", "claim", { claimKey, credits: 25 });
     assert.equal(created.status, 201, JSON.stringify(created.body));
-    assert.equal((await call("GET", `/v1/claims/${linkKey.address}`)).body.status, "open");
+    assert.equal((await call("GET", `/v1/claims/${claimKey}`)).body.status, "open");
 
-    // Bob opens the link: the link's key signs bob's address in his browser.
-    const signature = await linkKey.signTypedData({
-      domain: { name: "CreditVault", version: "1", chainId: 31337, verifyingContract: ctx.config.vault },
-      types: { RedeemClaim: vaultTypes.RedeemClaim },
-      primaryType: "RedeemClaim",
-      message: { claimKey: linkKey.address, to: bob.address },
-    });
-    const redeemed = await call("POST", `/v1/claims/${linkKey.address}/redeem`, { user: "bob", body: { signature } });
+    // Bob opens the link: the link's key signs the vault's claim message for bob's account.
+    const { message } = (await call("GET", `/v1/me/claims/${claimKey}/message`, { user: "bob" })).body;
+    assert.equal(message, `kredo-claim:${chain.vault}:${claimKey}:${bob.account}`);
+    const signature = Buffer.from(linkKey.sign(Buffer.from(message)).signature).toString("hex");
+    const redeemed = await call("POST", `/v1/claims/${claimKey}/redeem`, { user: "bob", body: { signature } });
     assert.equal(redeemed.status, 200, JSON.stringify(redeemed.body));
 
     const me = await call("GET", "/v1/me", { user: "bob" });
     assert.equal(me.body.balance.credits, "75");
-    assert.equal((await call("GET", `/v1/claims/${linkKey.address}`)).body.status, "claimed");
+    assert.equal((await call("GET", `/v1/claims/${claimKey}`)).body.status, "claimed");
   });
 
   test("after disconnecting, the app can't charge", async () => {
     const res = await act("alice", "disconnect", { app: appId });
     assert.equal(res.status, 200, JSON.stringify(res.body));
-    const charge = await company("POST", "/v1/charges", { user: alice.address, credits: 1 });
+    const charge = await company("POST", "/v1/charges", { user: alice.account, credits: 1 });
     assert.equal(charge.body.code, "OverLimit");
     const me = await call("GET", "/v1/me", { user: "alice" });
     assert.equal(me.body.connections[0].connected, false);
@@ -321,9 +304,9 @@ describe("api", { skip }, () => {
   // ---------------------------------------------------------------- indexer
 
   test("the indexer reads every vault event into activity and stats", async () => {
+    await ctx.indexer.settled();
     await ctx.indexer.tick();
     const status = (await call("GET", "/v1/health")).body.indexer;
-    assert.equal(status.lag, 0);
     assert.equal(status.backed, true);
     assert.equal(status.error, null);
 
@@ -337,7 +320,7 @@ describe("api", { skip }, () => {
 
     // Captured and Released name no user onchain; the indexer fills them in from the hold.
     const captured = mine.body.find((e: Json) => e.type === "Captured");
-    assert.equal(captured.user, alice.address);
+    assert.equal(captured.user, alice.account);
     assert.equal(captured.app, appId);
 
     const theirs = await company("GET", "/v1/activity?limit=500");
@@ -379,9 +362,10 @@ describe("api", { skip }, () => {
       assert.match(secret, /^whsec_/);
 
       assert.equal((await act("alice", "connect", { app: appId, credits: 50 })).status, 201);
-      const charged = await company("POST", "/v1/charges", { user: alice.address, credits: 3, ref: "hooked" });
+      const charged = await company("POST", "/v1/charges", { user: alice.account, credits: 3, ref: "hooked" });
       assert.equal(charged.status, 201, JSON.stringify(charged.body));
 
+      await ctx.indexer.settled();
       await ctx.indexer.tick();
       assert.equal(received.length, 2, "connection.approved, then charge.succeeded");
       const pending = ctx.db.data.deliveries.filter((d) => d.status === "pending");
@@ -411,7 +395,7 @@ describe("api", { skip }, () => {
 
   test("the sweeper releases an expired hold back to the user", async () => {
     const before = (await call("GET", "/v1/me", { user: "alice" })).body.balance.units;
-    const held = await company("POST", "/v1/holds", { user: alice.address, credits: 4 });
+    const held = await company("POST", "/v1/holds", { user: alice.account, credits: 4 });
     assert.equal(held.status, 201, JSON.stringify(held.body));
 
     // Pretend the hold's time is up. The operator may release at any time onchain.
@@ -442,7 +426,7 @@ describe("api", { skip }, () => {
     const again = await act("alice", "connect", { app: appId, credits: 40 });
     const swapped = await company("POST", "/v1/connect/exchange", { code: again.body.code });
     assert.equal(swapped.status, 200, JSON.stringify(swapped.body));
-    assert.equal(swapped.body.user, alice.address);
+    assert.equal(swapped.body.user, alice.account);
     assert.equal(swapped.body.email, "alice@example.com", "the app learns the email the user connected with");
     assert.equal(swapped.body.limit.credits, "40");
 
@@ -472,7 +456,7 @@ describe("api", { skip }, () => {
     const res = await call("POST", "/v1/me/connect-code", { user: "alice", body: { app: appId } });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     const swapped = await company("POST", "/v1/connect/exchange", { code: res.body.code });
-    assert.equal(swapped.body.user, alice.address);
+    assert.equal(swapped.body.user, alice.account);
 
     const notYet = await call("POST", "/v1/me/connect-code", { user: "bob", body: { app: appId } });
     assert.equal(notYet.status, 409);
@@ -505,7 +489,7 @@ describe("api", { skip }, () => {
     const made = await call("POST", "/v1/me/apps", { user: "bob", body: { name: "Bob's Chat", description: "Ask anything." } });
     assert.equal(made.status, 201, JSON.stringify(made.body));
     assert.match(made.body.apiKey, /^uc_live_/);
-    assert.equal(made.body.payout, bob.address, "payout defaults to the owner's wallet");
+    assert.equal(made.body.payout, bob.account, "payout defaults to the owner's NEAR account");
     const id: string = made.body.id;
 
     const mine = await call("GET", "/v1/me/apps", { user: "bob" });
@@ -588,9 +572,8 @@ describe("api", { skip }, () => {
   // ---------------------------------------------------------------- faucet
 
   test("a new user takes test USDT once, and only while their wallet is empty", async () => {
-    // Stock the operator wallet, as the deployer does on Whitechain.
-    const stock = await chain!.clients.walletClient.writeContract({ address: chain!.usdt, abi: mockUSDTAbi, functionName: "mint", args: [chain!.clients.operator.address, 5_000_000n] });
-    await chain!.clients.publicClient.waitForTransactionReceipt({ hash: stock });
+    // Stock the relayer with test USDT, as the deployer does on testnet.
+    chain.mint(chain.relayerId, 5_000_000n);
 
     const before = await call("GET", "/v1/me", { user: "dana" });
     assert.deepEqual(before.body.faucet, { usdt: "0.5", claimed: false, available: true });
@@ -598,8 +581,7 @@ describe("api", { skip }, () => {
     const got = await call("POST", "/v1/me/faucet", { user: "dana" });
     assert.equal(got.status, 200, JSON.stringify(got.body));
     assert.equal(got.body.usdt, "0.5");
-    const wallet = await chain!.clients.publicClient.readContract({ address: chain!.usdt, abi: mockUSDTAbi, functionName: "balanceOf", args: [dana.address] });
-    assert.equal(wallet, 500_000n);
+    assert.equal(await usdtOf(dana.account), "500000");
 
     const again = await call("POST", "/v1/me/faucet", { user: "dana" });
     assert.equal(again.body.code, "faucet_claimed");
@@ -616,8 +598,8 @@ describe("api", { skip }, () => {
     const testKey: string = made.body.testKey;
     assert.match(testKey, /^uc_test_/);
     const t = (method: string, path: string, body?: unknown) => call(method, path, { key: testKey, body });
-    const someone = privateKeyToAccount(generatePrivateKey()).address;
-    const sentBefore = await chain!.clients.publicClient.getTransactionCount({ address: chain!.clients.operator.address });
+    const someone = "someone.testnet";
+    const sentBefore = chain.sent.length;
 
     assert.equal((await t("PUT", "/v1/prices", { prices: {} })).body.code, "test_mode_unsupported", "config stays on the live key");
     const fresh = await t("GET", `/v1/users/${someone}`);
@@ -649,8 +631,7 @@ describe("api", { skip }, () => {
     assert.equal(after.body.balance.credits, "970", "1000 - 10 - 25 + 5 refund");
     assert.equal((await t("POST", "/v1/payout")).body.code, "test_mode_unsupported");
 
-    const sentAfter = await chain!.clients.publicClient.getTransactionCount({ address: chain!.clients.operator.address });
-    assert.equal(sentAfter, sentBefore, "test mode sent nothing onchain");
+    assert.equal(chain.sent.length, sentBefore, "test mode sent nothing onchain");
 
     await t("POST", "/v1/sandbox/reset");
     assert.equal((await t("GET", `/v1/users/${someone}`)).body.balance.credits, "1000");

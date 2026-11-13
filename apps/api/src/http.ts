@@ -40,12 +40,17 @@ const CONTRACT_ERRORS: Record<string, string> = {
   ClaimExists: "That claim link already exists.",
   EnforcedPause: "The network is paused for maintenance. Try again shortly.",
   ZeroAmount: "Nothing to do: the amount is zero.",
+  SameAccount: "That's the same account.",
+  BadExpiry: "That expiry isn't allowed.",
+  BelowMinimumDeposit: "The smallest purchase is 1 credit.",
+  DepositRefunded: "The vault turned the deposit down, so the USDT went back to your wallet.",
+  PayoutFailed: "The USDT transfer failed, so the earnings stay in the vault. Check the payout account can hold USDT.",
+  NotAuthorized: "That account isn't allowed to do this.",
 };
 
 /** The relayer's own limits. Nothing was sent, so nothing was spent. */
 const RELAYER_LIMITS: Record<string, string> = {
   GasTooHigh: "This transaction needs more gas than the network allows.",
-  GasPriceTooHigh: "Gas prices are unusually high right now. Try again shortly.",
   DailyBudgetReached: "The network has hit its daily gas budget. Try again later.",
   AppBudgetReached: "This app has hit its daily gas budget. Try again later.",
   RelayerLowBalance: "The network is low on gas. Only releases, revokes and payouts go through right now.",

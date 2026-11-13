@@ -12,14 +12,14 @@ import { appProfileSchema, companySchema } from "../profile.js";
 import { registerApp } from "../register.js";
 import { amount } from "../units.js";
 import { appRoutes } from "./app.js";
-import { addressSchema, appProfile, txInfo } from "./shared.js";
+import { accountIdSchema, appProfile, txInfo } from "./shared.js";
 
 const MAX_APPS_PER_OWNER = 5;
 
 const createSchema = appProfileSchema.extend({
   name: z.string().trim().min(2).max(60),
   /** Where earnings are paid. Defaults to the owner's own wallet. */
-  payout: addressSchema.optional(),
+  payout: accountIdSchema.optional(),
 });
 
 export function dashboardRoutes(ctx: Context): Router {
@@ -65,7 +65,7 @@ export function dashboardRoutes(ctx: Context): Router {
   /** The owner's apps, with what each has earned and not yet withdrawn. */
   r.get("/me/apps", async (_req, res) => {
     const apps = store.appsOwnedBy(owner(res));
-    const earnings = await Promise.all(apps.map((a) => ctx.vault.read.earningsOf([a.id])));
+    const earnings = await Promise.all(apps.map((a) => ctx.vault.earningsOf(a.id)));
     res.json(
       apps.map((a, i) => ({
         id: a.id,
@@ -161,7 +161,7 @@ export function dashboardRoutes(ctx: Context): Router {
       paidOut: amount(paidOut),
       charges,
       payingUsers: users.size,
-      gas: { transactions: gas.count, wei: gas.wei.toString(), symbol: ctx.chain.nativeCurrency.symbol },
+      gas: { transactions: gas.count, yocto: gas.yocto.toString(), symbol: "NEAR" },
     });
   });
 

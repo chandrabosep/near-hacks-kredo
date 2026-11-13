@@ -1,207 +1,132 @@
-/** Runs the relayer against a throwaway anvil chain with the real contracts. */
+/** Runs the relayer against the in-memory NEAR chain with the vault's rules. */
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
-import { parseEther, parseGwei, type Address } from "viem";
-import { creditVaultAbi } from "../src/abi/CreditVault.js";
+import { before, test } from "node:test";
 import { openDb, type Db } from "../src/db.js";
-import { createRelayer, RelayerError, transient, type Relayer, type RelayerLimits } from "../src/relayer.js";
-import { skipChainTests as skip, startLocalChain, type LocalChain } from "./localChain.js";
+import { parseOutcome } from "../src/near.js";
+import { createRelayer, reasonCode, RelayerError, transient, type Relayer, type RelayerLimits } from "../src/relayer.js";
+import { createFakeChain, type FakeChain } from "./fakeChain.js";
 
-let chain: LocalChain | undefined;
+let chain: FakeChain;
 let db: Db;
 let relayer: Relayer;
 
 before(async () => {
-  if (skip) return;
-  chain = await startLocalChain();
+  chain = createFakeChain();
   db = await openDb();
-  relayer = createRelayer({ clients: chain.clients, db, txTimeoutMs: 10_000 });
+  relayer = createRelayer({ chain, db, vault: chain.vault });
 });
 
-after(() => chain?.stop());
-
-const appAddr = (i: number) => `0x${(0xa000 + i).toString(16).padStart(40, "0")}` as Address;
 const register = (i: number) =>
-  relayer.write(
-    {
-      address: chain!.vault,
-      abi: creditVaultAbi,
-      functionName: "registerApp",
-      args: [appAddr(i), appAddr(100 + i), 500, 0n],
-    },
-    { app: appAddr(i) },
-  );
+  relayer.write({ method: "register_app", args: { app: `app-${i}`, payout: "payout.testnet", fee_bps: 500, max_charge: null } }, { app: `app-${i}` });
 
-test("concurrent writes go out one by one with sequential nonces", { skip }, async () => {
+test("concurrent writes go out one by one, and each records what it burnt", async () => {
   const results = await Promise.all([0, 1, 2, 3, 4].map(register));
-
-  const nonces = await Promise.all(
-    results.map(async (r) => (await chain!.clients.publicClient.getTransaction({ hash: r.hash })).nonce),
-  );
-  for (let i = 1; i < nonces.length; i++) assert.equal(nonces[i], nonces[i - 1] + 1);
-
+  const blocks = results.map((r) => r.outcome.block);
+  for (let i = 1; i < blocks.length; i++) assert.ok(blocks[i] > blocks[i - 1], "in queue order");
   for (const r of results) {
     assert.equal(r.tx.status, "success");
     assert.ok(r.tx.gasUsed > 0n);
-    assert.ok(r.tx.l2Fee > 0n, "gas cost recorded");
+    assert.ok(r.tx.fee > 0n, "NEAR burnt is recorded");
+    assert.equal(r.events[0].event, "app_registered");
   }
 });
 
-test("a call that would revert fails before sending, with the contract's error name", { skip }, async () => {
-  const { publicClient, operator } = chain!.clients;
-  const sentBefore = await publicClient.getTransactionCount({ address: operator.address });
-
+test("a contract panic becomes a RelayerError named after it, and the gas is still recorded", async () => {
   await assert.rejects(
-    relayer.write({
-      address: chain!.vault,
-      abi: creditVaultAbi,
-      functionName: "charge",
-      args: [appAddr(200), appAddr(0), 10_000n, `0x${"01".padStart(64, "0")}`],
-    }),
-    (err: unknown) => err instanceof RelayerError && err.reason === "OverLimit" && err.hash === undefined,
+    relayer.write({ method: "charge", args: { user: "alice.testnet", app: "app-0", amount: "10000", ref_id: "r1" } }),
+    (err: unknown) => err instanceof RelayerError && err.reason === "OverLimit" && !!err.hash,
   );
-
-  const sentAfter = await publicClient.getTransactionCount({ address: operator.address });
-  assert.equal(sentAfter, sentBefore, "nothing was sent, so no gas was spent");
   const last = db.data.txs.at(-1)!;
-  assert.equal(last.status, "failed");
-  assert.equal(last.error, "OverLimit");
-  assert.equal(last.l2Fee + last.l1Fee, 0n);
+  assert.equal(last.status, "reverted");
+  assert.equal(last.error, "Over limit");
+  assert.ok(last.fee > 0n);
 });
 
-test("the queue keeps working after a failure", { skip }, async () => {
-  await assert.rejects(register(0), (err: unknown) => err instanceof RelayerError && err.reason === "AppExists");
-  const r = await register(9);
-  assert.equal(r.tx.status, "success");
+test("a failed write doesn't block the queue", async () => {
+  const [bad, good] = await Promise.allSettled([register(0), register(10)]);
+  assert.equal(bad.status, "rejected");
+  assert.equal((bad as PromiseRejectedResult).reason.reason, "AppExists");
+  assert.equal(good.status, "fulfilled");
 });
 
-test("spent() totals sent transactions, overall and per app", { skip }, () => {
-  const sent = db.data.txs.filter((t) => t.status !== "failed");
-  const { count, wei } = relayer.spent();
-  assert.equal(count, sent.length);
-  assert.equal(wei, sent.reduce((sum, t) => sum + t.l2Fee + t.l1Fee, 0n));
+test("only the vault's own kredo events are handed back", async () => {
+  const r = await register(11);
+  assert.ok(r.events.every((e) => e.executor === chain.vault && e.standard === "kredo"));
+});
 
-  const one = relayer.spent(0, appAddr(1));
-  assert.equal(one.count, 1);
-  assert.ok(one.wei > 0n);
+test("panics and runtime errors map to error codes", () => {
+  assert.equal(reasonCode("Over limit"), "OverLimit");
+  assert.equal(reasonCode("Insufficient balance"), "InsufficientBalance");
+  assert.equal(reasonCode("Paused"), "EnforcedPause");
+  assert.equal(reasonCode("DelegateActionExpired"), "SignatureExpired");
+  assert.equal(reasonCode("DelegateActionInvalidNonce"), "NonceUsed");
+});
+
+test("outcomes are parsed: every receipt's burn, the first failure, and NEP-297 events", () => {
+  const o = parseOutcome(
+    {
+      status: { Failure: { ActionError: { kind: { FunctionCallError: { ExecutionError: "Smart contract panicked: Ref used" } } } } },
+      transaction: { hash: "Tx1" },
+      transaction_outcome: { block_hash: "B", outcome: { logs: [], gas_burnt: 100, tokens_burnt: "10", executor_id: "relayer.testnet", status: { SuccessReceiptId: "R" } } },
+      receipts_outcome: [
+        {
+          block_hash: "B",
+          outcome: {
+            logs: ['EVENT_JSON:{"standard":"kredo","version":"1.0.0","event":"charged","data":[{"user":"a.testnet","amount":"5"}]}', "plain log"],
+            gas_burnt: 200,
+            tokens_burnt: "20",
+            executor_id: "vault.testnet",
+            status: { Failure: { ActionError: { kind: { FunctionCallError: { ExecutionError: "Smart contract panicked: Ref used" } } } } },
+          },
+        },
+      ],
+    },
+    { height: 7, at: 1 },
+  );
+  assert.equal(o.gasBurnt, 300n);
+  assert.equal(o.burnt, 30n);
+  assert.equal(o.failure, "Ref used");
+  assert.deepEqual(o.events.map((e) => [e.event, e.executor, e.data.amount]), [["charged", "vault.testnet", "5"]]);
+});
+
+test("only network trouble is retried", () => {
+  assert.ok(transient(new Error("fetch failed")));
+  assert.ok(transient(new Error("503 Service Unavailable")));
+  assert.ok(!transient(new Error("Smart contract panicked: Over limit")));
 });
 
 // ---------------------------------------------------------------- limits
 
-const roomy: RelayerLimits = {
-  maxTxGas: 500_000n,
-  maxGasPrice: parseGwei("50"),
-  dailyBudget: parseEther("1"),
-  appDailyBudget: parseEther("1"),
-  minBalance: 0n,
-};
-
-async function limited(overrides: Partial<RelayerLimits>) {
-  const ldb = await openDb();
-  return { ldb, r: createRelayer({ clients: chain!.clients, db: ldb, txTimeoutMs: 10_000, limits: { ...roomy, ...overrides } }) };
+async function limited(limits: RelayerLimits) {
+  return createRelayer({ chain, db: await openDb(), vault: chain.vault, limits });
 }
 
-const registerWith = (r: Relayer, i: number, tagApp = true) =>
-  r.write(
-    {
-      address: chain!.vault,
-      abi: creditVaultAbi,
-      functionName: "registerApp",
-      args: [appAddr(i), appAddr(100 + i), 500, 0n],
-    },
-    tagApp ? { app: appAddr(i) } : {},
-  );
+const ONE_NEAR = 10n ** 24n;
+const roomy: RelayerLimits = { maxTxGas: 300n * 10n ** 12n, dailyBudget: ONE_NEAR, appDailyBudget: ONE_NEAR, minBalance: 0n };
 
-const refused = (reason: string) => (err: unknown) => err instanceof RelayerError && err.reason === reason && !err.hash;
-
-async function sentCount() {
-  const { publicClient, operator } = chain!.clients;
-  return publicClient.getTransactionCount({ address: operator.address });
-}
-
-test("within the limits, a transaction goes out with a capped gas limit", { skip }, async () => {
-  const { r } = await limited({});
-  const res = await registerWith(r, 20);
-  const tx = await chain!.clients.publicClient.getTransaction({ hash: res.hash });
-  assert.ok(tx.gas <= roomy.maxTxGas);
-  assert.equal(res.tx.status, "success");
+test("too much gas is refused before sending", async () => {
+  const r = await limited({ ...roomy, maxTxGas: 10n ** 12n });
+  const sent = chain.sent.length;
+  await assert.rejects(register(20).then(() => r.write({ method: "set_app_active", args: { app: "app-20", active: false } })), (e: unknown) => e instanceof RelayerError && e.reason === "GasTooHigh");
+  assert.equal(chain.sent.length, sent + 1, "only the unlimited register went out");
 });
 
-test("a transaction above the gas ceiling is refused before sending", { skip }, async () => {
-  const { r, ldb } = await limited({ maxTxGas: 21_000n });
-  const before = await sentCount();
-  await assert.rejects(registerWith(r, 21), refused("GasTooHigh"));
-  assert.equal(await sentCount(), before);
-  assert.equal(ldb.data.txs.at(-1)!.error, "GasTooHigh");
+test("the daily budget stops spending but never exits", async () => {
+  const r = await limited({ ...roomy, dailyBudget: 1n, appDailyBudget: 1n });
+  await assert.rejects(r.write({ method: "set_app_active", args: { app: "app-0", active: true } }), (e: unknown) => e instanceof RelayerError && e.reason === "DailyBudgetReached");
+  // A release is an exit: it goes out whatever the budget says (and fails onchain here, as there is no hold).
+  await assert.rejects(r.write({ method: "release", args: { hold_id: "none" } }), (e: unknown) => e instanceof RelayerError && e.reason === "HoldNotOpen");
 });
 
-test("a gas price above the ceiling is refused", { skip }, async () => {
-  const { r } = await limited({ maxGasPrice: 1n });
-  await assert.rejects(registerWith(r, 22), refused("GasPriceTooHigh"));
-});
-
-test("the daily budget stops new work but exits still go out", { skip }, async () => {
-  const { r } = await limited({ dailyBudget: 1n, appDailyBudget: 1n });
-  await assert.rejects(registerWith(r, 23), refused("DailyBudgetReached"));
-
-  // The operator revoking its own limit is an exit: no signature needed, and it skips the budget.
-  const operator = chain!.clients.operator.address;
-  const res = await r.write({
-    address: chain!.vault,
-    abi: creditVaultAbi,
-    functionName: "revokeApp",
-    args: [operator, appAddr(1), `0x${"00".repeat(32)}`, 0n, "0x"],
-  });
-  assert.equal(res.tx.status, "success");
-
+test("below the balance floor, only exits go out", async () => {
+  const r = await limited({ ...roomy, minBalance: 1_000n * ONE_NEAR });
+  await assert.rejects(r.write({ method: "set_app_active", args: { app: "app-0", active: true } }), (e: unknown) => e instanceof RelayerError && e.reason === "RelayerLowBalance");
   const s = await r.status();
   assert.equal(s.exitsOnly, true);
-  assert.equal(s.budgetLeft, 0n);
 });
 
-test("one app's budget can't spend the whole relayer's", { skip }, async () => {
-  const { r } = await limited({ appDailyBudget: 1n });
-  await assert.rejects(registerWith(r, 24), refused("AppBudgetReached"));
-  const res = await registerWith(r, 24, false);
-  assert.equal(res.tx.status, "success");
-});
-
-test("below the minimum balance, only exits go out", { skip }, async () => {
-  const { r } = await limited({ minBalance: parseEther("1000000") });
-  await assert.rejects(registerWith(r, 25), refused("RelayerLowBalance"));
-  assert.equal((await r.status()).exitsOnly, true);
-});
-
-// ---------------------------------------------------------------- retries
-
-test("only RPC hiccups and nonce clashes count as retryable", () => {
-  assert.equal(transient(new Error("nonce too low: next nonce 7, tx nonce 6")), "nonce");
-  assert.equal(transient(new Error("replacement transaction underpriced")), "nonce");
-  assert.equal(transient(new Error("The request took too long to respond. Timed out")), "network");
-  assert.equal(transient(new Error("fetch failed")), "network");
-  assert.equal(transient(new Error("execution reverted: OverLimit")), undefined);
-});
-
-test("a send that fails once on the network goes out on the retry", { skip }, async () => {
-  const { walletClient } = chain!.clients;
-  let failures = 1;
-  const flaky = {
-    ...chain!.clients,
-    walletClient: {
-      ...walletClient,
-      writeContract: ((args: Parameters<typeof walletClient.writeContract>[0]) => {
-        if (failures-- > 0) return Promise.reject(new Error("fetch failed"));
-        return walletClient.writeContract(args);
-      }) as typeof walletClient.writeContract,
-    } as typeof walletClient,
-  };
-  const r = createRelayer({ clients: flaky, db: await openDb(), txTimeoutMs: 10_000 });
-  const res = await r.write({
-    address: chain!.vault,
-    abi: creditVaultAbi,
-    functionName: "registerApp",
-    args: [appAddr(40), appAddr(140), 500, 0n],
-  });
-  assert.equal(res.tx.status, "success");
-  assert.equal(failures, -1, "the first try failed, the second went out");
+test("an app's own budget is separate", async () => {
+  const r = await limited({ ...roomy, appDailyBudget: 1n });
+  await assert.rejects(r.write({ method: "set_app_active", args: { app: "app-0", active: true } }, { app: "app-0" }), (e: unknown) => e instanceof RelayerError && e.reason === "AppBudgetReached");
+  await r.write({ method: "set_app_active", args: { app: "app-0", active: true } });
 });

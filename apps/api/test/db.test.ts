@@ -1,24 +1,24 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { bindToGenesis, dbFileFor, openDb, pgDirFor } from "../src/db.js";
+import { bindToVault, openDb, pgDirFor } from "../src/db.js";
 import { createStore, hashApiKey } from "../src/store.js";
 
-const tmpDir = () => mkdtempSync(join(tmpdir(), "uc-db-"));
-const PAYOUT = "0x00000000000000000000000000000000000000aa";
+const tmpDir = () => mkdtempSync(join(tmpdir(), "kredo-db-"));
+const PAYOUT = "payout.kredo.testnet";
 
 test("records and bigints survive a write and reopen", async () => {
   const dir = tmpDir();
   const db = await openDb({ dir });
-  db.data.txs.push({ fn: "charge", status: "success", gasUsed: 123n, l2Fee: 10n ** 18n, l1Fee: 7n, at: 1 });
-  db.data.events.push({ id: "0x01:0", event: "Charged", block: 5, logIndex: 0, txHash: "0x01", at: 1_700_000_000_000, units: 2n ** 200n });
+  db.data.txs.push({ fn: "charge", status: "success", gasUsed: 123n, fee: 10n ** 24n, at: 1 });
+  db.data.events.push({ id: "6i6ZaUXg:0", event: "Charged", block: 5, logIndex: 0, txHash: "6i6ZaUXg", at: 1_700_000_000_000, units: 2n ** 200n });
   db.data.cursor = 42;
   await db.close();
 
   const again = await openDb({ dir });
-  assert.equal(again.data.txs[0].l2Fee, 10n ** 18n);
+  assert.equal(again.data.txs[0].fee, 10n ** 24n);
   assert.equal(typeof again.data.txs[0].gasUsed, "bigint");
   assert.equal(again.data.events[0].units, 2n ** 200n, "numeric holds amounts past 64 bits");
   assert.equal(again.data.events[0].at, 1_700_000_000_000);
@@ -59,35 +59,22 @@ test("save is debounced into one write", async () => {
   await again.close();
 });
 
-test("a new genesis wipes data from an earlier local chain", async () => {
+test("data from another network or vault is wiped", async () => {
   const db = await openDb();
-  assert.equal(await bindToGenesis(db, "0x01"), false);
+  assert.equal(await bindToVault(db, "testnet:vault.kredo.testnet"), false);
   createStore(db).createApp({ name: "Video", payout: PAYOUT, feeBps: 500 });
 
-  assert.equal(await bindToGenesis(db, "0x01"), false, "same chain keeps data");
+  assert.equal(await bindToVault(db, "testnet:vault.kredo.testnet"), false, "same vault keeps data");
   assert.equal(db.data.apps.length, 1);
 
-  assert.equal(await bindToGenesis(db, "0x02"), true);
+  assert.equal(await bindToVault(db, "mainnet:vault.kredo.near"), true);
   assert.equal(db.data.apps.length, 0);
-  assert.equal(db.data.genesis, "0x02");
+  assert.equal(db.data.genesis, "mainnet:vault.kredo.near");
   await db.close();
 });
 
-test("an older JSON data file is imported once", async () => {
-  const dir = tmpDir();
-  const legacyFile = join(dir, "db.json");
-  writeFileSync(legacyFile, JSON.stringify({ apps: [], users: [{ privyId: "did:privy:1", address: PAYOUT, createdAt: 1 }], txs: [{ fn: "charge", status: "success", gasUsed: { $bigint: "9" }, l2Fee: { $bigint: "1" }, l1Fee: { $bigint: "0" }, at: 1 }], cursor: 7 }));
-  const db = await openDb({ dir: join(dir, "pg"), legacyFile });
-  assert.equal(db.data.users[0].privyId, "did:privy:1");
-  assert.equal(db.data.txs[0].gasUsed, 9n);
-  assert.equal(db.data.cursor, 7);
-  await db.close();
-});
-
-test("one database per chain and vault", () => {
-  const vault = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
-  assert.equal(dbFileFor("/data", 1874, vault), join("/data", "db-1874-e7f1725e.json"));
-  assert.equal(pgDirFor("/data", 1874, vault), join("/data", "pg-1874-e7f1725e"));
+test("one database per network and vault", () => {
+  assert.equal(pgDirFor("/data", "testnet", "vault.kredo-network.testnet"), join("/data", "pg-testnet-vault-kredo-network-testnet"));
 });
 
 test("API keys are stored only as hashes", async () => {
@@ -100,7 +87,8 @@ test("API keys are stored only as hashes", async () => {
   assert.equal(store.keysOf(app)[0].hash, hashApiKey(apiKey));
   assert.equal(store.appByApiKey(apiKey)?.id, app.id);
   assert.equal(store.appByApiKey(`${apiKey}x`), undefined);
-  assert.equal(store.appById(app.id.toLowerCase() as `0x${string}`)?.name, "Video");
+  assert.match(app.id, /^app-[0-9a-f]{16}$/, "a vault app id");
+  assert.equal(store.appById(app.id)?.name, "Video");
   await db.close();
 });
 
@@ -108,19 +96,19 @@ test("hold status updates", async () => {
   const db = await openDb();
   const store = createStore(db);
   store.putHold({
-    holdId: "0xabc",
+    holdId: "abc",
     app: PAYOUT,
     user: PAYOUT,
     units: 800_000n,
-    ref: "0x01",
+    ref: "01",
     label: "10s video",
     expiry: 0,
     status: "open",
-    txHash: "0x02",
+    txHash: "6i6ZaUXg",
   });
   assert.equal(store.openHolds().length, 1);
-  store.setHoldStatus("0xABC", "captured");
+  store.setHoldStatus("ABC", "captured");
   assert.equal(store.openHolds().length, 0);
-  assert.equal(store.hold("0xabc")?.status, "captured");
+  assert.equal(store.hold("abc")?.status, "captured");
   await db.close();
 });
