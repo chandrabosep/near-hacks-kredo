@@ -1,15 +1,20 @@
 {
   "name": "kredo",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "Server kit for charging Kredo credits from a company backend",
   "license": "MIT",
-  "homepage": "https://kredo-omega.vercel.app/docs/sdk",
+  "homepage": "https://kredo-near.vercel.app/docs/sdk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chandrabosep/near-hacks-kredo.git",
+    "directory": "packages/sdk"
+  },
   "keywords": [
     "kredo",
     "credits",
     "payments",
     "usdt",
-    "whitechain",
+    "near",
     "sdk"
   ],
   "type": "module",
@@ -35,9 +40,9 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "near-api-js": "7.4.0",
     "tsx": "^4.23.15",
-    "typescript": "^5.9.3",
-    "viem": "^2.57.16"
+    "typescript": "^5.9.3"
   },
   "publishConfig": {
     "access": "public"

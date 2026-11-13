@@ -4,13 +4,13 @@ import type { Amount, DirectoryEntry, NetworkStats, Reserves } from "./types.js"
 
 export type Health = {
   ok: boolean;
-  chainId: number;
+  network: string;
   block: number;
   vault: string;
   usdt: string;
-  relayer: { address: string; balance: string; symbol: string };
+  relayer: { account: string; balance: string; symbol: string };
   login: "privy" | "disabled";
-  indexer: { block: number; head: number; lag: number; backed: boolean; events: number; pendingWebhooks: number; error: string | null };
+  indexer: { block: number; head: number; backed: boolean; events: number; pendingWebhooks: number; error: string | null };
 };
 
 export type ClaimPreview = { claimKey: string; amount: Amount; status: "open" | "claimed" | "cancelled" | "expired"; expiresAt: string };
@@ -20,7 +20,7 @@ export class CreditsNetwork {
   private readonly fetchFn: typeof fetch;
 
   constructor(opts: { baseUrl?: string; fetch?: typeof fetch } = {}) {
-    this.baseUrl = (opts.baseUrl ?? "https://kredo-api.onrender.com").replace(/\/+$/, "");
+    this.baseUrl = (opts.baseUrl ?? "https://kredo-near-api.onrender.com").replace(/\/+$/, "");
     this.fetchFn = opts.fetch ?? globalThis.fetch;
   }
 

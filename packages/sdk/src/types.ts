@@ -79,7 +79,8 @@ export type Conversion = Operation & { kind: "convert"; appCredits: string };
 
 export type Payout = Operation & { kind: "payout"; to: string; usdt: string };
 
-export type GasReport = { transactions: number; wei: string; gas: string; symbol: string; paidBy: "network" };
+/** Gas the network paid for your app's transactions: yoctoNEAR, and the same as NEAR in `gas`. */
+export type GasReport = { transactions: number; yocto: string; gas: string; symbol: "NEAR"; paidBy: "network" };
 
 /** One vault event, newest first in every feed. */
 export type ActivityItem = {
@@ -154,5 +155,5 @@ export type DirectoryEntry = { id: string; name: string; prices: PriceList; exch
 /** The state the React kit renders, as your backend returns it from `credits.session()`. */
 export type CreditsSession = {
   app: { id: string; name: string };
-  user: { address: string; email: string | null; balance: Amount; connected: boolean; limit: Amount; spendable: Amount } | null;
+  user: { account: string; email: string | null; balance: Amount; connected: boolean; limit: Amount; spendable: Amount } | null;
 };

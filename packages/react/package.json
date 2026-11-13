@@ -1,16 +1,21 @@
 {
   "name": "kredo-react",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Kredo buttons and balance for any React app",
   "license": "MIT",
-  "homepage": "https://kredo-omega.vercel.app/docs/react",
+  "homepage": "https://kredo-near.vercel.app/docs/react",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chandrabosep/near-hacks-kredo.git",
+    "directory": "packages/react"
+  },
   "keywords": [
     "kredo",
     "credits",
     "payments",
     "react",
     "usdt",
-    "whitechain"
+    "near"
   ],
   "type": "module",
   "main": "dist/index.js",

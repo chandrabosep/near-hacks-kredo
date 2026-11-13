@@ -38,7 +38,7 @@ test("sends the API key and builds the quote query", async () => {
 
 test("a charge without a ref gets one, and keeps it across a retry", async () => {
   const api = fakeApi([new TypeError("socket hang up"), json(201, { kind: "charge" })]);
-  await client(api.fetch).charge({ user: "0xabc", credits: 2 });
+  await client(api.fetch).charge({ user: "alice.testnet", credits: 2 });
   assert.equal(api.seen.length, 2);
   const [first, second] = api.seen;
   assert.match(first.body.ref, /^[0-9a-f-]{36}$/);
@@ -47,20 +47,20 @@ test("a charge without a ref gets one, and keeps it across a retry", async () =>
 });
 
 test("your own ref is sent as is", async () => {
-  const api = fakeApi([json(201, { kind: "hold", holdId: "0x01" })]);
-  await client(api.fetch).hold({ user: "0xabc", action: "video.render", quantity: 3, ref: "job-42", ttlSeconds: 600 });
-  assert.deepEqual(api.seen[0].body, { user: "0xabc", action: "video.render", quantity: 3, ref: "job-42", ttlSeconds: 600 });
+  const api = fakeApi([json(201, { kind: "hold", holdId: "9f2c01" })]);
+  await client(api.fetch).hold({ user: "alice.testnet", action: "video.render", quantity: 3, ref: "job-42", ttlSeconds: 600 });
+  assert.deepEqual(api.seen[0].body, { user: "alice.testnet", action: "video.render", quantity: 3, ref: "job-42", ttlSeconds: 600 });
 });
 
 test("a rate limit is waited out, then retried", async () => {
   const api = fakeApi([json(429, { error: "Too many requests", code: "rate_limited" }, { "retry-after": "0" }), json(201, {})]);
-  await client(api.fetch).refund({ user: "0xabc", credits: "1.5" });
+  await client(api.fetch).refund({ user: "alice.testnet", credits: "1.5" });
   assert.equal(api.seen.length, 2);
 });
 
 test("a contract refusal is a declined CreditsError and isn't retried", async () => {
   const api = fakeApi([json(422, { error: "The user hasn't approved this app for that much.", code: "OverLimit" })]);
-  const err = await client(api.fetch).charge({ user: "0xabc", credits: 1000 }).catch((e) => e);
+  const err = await client(api.fetch).charge({ user: "alice.testnet", credits: 1000 }).catch((e) => e);
   assert.ok(err instanceof CreditsError);
   assert.equal(err.status, 422);
   assert.equal(err.code, "OverLimit");
@@ -71,7 +71,7 @@ test("a contract refusal is a declined CreditsError and isn't retried", async ()
 
 test("a paused relayer is retryable, not declined", async () => {
   const api = fakeApi([json(503, { error: "The network has hit its daily gas budget.", code: "DailyBudgetReached" })]);
-  const err = await client(api.fetch).charge({ user: "0xabc", credits: 1 }).catch((e) => e);
+  const err = await client(api.fetch).charge({ user: "alice.testnet", credits: 1 }).catch((e) => e);
   assert.equal(err.code, "DailyBudgetReached");
   assert.equal(err.isRetryable, true);
   assert.equal(err.isDeclined, false);
@@ -80,7 +80,7 @@ test("a paused relayer is retryable, not declined", async () => {
 test("gives up after the configured retries with a network error", async () => {
   const api = fakeApi([new TypeError("down"), new TypeError("down")]);
   const credits = new Credits({ apiKey: "k", baseUrl: "http://api.test", fetch: api.fetch, retries: 1 });
-  const err = await credits.release("0x01").catch((e) => e);
+  const err = await credits.release("9f2c01").catch((e) => e);
   assert.ok(err instanceof CreditsError);
   assert.equal(err.status, 0);
   assert.equal(err.code, "network");
@@ -89,8 +89,8 @@ test("gives up after the configured retries with a network error", async () => {
 
 test("capture sends a partial amount; holdIds are path-escaped", async () => {
   const api = fakeApi([json(200, { kind: "capture", returned: {} })]);
-  await client(api.fetch).capture("0xab/cd", { credits: 3 });
-  assert.equal(api.seen[0].url.pathname, "/v1/holds/0xab%2Fcd/capture");
+  await client(api.fetch).capture("9f/2c", { credits: 3 });
+  assert.equal(api.seen[0].url.pathname, "/v1/holds/9f%2F2c/capture");
   assert.deepEqual(api.seen[0].body, { credits: 3 });
 });
 

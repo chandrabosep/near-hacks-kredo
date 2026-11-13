@@ -13,7 +13,7 @@
  * Your backend answers two calls at `endpoint` (the SDK's `credits.session()` and
  * `credits.exchangeCode()` do the work):
  *   GET  endpoint          -> CreditsState for the signed-in user of your app
- *   POST endpoint {code}   -> swaps the code from the connect page for the user's address,
+ *   POST endpoint {code}   -> swaps the code from the connect page for the user's NEAR account,
  *                             remembers it in your session, and returns the new CreditsState
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -22,7 +22,7 @@ import { useStyles } from "./styles.js";
 export type Amount = { units: string; credits: string; usd: string };
 
 export type CreditsUser = {
-  address: string;
+  account: string;
   /** The email the user connected with, when your backend passes it to `session()`. */
   email?: string | null;
   balance: Amount;
@@ -54,7 +54,7 @@ type PageMessage = { type: "credits:connected"; code: string } | { type: "credit
 
 export function CreditsProvider({
   endpoint,
-  pagesUrl = "https://kredo-omega.vercel.app",
+  pagesUrl = "https://kredo-near.vercel.app",
   pollMs = 10_000,
   children,
 }: {

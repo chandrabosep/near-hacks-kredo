@@ -36,9 +36,9 @@ import type {
 export type CreditsOptions = {
   /** Your app's API key, `uc_live_...`. */
   apiKey: string;
-  /** The network's API. Defaults to https://kredo-api.onrender.com. */
+  /** The network's API. Defaults to https://kredo-near-api.onrender.com. */
   baseUrl?: string;
-  /** The network's hosted pages (connect, buy, wallet). Defaults to https://kredo-omega.vercel.app. */
+  /** The network's hosted pages (connect, buy, wallet). Defaults to https://kredo-near.vercel.app. */
   pagesUrl?: string;
   /** Extra tries after a network failure or a rate limit. Writes are safe to retry: each carries a ref. Default 2. */
   retries?: number;
@@ -65,8 +65,8 @@ export class Credits {
   constructor(opts: CreditsOptions) {
     if (!opts.apiKey) throw new Error("Credits: apiKey is required");
     this.apiKey = opts.apiKey;
-    this.baseUrl = (opts.baseUrl ?? "https://kredo-api.onrender.com").replace(/\/+$/, "");
-    this.pagesUrl = (opts.pagesUrl ?? "https://kredo-omega.vercel.app").replace(/\/+$/, "");
+    this.baseUrl = (opts.baseUrl ?? "https://kredo-near-api.onrender.com").replace(/\/+$/, "");
+    this.pagesUrl = (opts.pagesUrl ?? "https://kredo-near.vercel.app").replace(/\/+$/, "");
     this.retries = opts.retries ?? 2;
     this.timeoutMs = opts.timeoutMs ?? 60_000;
     this.fetchFn = opts.fetch ?? globalThis.fetch;
@@ -74,7 +74,7 @@ export class Credits {
 
   // ---------------------------------------------------------------- your app
 
-  /** Your app: payout address, fee, unpaid earnings, prices and webhook. */
+  /** Your app: payout account, fee, unpaid earnings, prices and webhook. */
   async app(): Promise<AppInfo> {
     const app = await this.request<AppInfo>("GET", "/v1/app");
     this.appId = app.id;
@@ -103,8 +103,8 @@ export class Credits {
   }
 
   /** A user's balance, whether they've connected your app, and the most you can charge them now. */
-  user(address: string): Promise<UserState> {
-    return this.request("GET", `/v1/users/${encodeURIComponent(address)}`);
+  user(account: string): Promise<UserState> {
+    return this.request("GET", `/v1/users/${encodeURIComponent(account)}`);
   }
 
   // ---------------------------------------------------------------- charging
@@ -181,8 +181,8 @@ export class Credits {
   }
 
   /**
-   * Swaps the one-time code from the connect page for the user's address and email. Call it from
-   * your server, then keep both in your own session. Never take an address from the browser.
+   * Swaps the one-time code from the connect page for the user's NEAR account and email. Call it from
+   * your server, then keep both in your own session. Never take an account from the browser.
    */
   exchangeCode(code: string): Promise<{ user: string; email: string | null; limit: Amount }> {
     return this.request("POST", "/v1/connect/exchange", { body: { code } });
@@ -199,13 +199,13 @@ export class Credits {
     const u = await this.user(user);
     return {
       app,
-      user: { address: u.user, email: opts.email ?? null, balance: u.balance, connected: u.connected, limit: u.limit, spendable: u.spendable },
+      user: { account: u.user, email: opts.email ?? null, balance: u.balance, connected: u.connected, limit: u.limit, spendable: u.spendable },
     };
   }
 
   // ---------------------------------------------------------------- money out and reporting
 
-  /** Pays all your unpaid earnings in USDT to your payout address, on Whitechain. */
+  /** Pays all your unpaid earnings in USDT to your payout account, on NEAR. */
   payout(): Promise<Payout> {
     return this.request("POST", "/v1/payout", { body: {} });
   }

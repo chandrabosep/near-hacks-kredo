@@ -1,40 +1,35 @@
 /**
- * The whole money flow, end to end, through the public SDK.
+ * The whole money flow, end to end, through the public SDK, against the vault on NEAR testnet.
  *
- *   npm run e2e -w kredo                       # local: anvil + API running
- *   CHAIN=whitechain USER_KEY=0x... ADMIN_TOKEN=... API_URL=http://localhost:4000 npm run e2e -w kredo
+ *   USER_ACCOUNT_ID=you.testnet ADMIN_TOKEN=... API_URL=http://localhost:4000 npm run e2e -w kredo
  *
  * A company registers and sets prices. A user tops up and approves a limit for the app. The
  * company then charges, holds and captures, holds and releases, refunds, and is paid out in USDT.
  * Every transaction prints its explorer link.
  *
- * The user here signs onchain with a local key, standing in for the hosted connect and buy pages.
- * Env: API_URL, ADMIN_TOKEN (default dev-admin), CREDITS_API_KEY (skip registering), USER_KEY,
- * CHAIN (local | whitechain).
+ * The user here signs with their own NEAR key, standing in for the hosted connect and buy pages,
+ * and needs test USDT (npm run fund:testnet -- you.testnet) and a little NEAR for gas.
+ * Env: API_URL, ADMIN_TOKEN, CREDITS_API_KEY (skip registering), USER_ACCOUNT_ID, and
+ * USER_PRIVATE_KEY (ed25519:..., else read from ~/.near-credentials/testnet).
  */
-import { createPublicClient, createWalletClient, http, parseAbi, type Address, type Hex } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { anvil, whitechainSepolia } from "viem/chains";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { Account, actions, JsonRpcProvider, KeyPairSigner, type KeyPairString } from "near-api-js";
 import { Credits, CreditsError, CreditsNetwork } from "../src/index.js";
 
 const API_URL = process.env.API_URL ?? "http://localhost:4000";
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? "dev-admin";
-const onWhitechain = process.env.CHAIN === "whitechain";
-const chain = onWhitechain ? whitechainSepolia : anvil;
-/** Anvil's second account, so the user isn't the operator. */
-const LOCAL_USER_KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
-const userKey = (process.env.USER_KEY ?? (onWhitechain ? undefined : LOCAL_USER_KEY)) as Hex | undefined;
-if (!userKey) throw new Error("Set USER_KEY to a wallet that holds test USDT and a little WBT");
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? "dev-admin-token";
+const EXPLORER = process.env.EXPLORER_URL ?? "https://testnet.nearblocks.io";
+const RPC = process.env.NEAR_RPC_URL ?? "https://test.rpc.fastnear.com";
+const userId = process.env.USER_ACCOUNT_ID;
+if (!userId) throw new Error("Set USER_ACCOUNT_ID to a testnet account that holds test USDT and a little NEAR");
 
-const vaultAbi = parseAbi([
-  "function deposit(address user, uint256 amount)",
-  "function approveApp(address user, address app, uint256 limit, uint64 expiry, bytes32 nonce, uint256 deadline, bytes signature)",
-]);
-const usdtAbi = parseAbi([
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function balanceOf(address) view returns (uint256)",
-  "function mint(address to, uint256 amount)",
-]);
+function userKey(): KeyPairString {
+  if (process.env.USER_PRIVATE_KEY) return process.env.USER_PRIVATE_KEY as KeyPairString;
+  const file = join(homedir(), ".near-credentials", "testnet", `${userId}.json`);
+  return (JSON.parse(readFileSync(file, "utf8")) as { private_key: KeyPairString }).private_key;
+}
 
 const UNITS_PER_CREDIT = 10_000n;
 const step = (title: string) => console.log(`\n${title}`);
@@ -43,7 +38,7 @@ const line = (label: string, value: string) => console.log(`  ${label.padEnd(26)
 async function main() {
   const net = new CreditsNetwork({ baseUrl: API_URL });
   const health = await net.health();
-  step(`Network on chain ${health.chainId}, block ${health.block}`);
+  step(`Kredo on NEAR ${health.network}, block ${health.block}`);
   line("vault", health.vault);
   line("relayer gas balance", `${health.relayer.balance} ${health.relayer.symbol}`);
 
@@ -54,7 +49,7 @@ async function main() {
     const res = await fetch(`${API_URL}/v1/admin/apps`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${ADMIN_TOKEN}` },
-      body: JSON.stringify({ name: `Demo ${new Date().toISOString().slice(11, 19)}`, payout: privateKeyToAccount(userKey!).address }),
+      body: JSON.stringify({ name: `Demo ${new Date().toISOString().slice(11, 19)}`, payout: userId }),
     });
     const body = (await res.json()) as { id: string; apiKey: string; explorer?: string; error?: string };
     if (!res.ok) throw new Error(`register failed: ${body.error}`);
@@ -69,53 +64,46 @@ async function main() {
   line("10s render costs", `${quote.price.credits} credits ($${quote.price.usd}), company keeps $${quote.youEarn.usd}`);
 
   // ---------------------------------------------------------------- user
-  const user = privateKeyToAccount(userKey!);
-  const transport = http(onWhitechain ? undefined : "http://127.0.0.1:8545");
-  const pub = createPublicClient({ chain, transport });
-  const wallet = createWalletClient({ account: user, chain, transport });
-  const send = async (label: string, request: Parameters<typeof wallet.writeContract>[0]) => {
-    const hash = await wallet.writeContract(request);
-    await pub.waitForTransactionReceipt({ hash });
-    line(label, explorer(hash));
+  const user = new Account(userId!, new JsonRpcProvider({ url: RPC }), KeyPairSigner.fromSecretKey(userKey()));
+  const call = async (label: string, contract: string, method: string, args: Record<string, unknown>, deposit = 0n) => {
+    const res = await user.signAndSendTransaction({
+      receiverId: contract,
+      actions: [actions.functionCall(method, args, 100_000_000_000_000n, deposit)],
+      waitUntil: "FINAL",
+    });
+    line(label, `${EXPLORER}/txns/${res.transaction.hash}`);
   };
 
   step("User tops up and connects the app");
-  const state = await credits.user(user.address);
+  const state = await credits.user(userId!);
   const need = 60n * UNITS_PER_CREDIT;
   if (BigInt(state.balance.units) < need) {
-    const usdt = health.usdt as Address;
-    if (!onWhitechain) await send("mint test USDT", { address: usdt, abi: usdtAbi, functionName: "mint", args: [user.address, need] } as never);
-    await send("approve USDT", { address: usdt, abi: usdtAbi, functionName: "approve", args: [health.vault as Address, need] } as never);
-    await send("deposit 60 credits", { address: health.vault as Address, abi: vaultAbi, functionName: "deposit", args: [user.address, need] } as never);
+    // NEP-141: the token moves USDT to the vault and calls its ft_on_transfer, which credits the sender.
+    await call("deposit 60 credits", health.usdt, "ft_transfer_call", { receiver_id: health.vault, amount: need.toString(), msg: "" }, 1n);
   }
-  await send("approve 50 credit limit", {
-    address: health.vault as Address,
-    abi: vaultAbi,
-    functionName: "approveApp",
-    args: [user.address, app.id as Address, 50n * UNITS_PER_CREDIT, 0n, `0x${"00".repeat(32)}`, 0n, "0x"],
-  } as never);
-  const connected = await credits.user(user.address);
+  await call("approve 50 credit limit", health.vault, "approve_app", { app: app.id, limit: (50n * UNITS_PER_CREDIT).toString(), expiry: null });
+  const connected = await credits.user(userId!);
   line("balance / spendable", `${connected.balance.credits} / ${connected.spendable.credits} credits`);
 
   // ---------------------------------------------------------------- spending
   step("Company charges, holds, captures, releases and refunds");
-  const charge = await credits.charge({ user: user.address, action: "chat.message", ref: `msg-${Date.now()}` });
+  const charge = await credits.charge({ user: userId!, action: "chat.message", ref: `msg-${Date.now()}` });
   line(`charge ${charge.amount.credits}`, charge.explorer ?? charge.txHash);
 
-  const hold = await credits.hold({ user: user.address, action: "video.render", quantity: 10 });
+  const hold = await credits.hold({ user: userId!, action: "video.render", quantity: 10 });
   line(`hold ${hold.amount.credits}`, hold.explorer ?? hold.txHash);
   const captured = await credits.capture(hold.holdId, { credits: 14 });
   line(`capture 14, return ${captured.returned.credits}`, captured.explorer ?? captured.txHash);
 
-  const failed = await credits.hold({ user: user.address, action: "video.render", quantity: 5 });
+  const failed = await credits.hold({ user: userId!, action: "video.render", quantity: 5 });
   const released = await credits.release(failed.holdId);
   line(`release ${released.amount.credits}`, released.explorer ?? released.txHash);
 
-  const refund = await credits.refund({ user: user.address, credits: 1 });
+  const refund = await credits.refund({ user: userId!, credits: 1 });
   line("refund 1", refund.explorer ?? refund.txHash);
 
   try {
-    await credits.charge({ user: user.address, credits: 10_000 });
+    await credits.charge({ user: userId!, credits: 10_000 });
   } catch (err) {
     if (!(err instanceof CreditsError) || !err.isDeclined) throw err;
     line("over the limit", `declined (${err.code}), no gas spent`);
@@ -132,11 +120,6 @@ async function main() {
   step(`Reserves: ${reserves.backed ? "fully backed" : "NOT BACKED"}`);
   line("USDT in vault", `$${reserves.usdtInVault.usd}`);
   line("owed", `$${reserves.owed.usd}`);
-}
-
-function explorer(hash: string) {
-  const base = chain.blockExplorers?.default.url;
-  return base ? `${base}/tx/${hash}` : hash;
 }
 
 main().catch((err) => {

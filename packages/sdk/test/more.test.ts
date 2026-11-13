@@ -13,7 +13,7 @@ const fakeFetch = (async (input: URL | string, init: RequestInit = {}) => {
     new Response(typeof body === "string" ? body : JSON.stringify(body), { status: 200, headers: { "content-type": type } });
   switch (url.pathname) {
     case "/v1/app":
-      return reply({ id: "0xApp", name: "Video Studio" });
+      return reply({ id: "app-3f9c2a1b", name: "Video Studio" });
     case "/v1/export.csv":
       return reply("date,kind\n2026-11-06,charge\n", "text/csv");
     case "/v1/reserves":
@@ -29,7 +29,7 @@ test("connectUrl looks up the app once and links to the hosted page", async () =
   calls.length = 0;
   const url = new URL(await credits.connectUrl({ credits: 200, returnTo: "https://video.test/done" }));
   assert.equal(url.origin + url.pathname, "https://pay.test/connect");
-  assert.equal(url.searchParams.get("app"), "0xApp");
+  assert.equal(url.searchParams.get("app"), "app-3f9c2a1b");
   assert.equal(url.searchParams.get("credits"), "200");
   assert.equal(url.searchParams.get("returnTo"), "https://video.test/done");
 
@@ -45,7 +45,7 @@ test("company calls hit the right routes", async () => {
   await credits.setPrices({ "chat.message": { price: 2 }, "video.render": { rate: 8, unit: "second" } });
   await credits.setProfile({ description: "Renders video.", category: "media" });
   await credits.setExchangeRate("2");
-  await credits.convert({ user: "0xU", credits: 10 });
+  await credits.convert({ user: "alice.testnet", credits: 10 });
   await credits.payout();
   await credits.activity({ limit: 20 });
   await credits.gas({ since: new Date("2026-11-06T00:00:00Z") });
@@ -78,7 +78,7 @@ test("the network client needs no key", async () => {
 // ---------------------------------------------------------------- webhooks
 
 const secret = "whsec_test";
-const body = JSON.stringify({ id: "0xabc:1", type: "charge.succeeded", createdAt: "2026-11-06T00:00:00.000Z", data: { ref: "job-1" } });
+const body = JSON.stringify({ id: "6i6ZaUXg:1", type: "charge.succeeded", createdAt: "2026-11-06T00:00:00.000Z", data: { ref: "job-1" } });
 const sign = (t: number, b = body, s = secret) => `t=${t},v1=${createHmac("sha256", s).update(`${t}.${b}`).digest("hex")}`;
 const now = 1_793_900_000;
 
@@ -86,7 +86,7 @@ test("a correctly signed webhook verifies and parses", () => {
   const event = verifyWebhook(body, sign(now), secret, { now });
   assert.equal(event.type, "charge.succeeded");
   assert.equal(event.data.ref, "job-1");
-  assert.equal(verifyWebhook(Buffer.from(body), sign(now), secret, { now }).id, "0xabc:1", "raw Buffer bodies work");
+  assert.equal(verifyWebhook(Buffer.from(body), sign(now), secret, { now }).id, "6i6ZaUXg:1", "raw Buffer bodies work");
 });
 
 test("a tampered body, wrong secret, old timestamp or missing header is rejected", () => {

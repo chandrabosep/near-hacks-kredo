@@ -1,12 +1,12 @@
 # kredo
 
-Charge Kredo credits from your server. Your users buy credits once and spend them in every app on the network. You're paid in USDT on Whitechain for what they spend with you.
+Charge Kredo credits from your server. Your users buy credits once and spend them in every app on the network. You're paid in USDT on NEAR for what they spend with you.
 
 ```bash
 npm install kredo
 ```
 
-No dependencies. Node 18+. It talks to the live network on Whitechain Sepolia by default: pass `baseUrl` and `pagesUrl` to point it elsewhere.
+No dependencies. Node 18+. It talks to the live network on NEAR testnet by default: pass `baseUrl` and `pagesUrl` to point it elsewhere.
 
 ## Quick start
 
@@ -42,7 +42,7 @@ Every app also gets a test key, `uc_test_...`, from the dashboard. Use it in pla
 
 ```ts
 const credits = new Credits({ apiKey: process.env.CREDITS_TEST_KEY! });
-const { user } = await credits.exchangeCode(`cc_test_${someAddress}`);   // any address, no hosted page
+const { user } = await credits.exchangeCode(`cc_test_${someAccount}`);   // any account, no hosted page
 await credits.charge({ user, credits: 10 });
 ```
 
@@ -54,14 +54,14 @@ A user has to approve a spending limit for your app before you can charge them. 
 
 1. Send them to the connect page: `await credits.connectUrl({ credits: 200, returnTo })`.
 2. They sign in with email, approve the limit, and come back to `returnTo?code=...`.
-3. On your server, swap the code for their address and keep it in your session:
+3. On your server, swap the code for their NEAR account and keep it in your session:
 
 ```ts
 const { user } = await credits.exchangeCode(req.query.code);
 req.session.creditsUser = user;
 ```
 
-Never take a user's address from the browser. The code works once, only for your app, for 10 minutes.
+Never take a user's NEAR account from the browser. The code works once, only for your app, for 10 minutes.
 
 The React kit ([`kredo-react`](../react)) does this in a popup, and `credits.session(user)` returns exactly what the kit renders.
 
@@ -70,14 +70,14 @@ The React kit ([`kredo-react`](../react)) does this in a popup, and `credits.ses
 | Call | What it does |
 |---|---|
 | `quote({ action, quantity })` | Price in credits and dollars, and what you keep after the network fee |
-| `user(address)` | Balance, whether they connected you, the limit left, and what's spendable now |
+| `user(account)` | Balance, whether they connected you, the limit left, and what's spendable now |
 | `charge({ user, action \| credits, ref })` | Charges now |
 | `hold({ user, action \| credits, ref, ttlSeconds })` | Reserves credits for a job, price locked |
 | `capture(holdId, { credits? })` | Charges all or part of a hold, returns the rest |
 | `release(holdId)` | Returns the whole hold |
 | `refund({ user, credits, ref })` | Gives credits back, up to what they spent with you |
 | `setExchangeRate(rate)`, `convert({ user, credits })` | Light mode: sell your own credits for ours |
-| `payout()` | Pays your unpaid earnings in USDT to your payout address |
+| `payout()` | Pays your unpaid earnings in USDT to your payout account |
 | `activity()`, `exportCsv()`, `gas()` | Reporting. Gas is paid by the network, never by you or your users |
 | `setWebhook(url)`, `webhookDeliveries()` | Signed event delivery |
 | `connectUrl()`, `buyUrl()`, `accountUrl()` | Links to the hosted pages |

@@ -30,7 +30,7 @@ app.get("/api/credits", async (req, res) => {
   res.json(await credits.session(req.session.creditsUser));
 });
 
-// Back from the connect page: swap the one-time code for the user's address.
+// Back from the connect page: swap the one-time code for the user's NEAR account.
 app.post("/api/credits", async (req, res) => {
   const { user } = await credits.exchangeCode(req.body.code);
   req.session.creditsUser = user;
@@ -46,7 +46,7 @@ The connect page posts the code only to your page's own origin. If popups are bl
 
 ```tsx
 const { state, connect, buy, openWallet, refresh } = useCredits();
-// state.user: { address, balance, connected, limit, spendable } or null
+// state.user: { account, balance, connected, limit, spendable } or null
 ```
 
 Styles are injected once and use `uc-*` class names, so you can override them.
