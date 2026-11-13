@@ -13,7 +13,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { Context } from "../context.js";
 import { HttpError, requireUser, userOf } from "../http.js";
-import { createIntents, IntentsError, settled, type BuyQuote, type Intents } from "../intents.js";
+import { createIntents, IntentsError, MAINNET_USDT, settled, type BuyQuote, type Intents } from "../intents.js";
 import { explorerTx, type AccountId } from "../near.js";
 import { amount, creditsToUnits } from "../units.js";
 import { creditsSchema } from "./shared.js";
@@ -34,6 +34,12 @@ export function intentsRoutes(ctx: Context, opts: { intents?: Intents; env?: Rec
   // Live quotes move real money, so they're on only where the vault holds real USDT.
   const live = (env.INTENTS_LIVE ?? (config.network === "mainnet" ? "true" : "false")) === "true";
   const maxCredits = Number(env.INTENTS_MAX_CREDITS ?? DEFAULT_MAX_CREDITS);
+  if (live && config.usdt !== MAINNET_USDT) {
+    throw new Error(`INTENTS_LIVE needs a vault holding ${MAINNET_USDT}; this one holds ${config.usdt}`);
+  }
+  // 1Click only quotes to accounts that exist on mainnet. A dry quote's price doesn't depend on the
+  // recipient, so off mainnet it quotes into a stand-in: the mainnet vault, or intents.near.
+  const quoteVault = live ? config.vault : (env.INTENTS_PREVIEW_RECIPIENT ?? "intents.near");
   /** Live quotes by deposit address, so a user can only follow their own. Lost on restart, which only loses the check. */
   const quotes = new Map<string, { user: AccountId; quote: BuyQuote }>();
 
@@ -70,7 +76,7 @@ export function intentsRoutes(ctx: Context, opts: { intents?: Intents; env?: Rec
       if (units > creditsToUnits(maxCredits)) throw new HttpError(400, `The most one purchase can be is ${maxCredits} credits.`, "above_maximum");
       const user = userOf(res).address;
       if (live) await ensureVaultStorage(user);
-      const quote = await intents.quote({ originAsset: body.originAsset, units, user, vault: config.vault, usdt: config.usdt, refundTo: body.refundTo, dry: !live });
+      const quote = await intents.quote({ originAsset: body.originAsset, units, user, vault: quoteVault, usdt: MAINNET_USDT, refundTo: body.refundTo, dry: !live });
       if (quote.depositAddress) quotes.set(quote.depositAddress, { user, quote });
       res.json({
         ...quote,

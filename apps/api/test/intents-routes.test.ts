@@ -16,7 +16,7 @@ import { AuthError, type UserVerifier } from "../src/auth.js";
 import { loadConfig } from "../src/config.js";
 import { createContext, type Context } from "../src/context.js";
 import { errorHandler } from "../src/http.js";
-import { createIntents } from "../src/intents.js";
+import { createIntents, MAINNET_USDT } from "../src/intents.js";
 import { intentsRoutes } from "../src/routes/intents.js";
 import { createFakeChain, newUserKey } from "./fakeChain.js";
 
@@ -57,8 +57,11 @@ const fake1Click = (async (url: string, init: RequestInit) => {
 
 /** Starts the intents routes on their own server, as `network` would see them. */
 async function serve(env: Record<string, string>) {
+  // A live vault holds real USDT; the guard in intentsRoutes checks it.
+  const usdt = env.INTENTS_LIVE === "true" ? MAINNET_USDT : ctx.config.usdt;
   const stubbed = {
     ...ctx,
+    config: { ...ctx.config, usdt },
     chain: {
       ...ctx.chain,
       view: async <T>(contract: string, method: string, args?: Record<string, unknown>): Promise<T> => {
@@ -164,10 +167,17 @@ describe("intents routes", () => {
     const r = await call("POST", "/v1/me/intents/quote", { user: "alice", body: buy });
     assert.equal(r.status, 200);
     assert.equal(quoteBodies[0].dry, true);
+    // 1Click only quotes to real mainnet accounts, so the preview uses stand-ins for the testnet vault and USDT.
+    assert.equal(quoteBodies[0].recipient, "intents.near");
+    assert.equal(quoteBodies[0].destinationAsset, `nep141:${MAINNET_USDT}`);
     assert.equal(r.body.live, false);
     assert.equal(r.body.depositAddress, undefined);
     assert.match(r.body.note, /Preview only/);
     assert.deepEqual(storageDeposits, []);
+  });
+
+  test("won't run live quotes for a vault that doesn't hold real USDT", () => {
+    assert.throws(() => intentsRoutes(ctx, { intents: createIntents({ fetch: fake1Click }), env: { INTENTS_LIVE: "true" } }), /needs a vault holding usdt.tether-token.near/);
   });
 
   test("refuses amounts under 1 credit or over the cap", async () => {
