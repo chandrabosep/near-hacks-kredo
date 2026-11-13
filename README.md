@@ -61,7 +61,7 @@ NEAR makes per-use pricing possible. A charge costs a fraction of a cent in gas,
 
 | | |
 |---|---|
-| Vault | [`vault.kredo-network.testnet`](https://testnet.nearblocks.io/address/vault.kredo-network.testnet) |
+| Vault | [`vault-v2.kredo-network.testnet`](https://testnet.nearblocks.io/address/vault-v2.kredo-network.testnet) |
 | Test USDT (NEP-141, 6 decimals) | [`usdt.kredo-network.testnet`](https://testnet.nearblocks.io/address/usdt.kredo-network.testnet) |
 | Vault deploy | [`7fd62Fu…oegw`](https://testnet.nearblocks.io/txns/7fd62FuSFSDY6huZzcCZX1tPza75ZRuBrwczZLBqoegw) |
 | Test USDT deploy | [`6i6ZaUX…moMeb`](https://testnet.nearblocks.io/txns/6i6ZaUXg4KwtFpn6FQkkQPvfkhvJPDzPEoSB3tYmoMeb) |

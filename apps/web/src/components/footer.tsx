@@ -4,7 +4,7 @@ import { DitherField } from "@/components/dots";
 const COLUMNS = [
   { title: "Use", links: [["Account", "/account"], ["Buy credits", "/buy"], ["Reserves", "/reserves"]] },
   { title: "Build", links: [["Docs", "/docs"], ["Quickstart", "/docs"], ["SDK", "https://github.com/chandrabosep/near-hacks-kredo/tree/main/packages/sdk"], ["Contracts", "https://github.com/chandrabosep/near-hacks-kredo/tree/main/contracts"]] },
-  { title: "Network", links: [["Vault on explorer", "https://testnet.nearblocks.io/address/vault.kredo-network.testnet"], ["NEAR", "https://near.org"]] },
+  { title: "Network", links: [["Vault on explorer", "https://testnet.nearblocks.io/address/vault-v2.kredo-network.testnet"], ["NEAR", "https://near.org"]] },
 ];
 
 export function Footer() {

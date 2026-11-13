@@ -30,7 +30,7 @@ usdt.ft_balance_of(vault) >= Σ user balances + Σ held + Σ claims + Σ app ear
 
 | | |
 |---|---|
-| Vault | `vault.kredo-network.testnet` |
+| Vault | `vault-v2.kredo-network.testnet` |
 | Test USDT | `usdt.kredo-network.testnet` (NEP-141, `USDT`, **6** decimals, owner-only mint for the faucet) |
 | Owner and fee recipient | `kredo-network.testnet` |
 | Operator (relayer) | `relayer.kredo-network.testnet` |
