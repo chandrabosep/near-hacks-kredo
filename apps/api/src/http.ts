@@ -23,6 +23,7 @@ const CONTRACT_ERRORS: Record<string, string> = {
   LimitExpired: "The user's approval for this app has expired.",
   InsufficientBalance: "The user doesn't have enough credits.",
   OverMaxCharge: "Above this app's largest allowed single charge.",
+  NotAppSigner: "Only this app's own signer account can charge for it. Check the SDK's signerKey.",
   AppInactive: "This app is switched off.",
   UnknownApp: "This app isn't registered on the vault.",
   RefUsed: "That ref was already used for this app.",

@@ -2,7 +2,7 @@
 import type { AccountId, Chain } from "./near.js";
 
 export type Limit = { remaining: bigint; expiry: number; version: number };
-export type OnchainApp = { payout: AccountId; feeBps: number; maxCharge: bigint; active: boolean };
+export type OnchainApp = { payout: AccountId; signer: AccountId; feeBps: number; maxCharge: bigint; active: boolean };
 export type OnchainHold = { user: AccountId; app: string; amount: bigint; expiry: number; status: "Open" | "Captured" | "Released" };
 export type OnchainClaim = { from: AccountId; amount: bigint; expiry: number; status: "Open" | "Claimed" | "Cancelled" };
 export type StorageBalance = { total: bigint; available: bigint };
@@ -25,8 +25,8 @@ export function createVault(chain: Chain, vault: AccountId, usdt: AccountId) {
     },
 
     async getApp(app: string): Promise<OnchainApp | undefined> {
-      const a = await v<{ payout: string; fee_bps: number; max_charge: U128; active: boolean } | null>("get_app", { app });
-      return a ? { payout: a.payout, feeBps: a.fee_bps, maxCharge: BigInt(a.max_charge), active: a.active } : undefined;
+      const a = await v<{ payout: string; signer: string; fee_bps: number; max_charge: U128; active: boolean } | null>("get_app", { app });
+      return a ? { payout: a.payout, signer: a.signer, feeBps: a.fee_bps, maxCharge: BigInt(a.max_charge), active: a.active } : undefined;
     },
 
     earningsOf: async (app: string) => BigInt(await v<U128>("earnings_of", { app })),

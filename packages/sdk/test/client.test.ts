@@ -124,6 +124,7 @@ test("a write the API asks to have signed is signed with the app's key and sent 
   assert.equal(api.seen.length, 2);
   const [first, second] = api.seen;
   assert.equal(first.headers["x-kredo-signature"], undefined);
+  assert.equal(first.headers["x-kredo-signer-key"], "ed25519:F3muxzTEDpteY3encsiNPMF8ZrgYE1Kg6adUeCaAbMvU", "the key's public half, so the API can prepare the transaction");
   assert.deepEqual(second.body, first.body, "same body and ref, so the API matches it to what it prepared");
   const [signedHash, sigHex] = second.headers["x-kredo-signature"].split(":");
   assert.equal(signedHash, `0x${hash}`);

@@ -35,6 +35,11 @@ const envSchema = z.object({
   NEAR_CREDENTIALS_DIR: z.string().default("~/.near-credentials"),
   VAULT_ACCOUNT_ID: accountIdSchema.optional(),
   USDT_ACCOUNT_ID: accountIdSchema.optional(),
+  /**
+   * Parent of the apps' signer accounts. An app registered without its own signer signs from
+   * `<app id>.<this>`, a sub-account whose only key is the company's function-call key.
+   */
+  APPS_PARENT_ACCOUNT_ID: accountIdSchema.optional(),
   DEPLOYMENTS_DIR: z.string().default(DEFAULT_DEPLOYMENTS_DIR),
   DATA_DIR: z.string().default("./data"),
   DATABASE_URL: z.string().url().optional(),
@@ -87,6 +92,7 @@ const deploymentSchema = z.object({
   vault: accountIdSchema,
   usdt: accountIdSchema,
   operator: accountIdSchema.optional(),
+  appsParent: accountIdSchema.optional(),
 });
 
 export type Config = {
@@ -98,6 +104,7 @@ export type Config = {
   relayerKey: KeyPairString;
   vault: AccountId;
   usdt: AccountId;
+  appsParent?: AccountId;
   dataDir: string;
   /** Postgres. Without it, an embedded Postgres under dataDir. */
   databaseUrl?: string;
@@ -138,6 +145,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   let vault = e.VAULT_ACCOUNT_ID;
   let usdt = e.USDT_ACCOUNT_ID;
   let relayerId = e.RELAYER_ACCOUNT_ID;
+  let appsParent = e.APPS_PARENT_ACCOUNT_ID;
   if (!vault || !usdt || !relayerId) {
     const file = resolve(e.DEPLOYMENTS_DIR, `${network}.json`);
     if (!existsSync(file)) {
@@ -148,6 +156,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     vault ??= d.vault;
     usdt ??= d.usdt;
     relayerId ??= d.operator;
+    appsParent ??= d.appsParent;
   }
   if (!relayerId) throw new Error("RELAYER_ACCOUNT_ID is required");
 
@@ -178,6 +187,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     relayerKey,
     vault,
     usdt,
+    appsParent,
     dataDir: e.DATA_DIR,
     databaseUrl: e.DATABASE_URL,
     privy: e.PRIVY_APP_ID && e.PRIVY_APP_SECRET ? { appId: e.PRIVY_APP_ID, appSecret: e.PRIVY_APP_SECRET } : undefined,

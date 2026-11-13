@@ -10,6 +10,7 @@ const visitor = (req: express.Request) => String(req.headers["x-visitor"] ?? req
 // Talks to the live network unless CREDITS_API_URL and CREDITS_PAGES_URL point elsewhere.
 const credits = new Credits({ // ◆
   apiKey: process.env.CREDITS_API_KEY!,
+  signerKey: process.env.CREDITS_SIGNER_KEY, // your app's own key: only it can charge for your app
   baseUrl: process.env.CREDITS_API_URL,
   pagesUrl: process.env.CREDITS_PAGES_URL,
 });

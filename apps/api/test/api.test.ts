@@ -5,6 +5,7 @@
  * NEAR wallet signs the same delegate-action hashes in the browser.
  */
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -34,6 +35,9 @@ const dana = newUserKey();
 const erin = newUserKey();
 const carol = newUserKey();
 const payout = "payout.kredo.test";
+/** The app's own signing key: on the company's server, never sent to Kredo. */
+const signerKey = KeyPair.fromRandom("ed25519");
+let signerAccount: string;
 
 /** Fake Privy: the token is the user's name. */
 const users: Record<string, { user: ReturnType<typeof newUserKey>; email: string }> = {
@@ -60,7 +64,28 @@ async function call(method: string, path: string, opts: { body?: unknown; key?: 
   return { status: res.status, body } as { status: number; body: any };
 }
 
-const company = (method: string, path: string, body?: unknown) => call(method, path, { key: apiKey, body });
+/**
+ * What the SDK does with a signerKey: sends the key's public half, and when the API answers 428
+ * with a prepared transaction hash, signs it and sends the same request again.
+ */
+async function company(method: string, path: string, body?: unknown, opts: { signer?: KeyPair | null } = {}) {
+  const key = opts.signer === undefined ? signerKey : opts.signer;
+  // Like the SDK, every charge, hold, refund and convert carries a ref, kept when it's sent again.
+  if (method === "POST" && /^\/v1\/(charges|holds|refunds|convert)$/.test(path) && body && typeof body === "object" && !("ref" in body)) {
+    body = { ...body, ref: randomUUID() };
+  }
+  const headers: Record<string, string> = { "content-type": "application/json", authorization: `Bearer ${apiKey}` };
+  if (key) headers["x-kredo-signer-key"] = key.getPublicKey().toString();
+  const send = async () => {
+    const res = await fetch(`${base}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    const text = await res.text();
+    return { status: res.status, body: res.headers.get("content-type")?.includes("json") ? JSON.parse(text) : text } as { status: number; body: any };
+  };
+  const first = await send();
+  if (first.status !== 428 || first.body?.code !== "signature_required" || !key) return first;
+  headers["x-kredo-signature"] = `${first.body.hash}:${sign(key, first.body.hash)}`;
+  return send();
+}
 
 /** What the browser does: the user's NEAR wallet signs the delegate action's hash. */
 function sign(key: KeyPair, hash: string): string {
@@ -86,6 +111,7 @@ before(async () => {
     USDT_ACCOUNT_ID: chain.usdt,
     RELAYER_ACCOUNT_ID: chain.relayerId,
     RELAYER_PRIVATE_KEY: KeyPair.fromRandom("ed25519").toString(),
+    APPS_PARENT_ACCOUNT_ID: "apps.kredo.test",
     ADMIN_TOKEN: "dev-admin",
     DATA_DIR: mkdtempSync(join(tmpdir(), "kredo-api-")),
   });
@@ -124,6 +150,10 @@ describe("api", () => {
     assert.match(res.body.apiKey, /^uc_live_/);
     apiKey = res.body.apiKey;
     appId = res.body.id;
+    // Each app signs its own charges from a sub-account of the apps parent. Its only key is the company's.
+    signerAccount = `${appId}.apps.kredo.test`;
+    assert.equal(res.body.signer, signerAccount);
+    chain.addAccount(signerAccount, signerKey.getPublicKey().toString());
 
     const me = await company("GET", "/v1/app");
     assert.equal(me.body.name, "Video Studio");
@@ -191,6 +221,16 @@ describe("api", () => {
     const forged = await call("POST", "/v1/me/submit/connect", { user: "alice", body: { hash, signature: sign(bob.key, hash) } });
     assert.equal(forged.status, 400);
     assert.equal(forged.body.code, "BadSignature");
+  });
+
+  test("a charge without the app's own key is refused, so Kredo can't charge on the app's behalf", async () => {
+    const res = await company("POST", "/v1/charges", { user: alice.account, credits: 1 }, { signer: null });
+    assert.equal(res.status, 428);
+    assert.equal(res.body.code, "missing_signer");
+    const wrong = await company("POST", "/v1/charges", { user: alice.account, credits: 1 }, { signer: KeyPair.fromRandom("ed25519") });
+    assert.notEqual(wrong.status, 201, "a key that isn't on the app's signer account can't charge");
+    const onchain = await chain.view<{ signer: string }>(chain.vault, "get_app", { app: appId });
+    assert.equal(onchain.signer, signerAccount);
   });
 
   test("company charges by action, and a retried ref doesn't charge twice", async () => {

@@ -63,6 +63,7 @@ export class Credits {
   readonly pagesUrl: string;
   private readonly apiKey: string;
   private readonly signerKey?: string;
+  private readonly signerPublicKey?: string;
   private appId?: string;
   private appInfo?: { id: string; name: string };
   private readonly retries: number;
@@ -73,6 +74,7 @@ export class Credits {
     if (!opts.apiKey) throw new Error("Credits: apiKey is required");
     this.apiKey = opts.apiKey;
     this.signerKey = opts.signerKey;
+    this.signerPublicKey = opts.signerKey ? publicKeyOf(opts.signerKey) : undefined;
     this.baseUrl = (opts.baseUrl ?? "https://kredo-near-api.onrender.com").replace(/\/+$/, "");
     this.pagesUrl = (opts.pagesUrl ?? "https://kredo-near.vercel.app").replace(/\/+$/, "");
     this.retries = opts.retries ?? 2;
@@ -267,6 +269,7 @@ export class Credits {
           headers: {
             authorization: `Bearer ${this.apiKey}`,
             ...(opts.body === undefined ? {} : { "content-type": "application/json" }),
+            ...(this.signerPublicKey === undefined ? {} : { "x-kredo-signer-key": this.signerPublicKey }),
             ...(signature === undefined ? {} : { "x-kredo-signature": signature }),
           },
           body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
@@ -324,6 +327,14 @@ function withRef<T extends { ref?: string }>(input: T): T & { ref: string } {
   return { ...input, ref: input.ref ?? randomUUID() };
 }
 
+/** The public half of a NEAR `ed25519:<base58>` secret key (seed then public key), as `ed25519:<base58>`. */
+function publicKeyOf(secretKey: string): string {
+  const [curve, encoded] = secretKey.split(":");
+  const bytes = curve === "ed25519" && encoded ? base58Decode(encoded) : Buffer.alloc(0);
+  if (bytes.length !== 64) throw new CreditsError("signerKey must look like ed25519:<base58>, as near-cli stores it", 0, "bad_signer_key");
+  return `ed25519:${base58Encode(bytes.subarray(32))}`;
+}
+
 /** Signs a prepared transaction hash with a NEAR `ed25519:<base58>` secret key. Returns hex. */
 function signHash(secretKey: string, hashHex: string): string {
   const [curve, encoded] = secretKey.split(":");
@@ -337,6 +348,21 @@ function signHash(secretKey: string, hashHex: string): string {
 }
 
 const BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+function base58Encode(bytes: Uint8Array): string {
+  let n = 0n;
+  for (const b of bytes) n = n * 256n + BigInt(b);
+  let out = "";
+  while (n > 0n) {
+    out = BASE58[Number(n % 58n)] + out;
+    n /= 58n;
+  }
+  for (const b of bytes) {
+    if (b !== 0) break;
+    out = "1" + out;
+  }
+  return out;
+}
 
 function base58Decode(s: string): Buffer {
   let n = 0n;
