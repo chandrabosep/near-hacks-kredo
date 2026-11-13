@@ -4,6 +4,7 @@ import { cors, errorHandler, HttpError } from "./http.js";
 import { adminRoutes } from "./routes/admin.js";
 import { appRoutes } from "./routes/app.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
+import { intentsRoutes } from "./routes/intents.js";
 import { testRoutes } from "./routes/test.js";
 import { publicRoutes } from "./routes/public.js";
 import { userRoutes } from "./routes/user.js";
@@ -19,6 +20,8 @@ export function createServer(ctx: Context): Express {
   app.use("/v1/admin", adminRoutes(ctx));
   // Company owners, signed in: their apps at /me/apps.
   app.use("/v1", dashboardRoutes(ctx));
+  // Buying credits from any chain through NEAR Intents: public assets, and quotes for a signed-in user.
+  app.use("/v1", intentsRoutes(ctx));
   // User routes need a Privy login and match only /me and /claims/:key/redeem.
   app.use("/v1", userRoutes(ctx));
   // Test API keys get the sandbox; live keys fall through to the real routes.
