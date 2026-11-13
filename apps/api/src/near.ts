@@ -201,9 +201,20 @@ export function createNearChain(cfg: NearConfig): Chain {
   const provider = new JsonRpcProvider({ url: cfg.rpcUrl });
   const relayer = new Account(cfg.relayerId, provider, KeyPairSigner.fromSecretKey(cfg.relayerKey));
 
+  /**
+   * The block a transaction landed in. Retried: the transaction is already final, and an RPC node
+   * that lags or rate-limits for a moment mustn't turn a sent transaction into a failed call.
+   */
   async function blockOf(hash: string) {
-    const b = await provider.viewBlock({ blockId: hash });
-    return { height: Number(b.header.height), at: Math.floor(Number(b.header.timestamp_nanosec) / 1e6) };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const b = await provider.viewBlock({ blockId: hash });
+        return { height: Number(b.header.height), at: Math.floor(Number(b.header.timestamp_nanosec) / 1e6) };
+      } catch (err) {
+        if (attempt >= 4) throw err;
+        await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
+      }
+    }
   }
 
   return {
