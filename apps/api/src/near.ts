@@ -179,6 +179,7 @@ export function parseOutcome(rpc: RpcOutcome, block: { height: number; at: numbe
 export type NearConfig = {
   network: string;
   rpcUrl: string;
+  rpcFallbacks?: string[];
   relayerId: AccountId;
   relayerKey: KeyPairString;
 };
@@ -197,8 +198,48 @@ function toNearAction(a: TxAction): Action {
   }
 }
 
+const RATE_LIMITED = /\b429\b|rate limit/i;
+const TRANSIENT = /\b429\b|rate limit|never been observed|UnknownBlock|fetch failed|ECONNRESET|ETIMEDOUT|socket hang up|Bad Gateway|unavailable|Internal server error|Timeout error|RetriesExceeded|Exceeded \d+ attempts/i;
+
+/**
+ * One provider over several RPC URLs. A call moves to the next URL only on a failure that says
+ * nothing about the chain (rate limit, lagging node, network error), and stays there for later
+ * calls; any other error is the chain's answer and is thrown as is. Sends move on only after a
+ * 429, which the RPC rejected before submitting, so a transaction is never sent twice.
+ * near-api-js's FailoverRpcProvider moves on after any error and wraps it, which hides real answers
+ * such as "account does not exist".
+ */
+export function failoverProvider(urls: string[]): JsonRpcProvider {
+  const providers = urls.map((url) => new JsonRpcProvider({ url }, { retries: 3, wait: 400, backoff: 2 }));
+  let current = 0;
+  return new Proxy(providers[0]!, {
+    get(_target, prop) {
+      const first = providers[current]![prop as keyof JsonRpcProvider];
+      if (typeof first !== "function") return first;
+      return async (...args: unknown[]) => {
+        const retryable = String(prop).startsWith("send") ? RATE_LIMITED : TRANSIENT;
+        let lastErr: unknown;
+        for (let i = 0; i < providers.length; i++) {
+          const idx = (current + i) % providers.length;
+          const p = providers[idx]!;
+          try {
+            const result = await (p[prop as keyof JsonRpcProvider] as (...a: unknown[]) => unknown).apply(p, args);
+            current = idx;
+            return result;
+          } catch (err) {
+            const e = err as Error & { cause?: unknown };
+            if (!retryable.test(`${e?.name} ${e?.message} ${e?.cause}`)) throw err;
+            lastErr = err;
+          }
+        }
+        throw lastErr;
+      };
+    },
+  });
+}
+
 export function createNearChain(cfg: NearConfig): Chain {
-  const provider = new JsonRpcProvider({ url: cfg.rpcUrl });
+  const provider = failoverProvider([cfg.rpcUrl, ...(cfg.rpcFallbacks ?? [])]);
   const relayer = new Account(cfg.relayerId, provider, KeyPairSigner.fromSecretKey(cfg.relayerKey));
 
   /**

@@ -10,8 +10,9 @@ import { creditsToUnits } from "./units.js";
 
 export const NETWORKS = {
   // NEAR's own public RPC (rpc.*.near.org) is deprecated and rate limited; FastNEAR is its recommended replacement.
-  testnet: { rpcUrl: "https://test.rpc.fastnear.com", explorerUrl: "https://testnet.nearblocks.io" },
-  mainnet: { rpcUrl: "https://free.rpc.fastnear.com", explorerUrl: "https://nearblocks.io" },
+  // Free RPCs throttle shared hosting IPs and have nodes that lag, so the API fails over between two providers.
+  testnet: { rpcUrl: "https://test.rpc.fastnear.com", fallbackRpcUrl: "https://near-testnet.drpc.org", explorerUrl: "https://testnet.nearblocks.io" },
+  mainnet: { rpcUrl: "https://free.rpc.fastnear.com", fallbackRpcUrl: "https://near.drpc.org", explorerUrl: "https://nearblocks.io" },
 } as const;
 export type Network = keyof typeof NETWORKS;
 
@@ -105,6 +106,8 @@ export type Config = {
   port: number;
   network: Network;
   rpcUrl: string;
+  /** Tried, in order, when `rpcUrl` rate-limits or has a lagging node. */
+  rpcFallbacks: string[];
   explorerUrl: string;
   relayerId: AccountId;
   relayerKey: KeyPairString;
@@ -185,10 +188,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new Error("Set both PRIVY_APP_ID and PRIVY_APP_SECRET, or neither");
   }
 
+  const rpcUrl = e.NEAR_RPC_URL ?? NETWORKS[network].rpcUrl;
   return {
     port: e.PORT,
     network,
-    rpcUrl: e.NEAR_RPC_URL ?? NETWORKS[network].rpcUrl,
+    rpcUrl,
+    rpcFallbacks: [NETWORKS[network].rpcUrl, NETWORKS[network].fallbackRpcUrl].filter((u) => u !== rpcUrl),
     explorerUrl: (e.EXPLORER_URL ?? NETWORKS[network].explorerUrl).replace(/\/$/, ""),
     relayerId,
     relayerKey,

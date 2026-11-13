@@ -16,7 +16,7 @@ export async function createContext(
   opts: { verifier?: UserVerifier; memoryDb?: boolean; chain?: Chain } = {},
 ) {
   const chain =
-    opts.chain ?? createNearChain({ network: config.network, rpcUrl: config.rpcUrl, relayerId: config.relayerId, relayerKey: config.relayerKey });
+    opts.chain ?? createNearChain({ network: config.network, rpcUrl: config.rpcUrl, rpcFallbacks: config.rpcFallbacks, relayerId: config.relayerId, relayerKey: config.relayerKey });
   const db = await openDb({
     url: config.databaseUrl,
     dir: opts.memoryDb ? undefined : pgDirFor(config.dataDir, config.network, config.vault),
