@@ -9,7 +9,7 @@
  *   // ...run the job...
  *   await credits.capture(hold.holdId);        // or credits.release(hold.holdId)
  */
-import { randomUUID } from "node:crypto";
+import { createPrivateKey, randomUUID, sign as ed25519Sign } from "node:crypto";
 import { CreditsError } from "./errors.js";
 import type {
   ActivityItem,
@@ -36,6 +36,12 @@ import type {
 export type CreditsOptions = {
   /** Your app's API key, `uc_live_...`. */
   apiKey: string;
+  /**
+   * Your app's signing key, `ed25519:...`: the function-call key on your app's signer account.
+   * Live charges, holds, captures, releases and refunds are signed with it on your server, so
+   * only your app can charge for your app. Kredo never sees it; its relayer only pays the gas.
+   */
+  signerKey?: string;
   /** The network's API. Defaults to https://kredo-near-api.onrender.com. */
   baseUrl?: string;
   /** The network's hosted pages (connect, buy, wallet). Defaults to https://kredo-near.vercel.app. */
@@ -56,6 +62,7 @@ export class Credits {
   readonly baseUrl: string;
   readonly pagesUrl: string;
   private readonly apiKey: string;
+  private readonly signerKey?: string;
   private appId?: string;
   private appInfo?: { id: string; name: string };
   private readonly retries: number;
@@ -65,6 +72,7 @@ export class Credits {
   constructor(opts: CreditsOptions) {
     if (!opts.apiKey) throw new Error("Credits: apiKey is required");
     this.apiKey = opts.apiKey;
+    this.signerKey = opts.signerKey;
     this.baseUrl = (opts.baseUrl ?? "https://kredo-near-api.onrender.com").replace(/\/+$/, "");
     this.pagesUrl = (opts.pagesUrl ?? "https://kredo-near.vercel.app").replace(/\/+$/, "");
     this.retries = opts.retries ?? 2;
@@ -250,6 +258,7 @@ export class Credits {
     const url = new URL(this.baseUrl + path);
     for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, String(v));
 
+    let signature: string | undefined;
     for (let attempt = 0; ; attempt++) {
       let res: Response;
       try {
@@ -258,6 +267,7 @@ export class Credits {
           headers: {
             authorization: `Bearer ${this.apiKey}`,
             ...(opts.body === undefined ? {} : { "content-type": "application/json" }),
+            ...(signature === undefined ? {} : { "x-kredo-signature": signature }),
           },
           body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
           signal: AbortSignal.timeout(this.timeoutMs),
@@ -281,6 +291,17 @@ export class Credits {
       if (opts.raw && res.ok) return (await res.text()) as T;
       const text = await res.text();
       const data = text ? safeJson(text) : undefined;
+      // The API prepared this write as a transaction from your app's signer: sign its hash and
+      // send the same request again. The body and ref are unchanged, so it matches what was prepared.
+      const sign = data as { code?: string; hash?: string } | undefined;
+      if (res.status === 428 && sign?.code === "signature_required" && sign.hash && signature === undefined) {
+        if (!this.signerKey) {
+          throw new CreditsError("This app signs its own charges: pass signerKey (your app's ed25519 key) to Credits", 428, "missing_signer");
+        }
+        signature = `${sign.hash}:${signHash(this.signerKey, sign.hash)}`;
+        attempt--;
+        continue;
+      }
       if (!res.ok) {
         const d = (data ?? {}) as { error?: string; code?: string; txHash?: string };
         throw new CreditsError(d.error ?? `HTTP ${res.status}`, res.status, d.code ?? "error", d.txHash);
@@ -301,6 +322,39 @@ function amountQuery(input: AmountInput): Query {
 /** Every write carries a ref, so a retry after a dropped connection can never charge twice. */
 function withRef<T extends { ref?: string }>(input: T): T & { ref: string } {
   return { ...input, ref: input.ref ?? randomUUID() };
+}
+
+/** Signs a prepared transaction hash with a NEAR `ed25519:<base58>` secret key. Returns hex. */
+function signHash(secretKey: string, hashHex: string): string {
+  const [curve, encoded] = secretKey.split(":");
+  if (curve !== "ed25519" || !encoded) throw new CreditsError("signerKey must look like ed25519:<base58>", 0, "bad_signer_key");
+  const seed = base58Decode(encoded).subarray(0, 32);
+  if (seed.length !== 32) throw new CreditsError("signerKey is too short", 0, "bad_signer_key");
+  // PKCS#8 DER prefix for a raw ed25519 private key seed.
+  const der = Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), seed]);
+  const key = createPrivateKey({ key: der, format: "der", type: "pkcs8" });
+  return ed25519Sign(null, Buffer.from(hashHex.replace(/^0x/, ""), "hex"), key).toString("hex");
+}
+
+const BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+function base58Decode(s: string): Buffer {
+  let n = 0n;
+  for (const c of s) {
+    const i = BASE58.indexOf(c);
+    if (i < 0) throw new CreditsError("signerKey isn't valid base58", 0, "bad_signer_key");
+    n = n * 58n + BigInt(i);
+  }
+  const bytes: number[] = [];
+  while (n > 0n) {
+    bytes.unshift(Number(n % 256n));
+    n /= 256n;
+  }
+  for (const c of s) {
+    if (c !== "1") break;
+    bytes.unshift(0);
+  }
+  return Buffer.from(bytes);
 }
 
 function safeJson(text: string): unknown {

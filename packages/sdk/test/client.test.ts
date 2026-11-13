@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createPublicKey, verify as cryptoVerify } from "node:crypto";
 import { Credits, CreditsError } from "../src/index.js";
 
 type Seen = { url: URL; method: string; headers: Record<string, string>; body?: any };
@@ -96,4 +97,40 @@ test("capture sends a partial amount; holdIds are path-escaped", async () => {
 
 test("an API key is required", () => {
   assert.throws(() => new Credits({ apiKey: "" }), /apiKey/);
+});
+
+// --- app-signed writes ------------------------------------------------------
+
+/** A throwaway test key, generated with near-api-js. Its public key, as raw hex: */
+const SIGNER_KEY = "ed25519:fXW1VAn6Qi468uphQZTphNGgfWh7Rpf1FBGYvA8QuSAsyPkXhbr6zeFe8iLQMTRpDMmUHi8RDxmLTxrFrB9y4Vi";
+const SIGNER_PUBLIC_HEX = "d0b98fe5bfa6694a05cc9fb97bc9cddc2947339d4dc42b1ae3ee9c1101c8d3ad";
+
+function verifyEd25519(publicHex: string, message: Buffer, signature: Buffer): boolean {
+  // DER prefix for a raw ed25519 public key (SubjectPublicKeyInfo).
+  const spki = Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), Buffer.from(publicHex, "hex")]);
+  const key = createPublicKey({ key: spki, format: "der", type: "spki" });
+  return cryptoVerify(null, message, key, signature);
+}
+
+test("a write the API asks to have signed is signed with the app's key and sent again with the same ref", async () => {
+  const hash = "ab".repeat(32);
+  const api = fakeApi([
+    json(428, { error: "Sign this charge with your app's key", code: "signature_required", hash: `0x${hash}` }),
+    json(201, { kind: "charge" }),
+  ]);
+  const credits = new Credits({ apiKey: "uc_live_test", baseUrl: "http://api.test/", fetch: api.fetch, signerKey: SIGNER_KEY });
+  await credits.charge({ user: "alice.testnet", credits: 2, ref: "msg-1" });
+
+  assert.equal(api.seen.length, 2);
+  const [first, second] = api.seen;
+  assert.equal(first.headers["x-kredo-signature"], undefined);
+  assert.deepEqual(second.body, first.body, "same body and ref, so the API matches it to what it prepared");
+  const [signedHash, sigHex] = second.headers["x-kredo-signature"].split(":");
+  assert.equal(signedHash, `0x${hash}`);
+  assert.ok(verifyEd25519(SIGNER_PUBLIC_HEX, Buffer.from(hash, "hex"), Buffer.from(sigHex, "hex")), "signed by the app's key");
+});
+
+test("without a signer key, a write the API wants signed fails clearly", async () => {
+  const api = fakeApi([json(428, { error: "Sign this", code: "signature_required", hash: "0x" + "ab".repeat(32) })]);
+  await assert.rejects(client(api.fetch).charge({ user: "alice.testnet", credits: 2 }), (e: CreditsError) => e.code === "missing_signer");
 });
