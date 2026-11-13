@@ -28,8 +28,8 @@ export async function registerApp(
   try {
     // The vault takes the new app's state from the caller's storage balance: here, the relayer's.
     await ctx.storage.ensureHeadroom(ctx.relayer.operator);
-    // The app's charges take their state from its signer's storage balance, which the relayer funds.
-    await ctx.storage.ensureRegistered(signer);
+    // The app's charges take their state from its signer's storage balance, funded once here.
+    await ctx.storage.fundSigner(signer, ctx.config.appSignerStorageYocto);
     const { hash } = await ctx.relayer.write(
       {
         method: "register_app",

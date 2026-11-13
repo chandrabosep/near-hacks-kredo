@@ -34,7 +34,7 @@ const convertSchema = z.object({ user: accountIdSchema, credits: creditsSchema, 
  */
 export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
   const r = Router();
-  const { store, relayer, config, vault, meta, storage } = ctx;
+  const { store, relayer, config, vault, meta } = ctx;
 
   r.use(auth ?? requireApiKey(store), rateLimit(config.rateLimitPerMin));
 
@@ -69,18 +69,11 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
 
   // ---------------------------------------------------------------- app-signed writes
 
-  const signers = new Map<string, AccountId>();
-
-  /** The account the vault accepts this app's charges from, read once from the vault. */
+  /** The account the vault accepts this app's charges from. Read every time, so a new signer takes effect at once. */
   async function signerOf(appId: string): Promise<AccountId> {
-    let signer = signers.get(appId);
-    if (!signer) {
-      const a = await vault.getApp(appId);
-      if (!a) throw new RelayerError("UnknownApp");
-      signer = a.signer;
-      signers.set(appId, signer);
-    }
-    return signer;
+    const a = await vault.getApp(appId);
+    if (!a) throw new RelayerError("UnknownApp");
+    return a.signer;
   }
 
   const metaError = (err: unknown) => {
@@ -102,7 +95,8 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
    * 2. It signs the hash with the app's key (the SDK does this) and sends the same request again
    *    with `x-kredo-signature: <hash>:<signature>`. We relay exactly what was signed.
    *
-   * Returns undefined when it has answered 428. The args returned are the prepared ones.
+   * Returns undefined when it has answered 428. The args returned are the ones that were signed:
+   * record those, not the second request's body.
    */
   async function appWrite(
     req: Request,
@@ -134,7 +128,8 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
       throw new HttpError(400, "That signature is for a different request: send the same body, with the same ref, again", "wrong_request");
     }
     const delegate = { kind: "delegate" as const, delegate: p.delegate, signature: p.signature };
-    const result = await storage.withHeadroom(signer, () => relayer.send(signer, [delegate], { fn: call.method, app: appId }));
+    // The signer's storage was funded once at registration; it isn't topped up per charge.
+    const result = await relayer.send(signer, [delegate], { fn: call.method, app: appId });
     return { result, args };
   }
 
@@ -244,8 +239,8 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
       app: app.id,
       kind: "charge",
       ref,
-      user: body.user,
-      units,
+      user: String(written.args.user),
+      units: BigInt(String(written.args.amount)),
       fee: BigInt(String(ev.fee)),
       label,
       txHash: hash,
@@ -276,20 +271,22 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
     const { result } = written;
     // The expiry that was signed, not one recomputed for the second request.
     const expiry = Number(written.args.expiry);
+    const user = String(written.args.user);
+    const held = BigInt(String(written.args.amount));
     const { hash } = result;
     const holdId = String(vaultEvent(result, "held").hold_id);
     store.putHold({
       holdId,
       app: app.id,
-      user: body.user,
-      units,
+      user,
+      units: held,
       ref: onchainRef("hold", ref),
       label,
       expiry,
       status: "open",
       txHash: hash,
     });
-    const op = store.addOp({ app: app.id, kind: "hold", ref, user: body.user, units, label, holdId, txHash: hash, at: Date.now() });
+    const op = store.addOp({ app: app.id, kind: "hold", ref, user, units: held, label, holdId, txHash: hash, at: Date.now() });
     res.status(201).json({ ...opView(op), holdId, expiresAt: new Date(expiry * 1000).toISOString() });
   });
 
@@ -333,7 +330,7 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
       kind: "capture",
       ref: h.holdId,
       user: h.user,
-      units: actual,
+      units: BigInt(String(written.args.actual)),
       fee: BigInt(String(ev.fee)),
       label: h.label,
       holdId: h.holdId,
@@ -382,7 +379,7 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
     });
     if (!written) return;
     const { hash } = written.result;
-    const op = store.addOp({ app: app.id, kind: "refund", ref, user: body.user, units, txHash: hash, at: Date.now() });
+    const op = store.addOp({ app: app.id, kind: "refund", ref, user: String(written.args.user), units: BigInt(String(written.args.amount)), txHash: hash, at: Date.now() });
     res.status(201).json(opView(op));
   });
 
@@ -430,8 +427,8 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
       app: app.id,
       kind: "convert",
       ref,
-      user: body.user,
-      units,
+      user: String(written.args.user),
+      units: BigInt(String(written.args.amount)),
       fee: BigInt(String(ev.fee)),
       label,
       txHash: hash,

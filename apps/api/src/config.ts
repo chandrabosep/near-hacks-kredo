@@ -71,6 +71,12 @@ const envSchema = z.object({
    * limit, a claim link: roughly 0.002 NEAR each), it's topped up when less than TOP_UP_BELOW is left.
    */
   VAULT_STORAGE_HEADROOM: near.default(parseNear("0.005")),
+  /**
+   * Vault storage the relayer puts on a new app's signer at registration, in NEAR. Each charge,
+   * hold or refund keeps a used ref (roughly 0.0015 NEAR), paid from it. It's funded once, not
+   * topped up per charge, so an app can't make Kredo pay for its state without limit.
+   */
+  APP_SIGNER_STORAGE: near.default(parseNear("0.5")),
   VAULT_STORAGE_TOP_UP_BELOW: near.default(parseNear("0.0025")),
   VAULT_STORAGE_TOP_UP: near.default(parseNear("0.005")),
   /** Smallest charge or hold, and smallest send or claim link, in credits. Dust would only burn gas. */
@@ -119,6 +125,7 @@ export type Config = {
   userAccountYocto: bigint;
   /** Vault storage the relayer pays for users, in yoctoNEAR. */
   vaultStorage: StoragePolicy;
+  appSignerStorageYocto: bigint;
   indexerIntervalMs: number;
   /** In USDT units. */
   minChargeUnits: bigint;
@@ -203,6 +210,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       minBalance: e.RELAYER_MIN_BALANCE,
     },
     userAccountYocto: e.USER_ACCOUNT_NEAR,
+    appSignerStorageYocto: e.APP_SIGNER_STORAGE,
     vaultStorage: { headroom: e.VAULT_STORAGE_HEADROOM, topUpBelow: e.VAULT_STORAGE_TOP_UP_BELOW, topUp: e.VAULT_STORAGE_TOP_UP },
     indexerIntervalMs: e.INDEXER_INTERVAL_MS,
     minChargeUnits: creditsToUnits(e.MIN_CHARGE_CREDITS),

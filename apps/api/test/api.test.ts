@@ -5,7 +5,7 @@
  * NEAR wallet signs the same delegate-action hashes in the browser.
  */
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -438,6 +438,27 @@ describe("api", () => {
       hook.close();
       await company("PUT", "/v1/webhook", { url: null });
     }
+  });
+
+  test("the hash to sign comes with the exact bytes behind it, so the app can check what it signs", async () => {
+    const res = await call("POST", "/v1/charges", { key: apiKey, body: { user: alice.account, credits: 1, ref: "peek" } });
+    // call() sends no signer key, so ask the way the SDK does.
+    const prepared = await fetch(`${base}/v1/charges`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "x-kredo-signer-key": signerKey.getPublicKey().toString() },
+      body: JSON.stringify({ user: alice.account, credits: 1, ref: "peek" }),
+    }).then((r) => r.json() as Promise<Json>);
+    assert.equal(res.status, 428);
+    const bytes = Buffer.from(prepared.delegate, "base64");
+    assert.equal(prepared.hash, `0x${createHash("sha256").update(bytes).digest("hex")}`);
+    assert.ok(bytes.includes(Buffer.from(alice.account)), "the bytes name the user being charged");
+  });
+
+  test("a charge draws on the signer's own storage: the relayer doesn't top it up", async () => {
+    const since = ctx.db.data.txs.length;
+    const res = await company("POST", "/v1/charges", { user: alice.account, credits: 1 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(relayedSince(since), ["charge"]);
   });
 
   test("the sweeper releases an expired hold back to the user", async () => {

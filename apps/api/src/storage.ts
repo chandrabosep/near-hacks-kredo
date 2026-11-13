@@ -42,9 +42,9 @@ export function createStorage(opts: { vault: Vault; relayer: Relayer; policy: St
   const deposit = (account: AccountId, amount: bigint) =>
     relayer.write({ method: "storage_deposit", args: { account_id: account, registration_only: false }, deposit: amount });
 
-  async function register(account: AccountId) {
+  async function register(account: AccountId, extra = policy.headroom) {
     min ??= await vault.storageMin();
-    await deposit(account, min + policy.headroom);
+    await deposit(account, min + extra);
     registered.add(account);
   }
 
@@ -65,6 +65,16 @@ export function createStorage(opts: { vault: Vault; relayer: Relayer; policy: St
         else await register(account);
       });
     },
+
+    /**
+     * Registers a new app's signer with `amount` above the minimum, once. Its charges draw that down;
+     * it is never topped up automatically, so an app can't make Kredo pay for its state without limit.
+     */
+    fundSigner: (account: AccountId, amount: bigint): Promise<void> =>
+      locked(account, async () => {
+        if (await vault.storageOf(account)) return void registered.add(account);
+        await register(account, amount);
+      }),
 
     /** Tops `account` up, registering it first if need be, so it can pay for one more entry of its own state. */
     ensureHeadroom: (account: AccountId): Promise<void> => locked(account, () => headroom(account)),
