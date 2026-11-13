@@ -1118,6 +1118,7 @@ name = "kredo-vault"
 version = "1.0.0"
 dependencies = [
  "ed25519-dalek",
+ "near-contract-standards",
  "near-sdk",
 ]
 

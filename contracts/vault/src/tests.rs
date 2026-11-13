@@ -43,9 +43,19 @@ const T0: u64 = 1_800_000_000;
 fn setup() -> Vault {
     ctx(owner(), T0);
     let mut v = Vault::new(usdt(), owner(), Some(operator()), acc("fees.testnet"));
+    register(&mut v, &operator());
     ctx(operator(), T0);
     v.register_app(APP.into(), payout_acc(), 500, None);
+    register(&mut v, &alice());
+    register(&mut v, &bob());
     v
+}
+
+/// The relayer pays an account's registration plus 0.01 NEAR for the state its calls add.
+fn register(v: &mut Vault, account: &AccountId) {
+    let min = v.storage_balance_bounds().min;
+    ctx_pay(operator(), T0, min.saturating_add(NearToken::from_millinear(10)));
+    v.storage_deposit(Some(account.clone()), None);
 }
 
 fn deposit(v: &mut Vault, user: &AccountId, amount: u128) {
@@ -500,4 +510,138 @@ fn ownership_is_two_step() {
     ctx(bob(), T0);
     v.accept_owner();
     assert_eq!(v.config().owner, bob());
+}
+
+// --- storage (NEP-145) ----------------------------------------------------
+
+fn carol() -> AccountId {
+    acc("carol.testnet")
+}
+
+/// Sets the caller, the block time and the attached NEAR.
+fn ctx_pay(caller: AccountId, at: u64, deposit: NearToken) {
+    let mut b = VMContextBuilder::new();
+    b.current_account_id(acc("vault.testnet"))
+        .predecessor_account_id(caller.clone())
+        .signer_account_id(caller)
+        .attached_deposit(deposit)
+        .block_timestamp(at * 1_000_000_000);
+    testing_env!(b.build());
+}
+
+#[test]
+fn registering_gives_a_storage_balance() {
+    let mut v = setup();
+    assert!(v.storage_balance_of(carol()).is_none());
+
+    let min = v.storage_balance_bounds().min;
+    // One account record is a few hundred bytes at 0.00001 NEAR per byte.
+    assert!(min > NearToken::from_millinear(1) && min < NearToken::from_millinear(10), "min = {min}");
+
+    ctx_pay(operator(), T0, min);
+    let b = v.storage_deposit(Some(carol()), None);
+    assert_eq!(b.total, min);
+    assert_eq!(b.available, NearToken::from_yoctonear(0));
+    let read = v.storage_balance_of(carol()).unwrap();
+    assert_eq!((read.total, read.available), (b.total, b.available));
+}
+
+#[test]
+#[should_panic(expected = "Recipient not registered")]
+fn send_to_unregistered_account_fails() {
+    let mut v = funded();
+    ctx(alice(), T0);
+    v.send(carol(), U128(CREDIT));
+}
+
+#[test]
+fn deposit_for_unregistered_user_is_refunded() {
+    let mut v = setup();
+    ctx(usdt(), T0);
+    let r = v.ft_on_transfer(alice(), U128(5 * CREDIT), r#"{"user":"carol.testnet"}"#.into());
+    assert!(matches!(r, PromiseOrValue::Value(U128(n)) if n == 5 * CREDIT));
+    assert_eq!(v.balance_of(carol()).0, 0);
+    assert!(v.storage_balance_of(carol()).is_none());
+    assert_backed(&v, 0);
+}
+
+#[test]
+#[should_panic(expected = "Unknown app")]
+fn revoking_an_unknown_app_fails() {
+    let mut v = setup();
+    ctx(alice(), T0);
+    v.revoke_app("x".repeat(500));
+}
+
+#[test]
+#[should_panic(expected = "Insufficient storage")]
+fn approving_needs_storage_beyond_the_minimum() {
+    let mut v = setup();
+    let min = v.storage_balance_bounds().min;
+    ctx_pay(operator(), T0, min);
+    v.storage_deposit(Some(carol()), None);
+    ctx(carol(), T0);
+    v.approve_app(APP.into(), U128(CREDIT), None);
+}
+
+#[test]
+fn approving_an_app_is_paid_from_the_users_storage_balance() {
+    let mut v = setup();
+    let before = v.storage_balance_of(alice()).unwrap().available;
+    approve(&mut v, &alice(), 10 * CREDIT, None);
+    let after = v.storage_balance_of(alice()).unwrap().available;
+    assert!(after < before);
+    // One limit entry is around a hundred bytes: well under 0.005 NEAR.
+    assert!(before.saturating_sub(after) < NearToken::from_millinear(5));
+    // Approving again replaces the entry, so it adds no state and costs nothing.
+    approve(&mut v, &alice(), 20 * CREDIT, None);
+    assert_eq!(v.storage_balance_of(alice()).unwrap().available, after);
+}
+
+#[test]
+#[should_panic(expected = "Recipient not registered")]
+fn claim_to_unregistered_account_fails() {
+    let mut v = funded();
+    let (sk, pk) = claim_key();
+    ctx(alice(), T0);
+    v.create_claim(U128(CREDIT), pk.clone(), T0 + 3600);
+    let sig = sign_claim(&v, &sk, &pk, &carol());
+    ctx(operator(), T0);
+    v.claim(pk, carol(), sig);
+}
+
+/// Registers carol with only the minimum, so any state her calls add has nothing to pay from.
+fn carol_with_minimum_storage(v: &mut Vault) {
+    let min = v.storage_balance_bounds().min;
+    ctx_pay(operator(), T0, min);
+    v.storage_deposit(Some(carol()), None);
+}
+
+#[test]
+#[should_panic(expected = "Insufficient storage")]
+fn creating_a_claim_is_paid_by_the_creator() {
+    let mut v = setup();
+    carol_with_minimum_storage(&mut v);
+    deposit(&mut v, &carol(), 10 * CREDIT);
+    let (_, pk) = claim_key();
+    ctx(carol(), T0);
+    v.create_claim(U128(CREDIT), pk, T0 + 3600);
+}
+
+#[test]
+fn revoking_an_app_never_approved_writes_nothing() {
+    let mut v = setup();
+    carol_with_minimum_storage(&mut v);
+    ctx(carol(), T0);
+    v.revoke_app(APP.into());
+    assert_eq!(v.limit_of(carol(), APP.into()).version, 0);
+}
+
+#[test]
+#[should_panic(expected = "Not registered")]
+fn registering_an_app_is_paid_by_the_caller() {
+    ctx(owner(), T0);
+    let mut v = Vault::new(usdt(), owner(), Some(operator()), acc("fees.testnet"));
+    ctx(operator(), T0);
+    v.register_app(APP.into(), payout_acc(), 500, None);
 }
