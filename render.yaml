@@ -20,13 +20,14 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
-      - key: CHAIN_ID
-        value: "1874"
+      - key: NEAR_NETWORK
+        value: testnet
       - key: DATABASE_URL
         fromDatabase:
           name: kredo-db
           property: connectionString
-      - key: OPERATOR_KEY
+      # The relayer's key (ed25519:...). Its account comes from contracts/deployments/testnet.json.
+      - key: RELAYER_PRIVATE_KEY
         sync: false
       - key: PRIVY_APP_ID
         sync: false

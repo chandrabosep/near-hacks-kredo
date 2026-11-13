@@ -1,46 +1,38 @@
 #!/usr/bin/env bash
-# Everything on a local chain: anvil, a fresh deploy, the API and the hosted pages.
+# The API and the hosted pages on this machine, against the Kredo vault on NEAR testnet.
 #
 #   npm run dev:local
 #
-# Then open http://localhost:3000 for the hosted pages.
-# Fund a signed-in user with: npm run fund:local -- <address> [usdt]
+# The relayer key is read from near-cli's credentials (~/.near-credentials/testnet/<relayer>.json),
+# or from RELAYER_PRIVATE_KEY. Then open http://localhost:3000 for the hosted pages.
+# Fund a signed-in user with test USDT: npm run fund:testnet -- <account> [usdt]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ANVIL_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-RPC=http://127.0.0.1:8545
 LOGS=.logs
 mkdir -p "$LOGS"
+DEPLOY=contracts/deployments/testnet.json
+RELAYER=${RELAYER_ACCOUNT_ID:-$(jq -r .operator "$DEPLOY")}
+
+if [[ -z "${RELAYER_PRIVATE_KEY:-}" && ! -f "$HOME/.near-credentials/testnet/$RELAYER.json" ]]; then
+  echo "No key for $RELAYER. Set RELAYER_PRIVATE_KEY, or import it with near-cli:"
+  echo "  near account import-account using-private-key <ed25519:...> network-config testnet"
+  exit 1
+fi
 
 # Stop everything this script started when it exits.
 trap 'kill $(jobs -p) 2>/dev/null' EXIT
 
-if ! cast chain-id --rpc-url "$RPC" >/dev/null 2>&1; then
-  echo "starting anvil"
-  anvil --silent >"$LOGS/anvil.log" 2>&1 &
-  for _ in $(seq 1 50); do cast chain-id --rpc-url "$RPC" >/dev/null 2>&1 && break; sleep 0.2; done
-fi
-
-echo "deploying contracts"
-(cd contracts && forge script script/Deploy.s.sol --rpc-url "$RPC" --broadcast --private-key "$ANVIL_KEY" >"../$LOGS/deploy.log" 2>&1)
-grep -E "CreditVault:|MockUSDT:" "$LOGS/deploy.log" | sed 's/^ */  /'
-
-# The test USDT faucet pays from the operator wallet, so give it mock USDT to hand out.
-USDT=$(jq -r .usdt contracts/deployments/31337.json)
-OPERATOR=$(cast wallet address --private-key "$ANVIL_KEY")
-cast send "$USDT" "mint(address,uint256)" "$OPERATOR" 1000000000 --private-key "$ANVIL_KEY" --rpc-url "$RPC" >/dev/null
-echo "  faucet funded with 1000 mock USDT"
+echo "vault $(jq -r .vault "$DEPLOY"), relayer $RELAYER on NEAR testnet"
 
 echo "building the SDK and React kit"
 npm run build -w kredo -w kredo-react --silent
 
 echo "starting the API and hosted pages"
-# Explicit env wins over apps/api/.env, so the Whitechain keys there are never used locally.
-CHAIN_ID=31337 PORT=4000 DATA_DIR=./data/local OPERATOR_KEY="$ANVIL_KEY" ADMIN_TOKEN=dev-admin RPC_URL="$RPC" \
+NEAR_NETWORK=testnet PORT=4000 DATA_DIR=./data/local ADMIN_TOKEN=${ADMIN_TOKEN:-dev-admin-token} \
   npm run dev -w @credits/api >"$LOGS/api.log" 2>&1 &
 for _ in $(seq 1 60); do curl -sf -o /dev/null localhost:4000/v1/health && break; sleep 0.5; done
-NEXT_PUBLIC_CHAIN_ID=31337 npm run dev -w @credits/web >"$LOGS/web.log" 2>&1 &
+npm run dev -w @credits/web >"$LOGS/web.log" 2>&1 &
 
 cat <<MSG
 

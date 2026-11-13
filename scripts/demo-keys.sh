@@ -2,16 +2,16 @@
 # Registers the demo apps on a Kredo network and writes each one's
 # demos/<app>/.env.local with its API key. Safe to rerun: apps whose key still works are skipped.
 #
-#   npm run demos:keys                       # local network (npm run dev:local)
-#   API=https://api.example ADMIN_TOKEN=... PAYOUT=0x... npm run demos:keys
+#   npm run demos:keys                       # the API from npm run dev:local
+#   API=https://api.example ADMIN_TOKEN=... PAYOUT=you.testnet npm run demos:keys
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 API=${API:-http://localhost:4000}
 PAGES=${PAGES:-http://localhost:3000}
-ADMIN_TOKEN=${ADMIN_TOKEN:-dev-admin}
-# Where the demo apps' earnings are paid. Defaults to anvil's second account.
-PAYOUT=${PAYOUT:-0x70997970C51812dc3A010C7d01b50e0d17dc79C8}
+ADMIN_TOKEN=${ADMIN_TOKEN:-dev-admin-token}
+# The NEAR account the demo apps' earnings are paid to. Defaults to the deployment's owner.
+PAYOUT=${PAYOUT:-$(jq -r .owner contracts/deployments/testnet.json)}
 
 curl -sf -o /dev/null "$API/v1/health" || { echo "Kredo API not reachable at $API. Start it with: npm run dev:local"; exit 1; }
 
