@@ -30,7 +30,7 @@ const photo = (seed: string, w: number, h: number) => `https://picsum.photos/see
 
 const IDEAS: Record<Kind, string[]> = {
   image: [
-    "A neon-lit chai stall on a rainy Mumbai street at night",
+    "A neon-lit noodle stall on a rainy street at night",
     "A glass perfume bottle on wet black stone, soft rim light",
     "An astronaut tending a rooftop garden above a dense city, golden hour",
   ],

@@ -16,7 +16,7 @@ export default function Home() {
       models={models}
       demo={isDemoMode()}
       configured={Boolean(process.env.CREDITS_API_KEY)}
-      pagesUrl={process.env.NEXT_PUBLIC_CREDITS_PAGES_URL ?? "https://kredo-omega.vercel.app"}
+      pagesUrl={process.env.NEXT_PUBLIC_CREDITS_PAGES_URL ?? "https://kredo-near.vercel.app"}
     />
   );
 }

@@ -49,13 +49,13 @@ export async function kredo(): Promise<Credits> {
 
 /**
  * A real app links the Kredo user to its own account system. Parley has no accounts, so the
- * Kredo address and email this browser connected live in an httpOnly cookie, signed so the
- * browser can't swap in someone else's address. Nothing is stored on the server.
+ * Kredo account and email this browser connected live in an httpOnly cookie, signed so the
+ * browser can't swap in someone else's account. Nothing is stored on the server.
  */
 const COOKIE = "parley_link";
 const MAX_AGE = 60 * 60 * 24 * 365;
 
-type Linked = { address: string; email: string | null };
+type Linked = { account: string; email: string | null };
 
 /** PARLEY_SESSION_SECRET if set, otherwise derived from the API key, which is already secret. */
 function secret(): string {
@@ -82,9 +82,9 @@ async function linked(): Promise<Linked | undefined> {
   }
 }
 
-/** The Kredo address this browser connected, if any. Never taken from the request body. */
+/** The Kredo account this browser connected, if any. Never taken from the request body. */
 export async function currentUser(): Promise<string | undefined> {
-  return (await linked())?.address;
+  return (await linked())?.account;
 }
 
 /** The email the user shared when they connected Parley, if any. */
@@ -92,8 +92,8 @@ export async function currentEmail(): Promise<string | null> {
   return (await linked())?.email ?? null;
 }
 
-export async function linkUser(address: string, email: string | null) {
-  const payload = Buffer.from(JSON.stringify({ address, email } satisfies Linked)).toString("base64url");
+export async function linkUser(account: string, email: string | null) {
+  const payload = Buffer.from(JSON.stringify({ account, email } satisfies Linked)).toString("base64url");
   (await cookies()).set(COOKIE, `${payload}.${sign(payload)}`, {
     httpOnly: true,
     sameSite: "lax",

@@ -1,6 +1,6 @@
 /**
  * The two calls the Kredo React kit makes: what to show for this visitor, and the swap of the
- * one-time code from the connect popup for the user's address and email.
+ * one-time code from the connect popup for the user's NEAR account and email.
  */
 import { currentEmail, currentUser, errorResponse, kredo, linkUser, unlinkUser } from "@/lib/kredo";
 

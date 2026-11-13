@@ -7,7 +7,7 @@ The smallest app that takes Kredo credits: a joke for 1 credit. One server file 
 1. Create the client with your API key.
 2. Set a price.
 3. Redirect to the connect page.
-4. Swap the one-time code for the user's address.
+4. Swap the one-time code for the user's NEAR account.
 5. Report state for the page.
 6. Charge before doing the paid work, and send a declined user to the buy page.
 
@@ -18,7 +18,7 @@ echo "CREDITS_API_KEY=uc_live_..." > .env     # from the dashboard, or POST /v1/
 npm start                                     # http://localhost:8080
 ```
 
-It uses the live network by default, with a key from the [dashboard](https://kredo-omega.vercel.app/dashboard). To run it against `npm run dev:local` instead, add these to `.env`:
+It uses the live network by default, with a key from the [dashboard](https://kredo-near.vercel.app/dashboard). To run it against `npm run dev:local` instead, add these to `.env`:
 
 ```bash
 CREDITS_API_URL=http://localhost:4000

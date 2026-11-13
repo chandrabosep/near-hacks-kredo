@@ -332,7 +332,7 @@ function Parley({ models, demo, configured, pagesUrl }: Props) {
         <Profile
           configured={configured}
           connected={connected}
-          address={user?.address}
+          account={user?.account}
           email={user?.email ?? undefined}
           balance={user?.balance.credits}
           onWallet={openWallet}
@@ -428,7 +428,7 @@ const SOON = [
 const SUGGESTIONS = [
   { icon: Plane, text: "Plan a 3-day trip to Goa" },
   { icon: Coins, text: "Explain stablecoins like I'm 12" },
-  { icon: CloudRain, text: "Write a haiku about Mumbai rain" },
+  { icon: CloudRain, text: "Write a haiku about monsoon rain" },
 ];
 
 /** The column the home composer and the thread share: 40rem, 48rem on wide screens. */
@@ -763,7 +763,7 @@ function Avatar({ label, size = "sm" }: { label?: string; size?: "sm" | "lg" }) 
 function Profile({
   configured,
   connected,
-  address,
+  account,
   email,
   balance,
   onWallet,
@@ -771,13 +771,13 @@ function Profile({
 }: {
   configured: boolean;
   connected: boolean;
-  address?: string;
+  account?: string;
   email?: string;
   balance?: string;
   onWallet: () => void;
   onConnect: () => void;
 }) {
-  const [name, sub] = !configured ? ["Guest", "Kredo isn't set up"] : connected && address ? [email ?? "Kredo account", `${fmt(balance ?? 0)} credits`] : ["Guest", "Connect Kredo"];
+  const [name, sub] = !configured ? ["Guest", "Kredo isn't set up"] : connected && account ? [email ?? "Kredo account", `${fmt(balance ?? 0)} credits`] : ["Guest", "Connect Kredo"];
 
   return (
     <div className="shrink-0 px-2 pb-2">
@@ -854,7 +854,7 @@ function Reply({ msg, models }: { msg: Msg; models: ModelOption[] }) {
           )}
           {msg.cost?.explorer && (
             <a href={msg.cost.explorer} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-ink">
-              View on Whitechain <ExternalLink className="size-3" />
+              View on explorer <ExternalLink className="size-3" />
             </a>
           )}
         </div>

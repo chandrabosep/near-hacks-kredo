@@ -4,7 +4,7 @@ import { Credits, CreditsError } from "kredo"; // ◆
 
 const app = express();
 app.use(express.json(), express.static("public"));
-const users = new Map<string, string>(); // visitor id -> user address (use your real session store)
+const users = new Map<string, string>(); // visitor id -> user account (use your real session store)
 const visitor = (req: express.Request) => String(req.headers["x-visitor"] ?? req.query.v ?? "anonymous");
 
 // Talks to the live network unless CREDITS_API_URL and CREDITS_PAGES_URL point elsewhere.
@@ -20,7 +20,7 @@ app.get("/connect", async (req, res) => {
   res.redirect(await credits.connectUrl({ credits: 100, returnTo: `http://localhost:8080/?v=${visitor(req)}` })); // ◆
 });
 
-// Swap the code for the user's address, server to server.
+// Swap the code for the user's NEAR account, server to server.
 app.post("/api/connected", async (req, res) => {
   const { user } = await credits.exchangeCode(req.body.code); // ◆
   users.set(visitor(req), user);

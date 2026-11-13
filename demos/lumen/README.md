@@ -1,6 +1,6 @@
 # Lumen
 
-An AI image and video studio that takes Kredo credits. Live at [lumen-gamma-rouge.vercel.app](https://lumen-gamma-rouge.vercel.app).
+An AI image and video studio that takes Kredo credits. Live at [kredo-near-lumen.vercel.app](https://kredo-near-lumen.vercel.app).
 
 - **Images** are a single `charge()` per batch, priced per image: Lumen Flash costs 1 credit, Lumen Pro costs 4. If generation fails, the charge is refunded.
 - **Video** is a long job, so it uses a hold: `hold()` the full price when the render starts (6 or 14 credits a second), `capture()` when the clip is ready, `release()` if it fails. If Lumen never comes back, the hold expires and the user keeps everything.

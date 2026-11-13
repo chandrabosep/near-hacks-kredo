@@ -85,7 +85,7 @@ Want me to add budgets or places to stay?`,
 So it's like an email that carries money, and the money doesn't wobble in value the way Bitcoin does.`,
   ],
   [
-    /haiku|poem|mumbai|rain/i,
+    /haiku|poem|monsoon|rain/i,
     `*Monsoon on Marine Drive*
 
 Grey waves fold the sky,
@@ -120,7 +120,7 @@ function sampleFor(prompt: string): string {
 
 To get real answers, add \`ANTHROPIC_API_KEY\` to \`demos/parley/.env.local\` and restart. Everything else you see is live:
 
-- This message was **paid for with Kredo credits**, charged by the vault contract on Whitechain
+- This message was **paid for with Kredo credits**, charged by the vault contract on NEAR
 - The cost under each reply links to its transaction
 - If the AI fails, the charge is **refunded automatically**`;
 }

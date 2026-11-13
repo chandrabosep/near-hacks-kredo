@@ -79,27 +79,27 @@ export function unseal<T>(token: string | undefined | null): T | undefined {
 // ---------------------------------------------------------------- Lumen's own sessions
 
 /**
- * A real app links the Kredo user to its own accounts. Lumen has none, so the Kredo address and
+ * A real app links the Kredo user to its own accounts. Lumen has none, so the Kredo account and
  * email this browser connected live in a signed httpOnly cookie. Nothing is stored on the server.
  */
 const COOKIE = "lumen_link";
 const MAX_AGE = 60 * 60 * 24 * 365;
 
-type Linked = { address: string; email: string | null };
+type Linked = { account: string; email: string | null };
 
 const linked = async () => unseal<Linked>((await cookies()).get(COOKIE)?.value);
 
-/** The Kredo address this browser connected, if any. Never taken from the request body. */
+/** The Kredo account this browser connected, if any. Never taken from the request body. */
 export async function currentUser(): Promise<string | undefined> {
-  return (await linked())?.address;
+  return (await linked())?.account;
 }
 
 export async function currentEmail(): Promise<string | null> {
   return (await linked())?.email ?? null;
 }
 
-export async function linkUser(address: string, email: string | null) {
-  (await cookies()).set(COOKIE, seal({ address, email } satisfies Linked), {
+export async function linkUser(account: string, email: string | null) {
+  (await cookies()).set(COOKIE, seal({ account, email } satisfies Linked), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

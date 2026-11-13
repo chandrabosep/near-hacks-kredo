@@ -4,8 +4,8 @@ AI apps that share one Kredo balance. Each is its own company on the network, wi
 
 | App | Kind | Live | Port | How it bills |
 |---|---|---|---|---|
-| [Parley](parley) | Chat | [parley-chi-sepia.vercel.app](https://parley-chi-sepia.vercel.app) | 3101 | `charge()` per message, `refund()` if the model fails |
-| [Lumen](lumen) | Images and video | [lumen-gamma-rouge.vercel.app](https://lumen-gamma-rouge.vercel.app) | 3102 | `charge()` per image; `hold()` per second of video, `capture()` when the clip is ready, `release()` if it fails |
+| [Parley](parley) | Chat | [kredo-near-parley.vercel.app](https://kredo-near-parley.vercel.app) | 3101 | `charge()` per message, `refund()` if the model fails |
+| [Lumen](lumen) | Images and video | [kredo-near-lumen.vercel.app](https://kredo-near-lumen.vercel.app) | 3102 | `charge()` per image; `hold()` per second of video, `capture()` when the clip is ready, `release()` if it fails |
 
 ## Run them
 
@@ -22,7 +22,7 @@ Each app runs in demo mode until its AI key is set (`ANTHROPIC_API_KEY` for Parl
 
 1. Open Parley, connect Kredo and buy credits once.
 2. Open Lumen and connect. The same balance is already there: make an image, then render a clip and watch the hold turn into a capture.
-3. Every charge is enforced by the vault contract on Whitechain, with a link to the transaction.
+3. Every charge is enforced by the vault contract on NEAR, with a link to the transaction.
 
 ## Deploy
 
