@@ -7,6 +7,7 @@ import { createIndexer } from "./indexer.js";
 import { createMeta } from "./meta.js";
 import { createNearChain, type Chain } from "./near.js";
 import { createRelayer } from "./relayer.js";
+import { createStorage } from "./storage.js";
 import { createStore } from "./store.js";
 import { createVault } from "./vault.js";
 
@@ -31,6 +32,7 @@ export async function createContext(
   const store = createStore(db);
   const relayer = createRelayer({ chain, db, vault: config.vault, limits: config.relayerLimits });
   const indexer = createIndexer({ config, chain, vault, db, store, relayer });
+  const storage = createStorage({ vault, relayer, policy: config.vaultStorage });
   const meta = createMeta({ chain, allowed: [config.vault, config.usdt] });
 
   return {
@@ -43,6 +45,7 @@ export async function createContext(
     meta,
     codes: createCodes(),
     vault,
+    storage,
     verifier,
   };
 }

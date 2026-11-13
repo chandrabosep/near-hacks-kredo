@@ -5,6 +5,7 @@ import type { KeyPairString } from "near-api-js";
 import { z } from "zod";
 import { accountIdSchema, keyFromCredentials, parseNear, TGAS, type AccountId } from "./near.js";
 import type { RelayerLimits } from "./relayer.js";
+import type { StoragePolicy } from "./storage.js";
 import { creditsToUnits } from "./units.js";
 
 export const NETWORKS = {
@@ -34,6 +35,11 @@ const envSchema = z.object({
   NEAR_CREDENTIALS_DIR: z.string().default("~/.near-credentials"),
   VAULT_ACCOUNT_ID: accountIdSchema.optional(),
   USDT_ACCOUNT_ID: accountIdSchema.optional(),
+  /**
+   * Parent of the apps' signer accounts. An app registered without its own signer signs from
+   * `<app id>.<this>`, a sub-account whose only key is the company's function-call key.
+   */
+  APPS_PARENT_ACCOUNT_ID: accountIdSchema.optional(),
   DEPLOYMENTS_DIR: z.string().default(DEFAULT_DEPLOYMENTS_DIR),
   DATA_DIR: z.string().default("./data"),
   DATABASE_URL: z.string().url().optional(),
@@ -59,6 +65,20 @@ const envSchema = z.object({
   MAX_TX_TGAS: z.coerce.number().int().min(10).max(300).default(300),
   /** NEAR sent to a new user's implicit account so it exists onchain and can sign. */
   USER_ACCOUNT_NEAR: near.default(parseNear("0.01")),
+  /**
+   * Vault storage (NEP-145) the relayer pays for users, in NEAR. A new account is registered with
+   * the vault's minimum plus the headroom. Before a call that adds the user's own state (an app
+   * limit, a claim link: roughly 0.002 NEAR each), it's topped up when less than TOP_UP_BELOW is left.
+   */
+  VAULT_STORAGE_HEADROOM: near.default(parseNear("0.005")),
+  /**
+   * Vault storage the relayer puts on a new app's signer at registration, in NEAR. Each charge,
+   * hold or refund keeps a used ref (roughly 0.0015 NEAR), paid from it. It's funded once, not
+   * topped up per charge, so an app can't make Kredo pay for its state without limit.
+   */
+  APP_SIGNER_STORAGE: near.default(parseNear("0.5")),
+  VAULT_STORAGE_TOP_UP_BELOW: near.default(parseNear("0.0025")),
+  VAULT_STORAGE_TOP_UP: near.default(parseNear("0.005")),
   /** Smallest charge or hold, and smallest send or claim link, in credits. Dust would only burn gas. */
   MIN_CHARGE_CREDITS: z.string().regex(/^\d+(\.\d{1,4})?$/).default("1"),
   MIN_SEND_CREDITS: z.string().regex(/^\d+(\.\d{1,4})?$/).default("1"),
@@ -78,6 +98,7 @@ const deploymentSchema = z.object({
   vault: accountIdSchema,
   usdt: accountIdSchema,
   operator: accountIdSchema.optional(),
+  appsParent: accountIdSchema.optional(),
 });
 
 export type Config = {
@@ -89,6 +110,7 @@ export type Config = {
   relayerKey: KeyPairString;
   vault: AccountId;
   usdt: AccountId;
+  appsParent?: AccountId;
   dataDir: string;
   /** Postgres. Without it, an embedded Postgres under dataDir. */
   databaseUrl?: string;
@@ -101,6 +123,9 @@ export type Config = {
   relayerLimits: RelayerLimits;
   /** yoctoNEAR sent to activate a new user's account. */
   userAccountYocto: bigint;
+  /** Vault storage the relayer pays for users, in yoctoNEAR. */
+  vaultStorage: StoragePolicy;
+  appSignerStorageYocto: bigint;
   indexerIntervalMs: number;
   /** In USDT units. */
   minChargeUnits: bigint;
@@ -127,6 +152,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   let vault = e.VAULT_ACCOUNT_ID;
   let usdt = e.USDT_ACCOUNT_ID;
   let relayerId = e.RELAYER_ACCOUNT_ID;
+  let appsParent = e.APPS_PARENT_ACCOUNT_ID;
   if (!vault || !usdt || !relayerId) {
     const file = resolve(e.DEPLOYMENTS_DIR, `${network}.json`);
     if (!existsSync(file)) {
@@ -137,6 +163,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     vault ??= d.vault;
     usdt ??= d.usdt;
     relayerId ??= d.operator;
+    appsParent ??= d.appsParent;
   }
   if (!relayerId) throw new Error("RELAYER_ACCOUNT_ID is required");
 
@@ -147,6 +174,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
 
   if (e.APP_DAILY_GAS_BUDGET > e.RELAYER_DAILY_BUDGET) {
     throw new Error("APP_DAILY_GAS_BUDGET can't be above RELAYER_DAILY_BUDGET");
+  }
+
+  // One registration or one top-up must always leave enough for the next entry.
+  if (e.VAULT_STORAGE_HEADROOM < e.VAULT_STORAGE_TOP_UP_BELOW || e.VAULT_STORAGE_TOP_UP < e.VAULT_STORAGE_TOP_UP_BELOW) {
+    throw new Error("VAULT_STORAGE_HEADROOM and VAULT_STORAGE_TOP_UP can't be below VAULT_STORAGE_TOP_UP_BELOW");
   }
 
   if ((e.PRIVY_APP_ID === undefined) !== (e.PRIVY_APP_SECRET === undefined)) {
@@ -162,6 +194,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     relayerKey,
     vault,
     usdt,
+    appsParent,
     dataDir: e.DATA_DIR,
     databaseUrl: e.DATABASE_URL,
     privy: e.PRIVY_APP_ID && e.PRIVY_APP_SECRET ? { appId: e.PRIVY_APP_ID, appSecret: e.PRIVY_APP_SECRET } : undefined,
@@ -177,6 +210,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       minBalance: e.RELAYER_MIN_BALANCE,
     },
     userAccountYocto: e.USER_ACCOUNT_NEAR,
+    appSignerStorageYocto: e.APP_SIGNER_STORAGE,
+    vaultStorage: { headroom: e.VAULT_STORAGE_HEADROOM, topUpBelow: e.VAULT_STORAGE_TOP_UP_BELOW, topUp: e.VAULT_STORAGE_TOP_UP },
     indexerIntervalMs: e.INDEXER_INTERVAL_MS,
     minChargeUnits: creditsToUnits(e.MIN_CHARGE_CREDITS),
     minSendUnits: creditsToUnits(e.MIN_SEND_CREDITS),

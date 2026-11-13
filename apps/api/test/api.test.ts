@@ -5,6 +5,7 @@
  * NEAR wallet signs the same delegate-action hashes in the browser.
  */
 import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -31,13 +32,20 @@ let appId: string;
 const alice = newUserKey();
 const bob = newUserKey();
 const dana = newUserKey();
+const erin = newUserKey();
+const carol = newUserKey();
 const payout = "payout.kredo.test";
+/** The app's own signing key: on the company's server, never sent to Kredo. */
+const signerKey = KeyPair.fromRandom("ed25519");
+let signerAccount: string;
 
 /** Fake Privy: the token is the user's name. */
 const users: Record<string, { user: ReturnType<typeof newUserKey>; email: string }> = {
   alice: { user: alice, email: "alice@example.com" },
   bob: { user: bob, email: "bob@example.com" },
   dana: { user: dana, email: "dana@example.com" },
+  erin: { user: erin, email: "erin@example.com" },
+  carol: { user: carol, email: "carol@example.com" },
 };
 const verifier: UserVerifier = async (token) => {
   const u = users[token];
@@ -56,7 +64,28 @@ async function call(method: string, path: string, opts: { body?: unknown; key?: 
   return { status: res.status, body } as { status: number; body: any };
 }
 
-const company = (method: string, path: string, body?: unknown) => call(method, path, { key: apiKey, body });
+/**
+ * What the SDK does with a signerKey: sends the key's public half, and when the API answers 428
+ * with a prepared transaction hash, signs it and sends the same request again.
+ */
+async function company(method: string, path: string, body?: unknown, opts: { signer?: KeyPair | null } = {}) {
+  const key = opts.signer === undefined ? signerKey : opts.signer;
+  // Like the SDK, every charge, hold, refund and convert carries a ref, kept when it's sent again.
+  if (method === "POST" && /^\/v1\/(charges|holds|refunds|convert)$/.test(path) && body && typeof body === "object" && !("ref" in body)) {
+    body = { ...body, ref: randomUUID() };
+  }
+  const headers: Record<string, string> = { "content-type": "application/json", authorization: `Bearer ${apiKey}` };
+  if (key) headers["x-kredo-signer-key"] = key.getPublicKey().toString();
+  const send = async () => {
+    const res = await fetch(`${base}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    const text = await res.text();
+    return { status: res.status, body: res.headers.get("content-type")?.includes("json") ? JSON.parse(text) : text } as { status: number; body: any };
+  };
+  const first = await send();
+  if (first.status !== 428 || first.body?.code !== "signature_required" || !key) return first;
+  headers["x-kredo-signature"] = `${first.body.hash}:${sign(key, first.body.hash)}`;
+  return send();
+}
 
 /** What the browser does: the user's NEAR wallet signs the delegate action's hash. */
 function sign(key: KeyPair, hash: string): string {
@@ -72,6 +101,9 @@ async function act(user: string, action: string, input: Json) {
 }
 
 const usdtOf = (account: string) => chain.view<string>(chain.usdt, "ft_balance_of", { account_id: account });
+const storageOf = (account: string) => chain.view<{ total: string; available: string } | null>(chain.vault, "storage_balance_of", { account_id: account });
+/** What the relayer sent since `since`, by function name, oldest first. */
+const relayedSince = (since: number) => ctx.db.data.txs.slice(since).map((t) => t.fn);
 
 before(async () => {
   const config = loadConfig({
@@ -79,6 +111,7 @@ before(async () => {
     USDT_ACCOUNT_ID: chain.usdt,
     RELAYER_ACCOUNT_ID: chain.relayerId,
     RELAYER_PRIVATE_KEY: KeyPair.fromRandom("ed25519").toString(),
+    APPS_PARENT_ACCOUNT_ID: "apps.kredo.test",
     ADMIN_TOKEN: "dev-admin",
     DATA_DIR: mkdtempSync(join(tmpdir(), "kredo-api-")),
   });
@@ -117,6 +150,10 @@ describe("api", () => {
     assert.match(res.body.apiKey, /^uc_live_/);
     apiKey = res.body.apiKey;
     appId = res.body.id;
+    // Each app signs its own charges from a sub-account of the apps parent. Its only key is the company's.
+    signerAccount = `${appId}.apps.kredo.test`;
+    assert.equal(res.body.signer, signerAccount);
+    chain.addAccount(signerAccount, signerKey.getPublicKey().toString());
 
     const me = await company("GET", "/v1/app");
     assert.equal(me.body.name, "Video Studio");
@@ -184,6 +221,16 @@ describe("api", () => {
     const forged = await call("POST", "/v1/me/submit/connect", { user: "alice", body: { hash, signature: sign(bob.key, hash) } });
     assert.equal(forged.status, 400);
     assert.equal(forged.body.code, "BadSignature");
+  });
+
+  test("a charge without the app's own key is refused, so Kredo can't charge on the app's behalf", async () => {
+    const res = await company("POST", "/v1/charges", { user: alice.account, credits: 1 }, { signer: null });
+    assert.equal(res.status, 428);
+    assert.equal(res.body.code, "missing_signer");
+    const wrong = await company("POST", "/v1/charges", { user: alice.account, credits: 1 }, { signer: KeyPair.fromRandom("ed25519") });
+    assert.notEqual(wrong.status, 201, "a key that isn't on the app's signer account can't charge");
+    const onchain = await chain.view<{ signer: string }>(chain.vault, "get_app", { app: appId });
+    assert.equal(onchain.signer, signerAccount);
   });
 
   test("company charges by action, and a retried ref doesn't charge twice", async () => {
@@ -393,6 +440,38 @@ describe("api", () => {
     }
   });
 
+  test("the hash to sign comes with the exact bytes behind it, so the app can check what it signs", async () => {
+    const res = await call("POST", "/v1/charges", { key: apiKey, body: { user: alice.account, credits: 1, ref: "peek" } });
+    // call() sends no signer key, so ask the way the SDK does.
+    const prepared = await fetch(`${base}/v1/charges`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "x-kredo-signer-key": signerKey.getPublicKey().toString() },
+      body: JSON.stringify({ user: alice.account, credits: 1, ref: "peek" }),
+    }).then((r) => r.json() as Promise<Json>);
+    assert.equal(res.status, 428);
+    const bytes = Buffer.from(prepared.delegate, "base64");
+    assert.equal(prepared.hash, `0x${createHash("sha256").update(bytes).digest("hex")}`);
+    assert.ok(bytes.includes(Buffer.from(alice.account)), "the bytes name the user being charged");
+  });
+
+  test("a charge draws on the signer's own storage: the relayer doesn't top it up", async () => {
+    const since = ctx.db.data.txs.length;
+    const res = await company("POST", "/v1/charges", { user: alice.account, credits: 1 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(relayedSince(since), ["charge"]);
+  });
+
+  test("the real SDK, holding the app's key, checks and signs its charges through the API", async () => {
+    const { Credits } = await import("kredo");
+    const credits = new Credits({ apiKey, baseUrl: base, signerKey: signerKey.toString(), retries: 0 });
+    const op = await credits.charge({ user: alice.account, credits: 1, ref: "via-sdk" });
+    assert.equal(op.kind, "charge");
+    assert.equal(op.amount.credits, "1");
+    const hold = await credits.hold({ user: alice.account, credits: 2, ref: "via-sdk-hold" });
+    const cap = await credits.capture(hold.holdId, { credits: 1 });
+    assert.equal(cap.amount.credits, "1");
+  });
+
   test("the sweeper releases an expired hold back to the user", async () => {
     const before = (await call("GET", "/v1/me", { user: "alice" })).body.balance.units;
     const held = await company("POST", "/v1/holds", { user: alice.account, credits: 4 });
@@ -589,6 +668,66 @@ describe("api", () => {
 
     // Alice already holds USDT, so she doesn't need any.
     assert.equal((await call("POST", "/v1/me/faucet", { user: "alice" })).body.code, "faucet_not_needed");
+  });
+
+  // ---------------------------------------------------------------- vault storage (NEP-145)
+
+  test("buying as a new user registers them on the vault first, paid by the relayer", async () => {
+    chain.mint(erin.account, 5_000_000n);
+    assert.equal(await storageOf(erin.account), null);
+
+    const since = ctx.db.data.txs.length;
+    const res = await act("erin", "buy", { credits: 100 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(relayedSince(since), ["activate_account", "storage_deposit", "ft_transfer_call"]);
+    assert.equal((await storageOf(erin.account))?.available, ctx.config.vaultStorage.headroom.toString(), "registered with the headroom");
+    assert.equal((await call("GET", "/v1/me", { user: "erin" })).body.balance.credits, "100");
+
+    const again = ctx.db.data.txs.length;
+    assert.equal((await act("erin", "buy", { credits: 10 })).status, 201);
+    assert.deepEqual(relayedSince(again), ["ft_transfer_call"], "registered once");
+  });
+
+  test("sending to an account the vault hasn't seen registers the recipient first", async () => {
+    const frank = newUserKey().account;
+    assert.equal(await storageOf(frank), null);
+
+    const since = ctx.db.data.txs.length;
+    const res = await act("alice", "send", { to: frank, credits: 5 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(relayedSince(since), ["storage_deposit", "send"]);
+    assert.ok(await storageOf(frank));
+    assert.equal(await ctx.vault.balanceOf(frank), 50_000n);
+  });
+
+  test("approving an app with too little storage left tops the user up first", async () => {
+    chain.mint(carol.account, 0n); // registered with the USDT token, so the only storage_deposit below is the vault's
+    // Carol is registered with only the minimum, so a new limit can't be paid from her storage.
+    const { min } = await chain.view<{ min: string }>(chain.vault, "storage_balance_bounds");
+    await ctx.relayer.write({ method: "storage_deposit", args: { account_id: carol.account, registration_only: true }, deposit: BigInt(min) });
+    assert.equal((await storageOf(carol.account))?.available, "0");
+
+    const since = ctx.db.data.txs.length;
+    const res = await act("carol", "connect", { app: appId, credits: 20 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(relayedSince(since), ["activate_account", "storage_deposit", "approve_app"]);
+    const after = (await storageOf(carol.account))!;
+    assert.equal(after.total, (BigInt(min) + ctx.config.vaultStorage.topUp).toString(), "topped up once");
+    assert.ok(BigInt(after.available) < ctx.config.vaultStorage.topUp, "the new limit was paid from it");
+
+    // Plenty left now: changing the same limit adds no state and needs no top-up.
+    const again = ctx.db.data.txs.length;
+    assert.equal((await act("carol", "connect", { app: appId, credits: 30 })).status, 201);
+    assert.deepEqual(relayedSince(again), ["approve_app"]);
+  });
+
+  test("the same account is registered once, however many ask at the same time", async () => {
+    const someone = newUserKey().account;
+    const since = ctx.db.data.txs.length;
+    await Promise.all([ctx.storage.ensureRegistered(someone), ctx.storage.ensureRegistered(someone), ctx.storage.ensureHeadroom(someone)]);
+    assert.deepEqual(relayedSince(since), ["storage_deposit"]);
+    await ctx.storage.ensureRegistered(someone);
+    assert.equal(ctx.db.data.txs.length, since + 1, "known accounts aren't asked about again");
   });
 
   // ---------------------------------------------------------------- test mode

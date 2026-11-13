@@ -33,6 +33,8 @@ export async function kredo(): Promise<Credits> {
   }
   client ??= new Credits({
     apiKey: process.env.CREDITS_API_KEY,
+    // This app's own function-call key: charges are signed here, so only this app can charge for it.
+    signerKey: process.env.CREDITS_SIGNER_KEY,
     baseUrl: process.env.CREDITS_API_URL,
     pagesUrl: process.env.NEXT_PUBLIC_CREDITS_PAGES_URL,
   });

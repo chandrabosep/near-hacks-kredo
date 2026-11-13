@@ -14,6 +14,8 @@ import { formatNear } from "../near.js";
 const createAppSchema = z.object({
   name: z.string().trim().min(2).max(60),
   payout: accountIdSchema,
+  /** The account that signs the app's charges. Defaults to `<app id>.<APPS_PARENT_ACCOUNT_ID>`. */
+  signer: accountIdSchema.optional(),
   feeBps: z.number().int().min(0).max(2_000).optional(),
   /** Largest single charge or hold, in credits. Omit for no cap. */
   maxCharge: creditsSchema.optional(),
@@ -29,11 +31,12 @@ export function adminRoutes(ctx: Context): Router {
   r.post("/apps", async (req, res) => {
     const body = createAppSchema.parse(req.body);
     const maxCharge = body.maxCharge === undefined ? 0n : creditsToUnits(body.maxCharge);
-    const { app, apiKey, hash } = await registerApp(ctx, { name: body.name, payout: body.payout, feeBps: body.feeBps, maxCharge });
+    const { app, apiKey, signer, hash } = await registerApp(ctx, { name: body.name, payout: body.payout, signer: body.signer, feeBps: body.feeBps, maxCharge });
     res.status(201).json({
       id: app.id,
       name: app.name,
       payout: app.payout,
+      signer,
       feeBps: app.feeBps,
       maxCharge: maxCharge === 0n ? null : amount(maxCharge),
       apiKey,

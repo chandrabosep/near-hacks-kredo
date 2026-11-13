@@ -2,7 +2,7 @@
  * Routes a company's backend calls with its API key. Every write accepts the company's own
  * `ref`. Repeating a request with the same ref returns the first result instead of charging again.
  */
-import { Router, type RequestHandler } from "express";
+import { Router, type Request, type RequestHandler, type Response } from "express";
 import { z } from "zod";
 import type { Context } from "../context.js";
 import { appOf, HttpError, rateLimit, requireApiKey } from "../http.js";
@@ -10,7 +10,9 @@ import { formatNear, TGAS } from "../near.js";
 import { amountInputSchema, priceListSchema, resolveAmount } from "../pricing.js";
 import { appProfileSchema } from "../profile.js";
 import type { OpRecord } from "../store.js";
-import { RelayerError, vaultEvent } from "../relayer.js";
+import { MetaError } from "../meta.js";
+import type { AccountId } from "../near.js";
+import { RelayerError, vaultEvent, type RelayResult } from "../relayer.js";
 import { amount, creditsToUnits, unitsToCreditsString, UNITS_PER_CREDIT } from "../units.js";
 import { accountIdSchema, activityFor, appProfile, creditsSchema, forApp, newRef, onchainRef, refSchema, txInfo } from "./shared.js";
 
@@ -32,7 +34,7 @@ const convertSchema = z.object({ user: accountIdSchema, credits: creditsSchema, 
  */
 export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
   const r = Router();
-  const { store, relayer, config, vault } = ctx;
+  const { store, relayer, config, vault, meta } = ctx;
 
   r.use(auth ?? requireApiKey(store), rateLimit(config.rateLimitPerMin));
 
@@ -63,6 +65,72 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
     if (limit.expiry !== 0 && limit.expiry <= Math.floor(Date.now() / 1000)) throw new RelayerError("LimitExpired");
     if (units > limit.remaining) throw new RelayerError("OverLimit");
     if (units > balance) throw new RelayerError("InsufficientBalance");
+  }
+
+  // ---------------------------------------------------------------- app-signed writes
+
+  /** The account the vault accepts this app's charges from. Read every time, so a new signer takes effect at once. */
+  async function signerOf(appId: string): Promise<AccountId> {
+    const a = await vault.getApp(appId);
+    if (!a) throw new RelayerError("UnknownApp");
+    return a.signer;
+  }
+
+  const metaError = (err: unknown) => {
+    if (!(err instanceof MetaError)) return err;
+    if (err.code === "account_not_ready") return new HttpError(403, "That key isn't on this app's signer account", "signer_key_unknown");
+    return new HttpError(err.status, err.message, err.code);
+  };
+
+  /** What makes two requests the same write: the method and its ref (or hold). */
+  const identity = (method: string, args: Record<string, unknown>) => `${method}:${String(args.app ?? "")}:${String(args.ref_id ?? args.hold_id)}`;
+
+  /**
+   * Charges, holds, captures and refunds are transactions from the app's own signer (NEP-366):
+   * the vault takes them from no one else, so Kredo can't charge on an app's behalf. The relayer
+   * only submits them and pays the gas.
+   *
+   * 1. The company's server sends the request with its key's public half. We prepare the vault
+   *    call as a delegate action from the app's signer and answer 428 with its hash.
+   * 2. It signs the hash with the app's key (the SDK does this) and sends the same request again
+   *    with `x-kredo-signature: <hash>:<signature>`. We relay exactly what was signed.
+   *
+   * Returns undefined when it has answered 428. The args returned are the ones that were signed:
+   * record those, not the second request's body.
+   */
+  async function appWrite(
+    req: Request,
+    res: Response,
+    appId: string,
+    call: { method: string; args: Record<string, unknown>; gas?: bigint },
+  ): Promise<{ result: RelayResult; args: Record<string, unknown> } | undefined> {
+    const signer = await signerOf(appId);
+    const signed = req.get("x-kredo-signature");
+    if (!signed) {
+      const publicKey = req.get("x-kredo-signer-key");
+      if (!publicKey) throw new HttpError(428, "This app signs its own charges: pass your app's signerKey to the Kredo SDK", "missing_signer");
+      const prepared = await meta.prepare(signer, publicKey, { receiver: vault.id, ...call }, { app: appId, args: call.args }).catch((err) => {
+        throw metaError(err);
+      });
+      res.status(428).json({ error: "Sign this with your app's key, then send the same request again", code: "signature_required", ...prepared });
+      return undefined;
+    }
+
+    const [hash = "", signature = ""] = signed.split(":");
+    let p;
+    try {
+      p = meta.take(signer, hash, signature);
+    } catch (err) {
+      throw metaError(err);
+    }
+    const args = p.meta.args as Record<string, unknown>;
+    if (p.meta.method !== call.method || identity(call.method, args) !== identity(call.method, call.args)) {
+      throw new HttpError(400, "That signature is for a different request: send the same body, with the same ref, again", "wrong_request");
+    }
+    const delegate = { kind: "delegate" as const, delegate: p.delegate, signature: p.signature };
+    // The signer's storage was funded once at registration; it isn't topped up per charge.
+    const result = await relayer.send(signer, [delegate], { fn: call.method, app: appId });
+    return { result, args };
   }
 
   const limitView = (limit: { remaining: bigint; expiry: number }) => {
@@ -159,18 +227,20 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
     const { units, label } = resolveAmount(body, app.prices);
     atLeast(units, config.minChargeUnits);
     await precheck(body.user, app.id, units);
-    const result = await relayer.write(
-      { method: "charge", args: { user: body.user, app: app.id, amount: units.toString(), ref_id: onchainRef("charge", ref) } },
-      { app: app.id },
-    );
+    const written = await appWrite(req, res, app.id, {
+      method: "charge",
+      args: { user: body.user, app: app.id, amount: units.toString(), ref_id: onchainRef("charge", ref) },
+    });
+    if (!written) return;
+    const { result } = written;
     const { hash } = result;
     const ev = vaultEvent(result, "charged");
     const op = store.addOp({
       app: app.id,
       kind: "charge",
       ref,
-      user: body.user,
-      units,
+      user: String(written.args.user),
+      units: BigInt(String(written.args.amount)),
       fee: BigInt(String(ev.fee)),
       label,
       txHash: hash,
@@ -192,29 +262,31 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
     const { units, label } = resolveAmount(body, app.prices);
     atLeast(units, config.minChargeUnits);
     const ttl = Math.min(body.ttlSeconds ?? config.holdTtlSeconds, config.holdTtlSeconds);
-    const expiry = Math.floor(Date.now() / 1000) + ttl;
     await precheck(body.user, app.id, units);
-    const result = await relayer.write(
-      {
-        method: "hold",
-        args: { user: body.user, app: app.id, amount: units.toString(), ref_id: onchainRef("hold", ref), expiry },
-      },
-      { app: app.id },
-    );
+    const written = await appWrite(req, res, app.id, {
+      method: "hold",
+      args: { user: body.user, app: app.id, amount: units.toString(), ref_id: onchainRef("hold", ref), expiry: Math.floor(Date.now() / 1000) + ttl },
+    });
+    if (!written) return;
+    const { result } = written;
+    // The expiry that was signed, not one recomputed for the second request.
+    const expiry = Number(written.args.expiry);
+    const user = String(written.args.user);
+    const held = BigInt(String(written.args.amount));
     const { hash } = result;
     const holdId = String(vaultEvent(result, "held").hold_id);
     store.putHold({
       holdId,
       app: app.id,
-      user: body.user,
-      units,
+      user,
+      units: held,
       ref: onchainRef("hold", ref),
       label,
       expiry,
       status: "open",
       txHash: hash,
     });
-    const op = store.addOp({ app: app.id, kind: "hold", ref, user: body.user, units, label, holdId, txHash: hash, at: Date.now() });
+    const op = store.addOp({ app: app.id, kind: "hold", ref, user, units: held, label, holdId, txHash: hash, at: Date.now() });
     res.status(201).json({ ...opView(op), holdId, expiresAt: new Date(expiry * 1000).toISOString() });
   });
 
@@ -247,7 +319,9 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
     const body = captureSchema.parse(req.body ?? {});
     const actual = body.credits === undefined ? h.units : creditsToUnits(body.credits);
     if (actual > h.units) throw new HttpError(400, "Can't capture more than was held", "over_held");
-    const result = await relayer.write({ method: "capture", args: { hold_id: h.holdId, actual: actual.toString() } }, { app: app.id });
+    const written = await appWrite(req, res, app.id, { method: "capture", args: { hold_id: h.holdId, actual: actual.toString() } });
+    if (!written) return;
+    const { result } = written;
     const { hash } = result;
     const ev = vaultEvent(result, "captured");
     store.setHoldStatus(h.holdId, "captured");
@@ -256,7 +330,7 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
       kind: "capture",
       ref: h.holdId,
       user: h.user,
-      units: actual,
+      units: BigInt(String(written.args.actual)),
       fee: BigInt(String(ev.fee)),
       label: h.label,
       holdId: h.holdId,
@@ -299,11 +373,13 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
     if (earlier) return void res.json(replay(earlier));
 
     const units = creditsToUnits(body.credits);
-    const { hash } = await relayer.write(
-      { method: "refund", args: { app: app.id, user: body.user, amount: units.toString(), ref_id: onchainRef("refund", ref) } },
-      { app: app.id },
-    );
-    const op = store.addOp({ app: app.id, kind: "refund", ref, user: body.user, units, txHash: hash, at: Date.now() });
+    const written = await appWrite(req, res, app.id, {
+      method: "refund",
+      args: { app: app.id, user: body.user, amount: units.toString(), ref_id: onchainRef("refund", ref) },
+    });
+    if (!written) return;
+    const { hash } = written.result;
+    const op = store.addOp({ app: app.id, kind: "refund", ref, user: String(written.args.user), units: BigInt(String(written.args.amount)), txHash: hash, at: Date.now() });
     res.status(201).json(opView(op));
   });
 
@@ -338,10 +414,12 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
     // App credits, exact to 4 decimals: units / rateUnits, scaled back up by UNITS_PER_CREDIT.
     const appCredits = unitsToCreditsString((units * UNITS_PER_CREDIT) / rateUnits);
     await precheck(body.user, app.id, units);
-    const result = await relayer.write(
-      { method: "charge", args: { user: body.user, app: app.id, amount: units.toString(), ref_id: onchainRef("convert", ref) } },
-      { app: app.id },
-    );
+    const written = await appWrite(req, res, app.id, {
+      method: "charge",
+      args: { user: body.user, app: app.id, amount: units.toString(), ref_id: onchainRef("convert", ref) },
+    });
+    if (!written) return;
+    const { result } = written;
     const { hash } = result;
     const ev = vaultEvent(result, "charged");
     const label = `converted to ${appCredits} ${app.name} credits`;
@@ -349,8 +427,8 @@ export function appRoutes(ctx: Context, auth?: RequestHandler): Router {
       app: app.id,
       kind: "convert",
       ref,
-      user: body.user,
-      units,
+      user: String(written.args.user),
+      units: BigInt(String(written.args.amount)),
       fee: BigInt(String(ev.fee)),
       label,
       txHash: hash,

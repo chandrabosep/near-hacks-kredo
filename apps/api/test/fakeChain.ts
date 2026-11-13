@@ -1,7 +1,8 @@
 /**
  * An in-memory NEAR chain for API tests: accounts and access keys, signed delegate actions
  * (NEP-366) checked like the runtime checks them, the test USDT token (NEP-141 with storage
- * registration) and the Kredo vault, ported rule for rule from contracts/vault/src/lib.rs.
+ * registration) and the Kredo vault, ported rule for rule from contracts/vault/src/lib.rs, with its
+ * NEP-145 storage priced per entry rather than per measured byte.
  *
  * Each receipt is atomic, as on NEAR: a panic rolls back that receipt's changes, and a deposit
  * the vault turns down is refunded by the token. The vault's own behaviour is tested in Rust;
@@ -17,13 +18,21 @@ const MAX_HOLD_SECONDS = 86_400;
 const STORAGE_COST = 1_250_000_000_000_000_000_000n;
 const GAS_PRICE = 100_000_000n;
 const GAS_PER_RECEIPT = 2_500_000_000_000n;
+// Vault storage (NEP-145): yoctoNEAR per byte, and roughly what each kind of entry takes.
+const BYTE_COST = 10_000_000_000_000_000_000n;
+const ACCOUNT_BYTES = 250n;
+const LIMIT_BYTES = 150n;
+const CLAIM_BYTES = 200n;
+/** A used charge, hold or refund ref, paid by the app's signer. */
+const REF_BYTES = 150n;
+const APP_BYTES = 200n;
 
 class Panic extends Error {}
 const require = (ok: boolean, msg: string): void => {
   if (!ok) throw new Panic(msg);
 };
 
-type App = { payout: string; fee_bps: number; max_charge: bigint; active: boolean };
+type App = { payout: string; signer: string; fee_bps: number; max_charge: bigint; active: boolean };
 type Limit = { remaining: bigint; expiry: number; version: number };
 type Hold = { user: string; app: string; amount: bigint; expiry: number; limit_version: number; status: "Open" | "Captured" | "Released" };
 type Claim = { from: string; amount: bigint; expiry: number; status: "Open" | "Claimed" | "Cancelled" };
@@ -44,6 +53,8 @@ function emptyState(owner: string, operator: string) {
       earnings: new Map<string, bigint>(),
       spent: new Map<string, bigint>(),
       refs: new Set<string>(),
+      /** NEP-145 storage balances, in yoctoNEAR. */
+      storage: new Map<string, { total: bigint; available: bigint }>(),
       totals: { balances: 0n, held: 0n, claims: 0n, earnings: 0n, fees: 0n },
     },
   };
@@ -60,6 +71,8 @@ export type FakeChain = Chain & {
   usdt: AccountId;
   /** Moves the chain's clock forward, in seconds. */
   advance(seconds: number): void;
+  /** Creates a named account holding one access key, like an app's signer sub-account. */
+  addAccount(account: AccountId, publicKey: string): void;
   /** Mints test USDT to an account, registering it first. */
   mint(account: AccountId, units: bigint): void;
   /** Every transaction sent, newest last. */
@@ -157,7 +170,12 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
   // ---------------------------------------------------------------- vault
 
   const v = () => state.vault;
-  const onlyOperator = (caller: string) => require(v().operators.has(caller), "Not operator");
+  /** Charges are signed by the app itself, never by a Kredo key. */
+  const onlyAppSigner = (caller: string, app: string) => {
+    const a = v().apps.get(app);
+    require(!!a, "Unknown app");
+    require(caller === a!.signer, "Not app signer");
+  };
   const notPaused = () => require(!v().paused, "Paused");
   const activeApp = (app: string) => {
     const a = v().apps.get(app);
@@ -200,6 +218,14 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
     const l = v().limits.get(pair(h.user, h.app));
     if (l && l.version === h.limit_version) l.remaining += amount;
   };
+  /** Takes the state a call added from `payer`'s storage balance, as the vault's pay_storage does. */
+  const payStorage = (payer: string, bytes: bigint) => {
+    const d = v().storage.get(payer);
+    require(!!d, "Not registered");
+    const cost = bytes * BYTE_COST;
+    require(d!.available >= cost, "Insufficient storage");
+    d!.available -= cost;
+  };
   const claimMessage = (claimKey: string, to: string) => `kredo-claim:${vaultId}:${claimKey}:${to}`;
 
   function vaultOnTransfer(sender: string, amount: bigint, msg: string, emit: (e: string, d: Record<string, unknown>) => void): bigint {
@@ -213,13 +239,17 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
       }
     }
     require(amount >= UNITS_PER_CREDIT, "Below minimum deposit");
+    if (!v().storage.has(user)) {
+      emit("deposit_refunded", { user, payer: sender, amount, reason: "not_registered" });
+      return amount;
+    }
     addBalance(user, amount);
     v().totals.balances += amount;
     emit("deposited", { user, payer: sender, amount });
     return 0n;
   }
 
-  function vaultCall(c: Ctx, caller: string, method: string, a: Record<string, unknown>): void {
+  function vaultCall(c: Ctx, caller: string, method: string, a: Record<string, unknown>, deposit: bigint): void {
     if (method === "payout") return payout(c, caller, String(a.app));
     receipt(c, vaultId, (emit) => {
       switch (method) {
@@ -230,8 +260,9 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
           require(!v().apps.has(app), "App exists");
           require(Number(a.fee_bps) <= MAX_FEE_BPS, "Fee too high");
           const maxCharge = a.max_charge == null ? 0n : big(a.max_charge);
-          v().apps.set(app, { payout: String(a.payout), fee_bps: Number(a.fee_bps), max_charge: maxCharge, active: true });
-          emit("app_registered", { app, payout: a.payout, fee_bps: a.fee_bps, max_charge: maxCharge });
+          v().apps.set(app, { payout: String(a.payout), signer: String(a.signer), fee_bps: Number(a.fee_bps), max_charge: maxCharge, active: true });
+          payStorage(caller, APP_BYTES);
+          emit("app_registered", { app, payout: a.payout, signer: a.signer, fee_bps: a.fee_bps, max_charge: maxCharge });
           return;
         }
         case "set_app_active": {
@@ -247,25 +278,31 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
           const app = String(a.app);
           activeApp(app);
           const key = pair(caller, app);
+          const added = !v().limits.has(key);
           const version = (v().limits.get(key)?.version ?? 0) + 1;
           const expiry = a.expiry == null ? 0 : Number(a.expiry);
           v().limits.set(key, { remaining: big(a.limit), expiry, version });
+          if (added) payStorage(caller, LIMIT_BYTES);
           emit("app_approved", { user: caller, app, limit: a.limit, expiry });
           return;
         }
         case "revoke_app": {
           const app = String(a.app);
+          require(v().apps.has(app), "Unknown app");
           const key = pair(caller, app);
-          const version = (v().limits.get(key)?.version ?? 0) + 1;
+          // Nothing approved means nothing to revoke, and no new state for the vault to pay for.
+          if (!v().limits.has(key)) return;
+          const version = v().limits.get(key)!.version + 1;
           v().limits.set(key, { remaining: 0n, expiry: 0, version });
           emit("app_revoked", { user: caller, app });
           return;
         }
         case "charge": {
-          onlyOperator(caller);
+          onlyAppSigner(caller, String(a.app));
           notPaused();
           const [user, app, amount, ref] = [String(a.user), String(a.app), big(a.amount), String(a.ref_id)];
           useRef(app, ref);
+          payStorage(caller, REF_BYTES);
           consumeLimit(user, app, amount);
           debit(user, amount);
           v().totals.balances -= amount;
@@ -274,11 +311,12 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
           return;
         }
         case "hold": {
-          onlyOperator(caller);
+          onlyAppSigner(caller, String(a.app));
           notPaused();
           const [user, app, amount, ref, expiry] = [String(a.user), String(a.app), big(a.amount), String(a.ref_id), Number(a.expiry)];
           require(expiry > nowSec() && expiry <= nowSec() + MAX_HOLD_SECONDS, "Bad expiry");
           useRef(app, ref);
+          payStorage(caller, REF_BYTES);
           consumeLimit(user, app, amount);
           debit(user, amount);
           v().totals.balances -= amount;
@@ -290,11 +328,11 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
           return;
         }
         case "capture": {
-          onlyOperator(caller);
           notPaused();
           const id = String(a.hold_id);
           const h = v().holds.get(id);
           require(!!h && h.status === "Open", "Hold not open");
+          onlyAppSigner(caller, h!.app);
           require(nowSec() < h!.expiry, "Hold expired");
           const actual = big(a.actual);
           require(actual > 0n, "Zero amount");
@@ -311,7 +349,7 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
           const id = String(a.hold_id);
           const h = v().holds.get(id);
           require(!!h && h.status === "Open", "Hold not open");
-          require(nowSec() >= h!.expiry || v().operators.has(caller), "Hold not expired");
+          require(nowSec() >= h!.expiry || v().operators.has(caller) || v().apps.get(h!.app)?.signer === caller, "Hold not expired");
           h!.status = "Released";
           v().totals.held -= h!.amount;
           returnToUser(h!, h!.amount);
@@ -319,12 +357,12 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
           return;
         }
         case "refund": {
-          onlyOperator(caller);
+          onlyAppSigner(caller, String(a.app));
           notPaused();
           const [app, user, amount, ref] = [String(a.app), String(a.user), big(a.amount), String(a.ref_id)];
           require(amount > 0n, "Zero amount");
-          require(v().apps.has(app), "Unknown app");
           useRef(app, ref);
+          payStorage(caller, REF_BYTES);
           const spent = v().spent.get(pair(user, app)) ?? 0n;
           require(amount <= spent, "Over spent");
           const earned = v().earnings.get(app) ?? 0n;
@@ -342,6 +380,7 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
           const [to, amount] = [String(a.to), big(a.amount)];
           require(amount > 0n, "Zero amount");
           require(caller !== to, "Same account");
+          require(v().storage.has(to), "Recipient not registered");
           debit(caller, amount);
           addBalance(to, amount);
           emit("sent", { from: caller, to, amount });
@@ -359,6 +398,7 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
           v().totals.balances -= amount;
           v().totals.claims += amount;
           v().claims.set(id, { from: caller, amount, expiry: Number(a.expiry), status: "Open" });
+          payStorage(caller, CLAIM_BYTES);
           emit("claim_created", { claim_key: id, from: caller, amount, expiry: a.expiry });
           return;
         }
@@ -371,6 +411,7 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
           const to = String(a.to);
           const sig = Buffer.from(String(a.signature), "base64");
           require(sig.length === 64 && PublicKey.fromString(id).verify(Buffer.from(claimMessage(id, to)), sig), "Bad signature");
+          require(v().storage.has(to), "Recipient not registered");
           cl!.status = "Claimed";
           v().totals.claims -= cl!.amount;
           addBalance(to, cl!.amount);
@@ -388,6 +429,28 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
           addBalance(cl!.from, cl!.amount);
           v().totals.balances += cl!.amount;
           emit("claim_cancelled", { claim_key: id, by: caller, amount: cl!.amount });
+          return;
+        }
+        case "storage_deposit": {
+          // Anyone can register anyone. Above the minimum goes to what the account's own calls use later.
+          const account = String(a.account_id ?? caller);
+          const min = ACCOUNT_BYTES * BYTE_COST;
+          const d = v().storage.get(account);
+          let refund = 0n;
+          if (d) {
+            if (a.registration_only) refund = deposit;
+            else {
+              d.total += deposit;
+              d.available += deposit;
+            }
+          } else {
+            require(deposit >= min, "Below minimum storage deposit");
+            const kept = a.registration_only ? min : deposit;
+            refund = deposit - kept;
+            v().storage.set(account, { total: kept, available: kept - min });
+            emit("storage_registered", { account, by: caller });
+          }
+          if (refund > 0n) state.accounts.get(caller)!.balance += refund;
           return;
         }
         default:
@@ -434,7 +497,7 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
       }
       case "get_app": {
         const app = s.apps.get(String(a.app));
-        return app ? { payout: app.payout, fee_bps: app.fee_bps, max_charge: u128(app.max_charge), active: app.active } : null;
+        return app ? { payout: app.payout, signer: app.signer, fee_bps: app.fee_bps, max_charge: u128(app.max_charge), active: app.active } : null;
       }
       case "earnings_of":
         return u128(s.earnings.get(String(a.app)) ?? 0n);
@@ -448,6 +511,12 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
       }
       case "claim_message":
         return claimMessage(String(a.claim_key), String(a.to));
+      case "storage_balance_of": {
+        const d = s.storage.get(String(a.account_id));
+        return d ? { total: u128(d.total), available: u128(d.available) } : null;
+      }
+      case "storage_balance_bounds":
+        return { min: u128(ACCOUNT_BYTES * BYTE_COST), max: null };
       case "is_operator":
         return s.operators.has(String(a.account));
       case "totals": {
@@ -472,7 +541,7 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
       from.balance -= deposit;
     }
     if (receiver === usdtId) return usdtCall(c, caller, method, args, deposit);
-    if (receiver === vaultId) return vaultCall(c, caller, method, args);
+    if (receiver === vaultId) return vaultCall(c, caller, method, args, deposit);
     c.failure ??= "AccountDoesNotExist";
   }
 
@@ -566,6 +635,10 @@ export function createFakeChain(opts: { relayer?: string; vault?: string; usdt?:
     advance(seconds) {
       offsetMs += seconds * 1000;
       height += seconds;
+    },
+
+    addAccount(account, publicKey) {
+      state.accounts.set(account, { balance: 0n, keys: new Map([[publicKey, BigInt(height) * 1_000_000n]]) });
     },
 
     mint(account, units) {

@@ -57,7 +57,7 @@ export function createMeta(opts: { chain: Chain; allowed: AccountId[]; now?: () 
 
   return {
     /** Builds one action for `user` and keeps it until they sign or it expires. */
-    async prepare(user: AccountId, publicKey: string, c: UserCall, meta: Record<string, unknown> = {}): Promise<{ hash: string; expiresAt: string }> {
+    async prepare(user: AccountId, publicKey: string, c: UserCall, meta: Record<string, unknown> = {}): Promise<{ hash: string; delegate: string; expiresAt: string }> {
       if (!allowed.includes(c.receiver)) throw new MetaError(400, "Not a Kredo contract", "bad_receiver");
       sweep();
       const key = toPublicKey(publicKey);
@@ -75,7 +75,9 @@ export function createMeta(opts: { chain: Chain; allowed: AccountId[]; now?: () 
       const hash = Buffer.from(delegateHash(delegate)).toString("hex");
       const expires = now() + TTL_MS;
       pending.set(hash, { hash, delegate, expires, meta: { ...meta, method: c.method }, user, publicKey: key.toString(), nonce });
-      return { hash: `0x${hash}`, expiresAt: new Date(expires).toISOString() };
+      // The exact bytes behind the hash, so the signer can check what it signs instead of trusting us.
+      const bytes = Buffer.from(encodeDelegateAction(delegate)).toString("base64");
+      return { hash: `0x${hash}`, delegate: bytes, expiresAt: new Date(expires).toISOString() };
     },
 
     /**

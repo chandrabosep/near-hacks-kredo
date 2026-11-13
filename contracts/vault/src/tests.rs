@@ -26,6 +26,10 @@ fn bob() -> AccountId {
 fn payout_acc() -> AccountId {
     acc("parley-payout.testnet")
 }
+/// The app's own signer: a sub-account whose only key can call the charge methods.
+fn signer() -> AccountId {
+    acc("parley.apps.testnet")
+}
 const APP: &str = "parley";
 
 /// Sets the caller and the block time (unix seconds).
@@ -43,9 +47,20 @@ const T0: u64 = 1_800_000_000;
 fn setup() -> Vault {
     ctx(owner(), T0);
     let mut v = Vault::new(usdt(), owner(), Some(operator()), acc("fees.testnet"));
+    register(&mut v, &operator());
     ctx(operator(), T0);
-    v.register_app(APP.into(), payout_acc(), 500, None);
+    v.register_app(APP.into(), payout_acc(), signer(), 500, None);
+    register(&mut v, &alice());
+    register(&mut v, &bob());
+    register(&mut v, &signer());
     v
+}
+
+/// The relayer pays an account's registration plus 0.01 NEAR for the state its calls add.
+fn register(v: &mut Vault, account: &AccountId) {
+    let min = v.storage_balance_bounds().min;
+    ctx_pay(operator(), T0, min.saturating_add(NearToken::from_millinear(10)));
+    v.storage_deposit(Some(account.clone()), None);
 }
 
 fn deposit(v: &mut Vault, user: &AccountId, amount: u128) {
@@ -123,7 +138,7 @@ fn paused_vault_refunds_deposits() {
 #[test]
 fn charge_splits_fee_and_lowers_limit() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     let fee = v.charge(alice(), APP.into(), U128(10 * CREDIT), "msg-1".into());
     assert_eq!(fee.0, 10 * CREDIT * 500 / 10_000);
     assert_eq!(v.balance_of(alice()).0, 90 * CREDIT);
@@ -138,7 +153,7 @@ fn charge_splits_fee_and_lowers_limit() {
 #[should_panic(expected = "Over limit")]
 fn charge_above_limit_fails() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     v.charge(alice(), APP.into(), U128(51 * CREDIT), "big".into());
 }
 
@@ -147,7 +162,7 @@ fn charge_above_limit_fails() {
 fn charge_without_approval_fails() {
     let mut v = setup();
     deposit(&mut v, &alice(), 10 * CREDIT);
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     v.charge(alice(), APP.into(), U128(CREDIT), "x".into());
 }
 
@@ -155,14 +170,22 @@ fn charge_without_approval_fails() {
 #[should_panic(expected = "Ref used")]
 fn charge_ref_is_single_use() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     v.charge(alice(), APP.into(), U128(CREDIT), "same".into());
     v.charge(alice(), APP.into(), U128(CREDIT), "same".into());
 }
 
 #[test]
-#[should_panic(expected = "Not operator")]
-fn only_operator_charges() {
+#[should_panic(expected = "Not app signer")]
+fn operator_cannot_charge() {
+    let mut v = funded();
+    ctx(operator(), T0);
+    v.charge(alice(), APP.into(), U128(CREDIT), "x".into());
+}
+
+#[test]
+#[should_panic(expected = "Not app signer")]
+fn payout_account_cannot_charge() {
     let mut v = funded();
     ctx(payout_acc(), T0);
     v.charge(alice(), APP.into(), U128(CREDIT), "x".into());
@@ -174,7 +197,7 @@ fn expired_limit_fails() {
     let mut v = setup();
     deposit(&mut v, &alice(), 10 * CREDIT);
     approve(&mut v, &alice(), 10 * CREDIT, Some(T0 + 60));
-    ctx(operator(), T0 + 60);
+    ctx(signer(), T0 + 60);
     v.charge(alice(), APP.into(), U128(CREDIT), "x".into());
 }
 
@@ -184,7 +207,7 @@ fn revoke_stops_charges() {
     let mut v = funded();
     ctx(alice(), T0);
     v.revoke_app(APP.into());
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     v.charge(alice(), APP.into(), U128(CREDIT), "x".into());
 }
 
@@ -204,7 +227,7 @@ fn max_charge_caps_single_charge() {
     let mut v = funded();
     ctx(owner(), T0);
     v.set_app_terms(APP.into(), 500, U128(5 * CREDIT));
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     v.charge(alice(), APP.into(), U128(6 * CREDIT), "x".into());
 }
 
@@ -214,6 +237,7 @@ fn inactive_app_cannot_charge() {
     let mut v = funded();
     ctx(operator(), T0);
     v.set_app_active(APP.into(), false);
+    ctx(signer(), T0);
     v.charge(alice(), APP.into(), U128(CREDIT), "x".into());
 }
 
@@ -230,7 +254,7 @@ fn operator_cannot_raise_fee() {
 fn fee_is_capped() {
     let mut v = setup();
     ctx(operator(), T0);
-    v.register_app("other".into(), payout_acc(), MAX_FEE_BPS + 1, None);
+    v.register_app("other".into(), payout_acc(), signer(), MAX_FEE_BPS + 1, None);
 }
 
 #[test]
@@ -238,7 +262,7 @@ fn fee_is_capped() {
 fn app_id_is_validated() {
     let mut v = setup();
     ctx(operator(), T0);
-    v.register_app("has space".into(), payout_acc(), 0, None);
+    v.register_app("has space".into(), payout_acc(), signer(), 0, None);
 }
 
 // --- holds ----------------------------------------------------------------
@@ -246,7 +270,7 @@ fn app_id_is_validated() {
 #[test]
 fn hold_then_capture_returns_the_rest() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     let id = v.hold(alice(), APP.into(), U128(20 * CREDIT), "job-1".into(), T0 + 600);
     assert_eq!(id, v.hold_id_of(APP.into(), "job-1".into()));
     assert_eq!(v.balance_of(alice()).0, 80 * CREDIT);
@@ -263,7 +287,7 @@ fn hold_then_capture_returns_the_rest() {
 #[test]
 fn anyone_releases_after_expiry() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     let id = v.hold(alice(), APP.into(), U128(20 * CREDIT), "job".into(), T0 + 600);
     ctx(owner(), T0);
     v.pause();
@@ -278,7 +302,7 @@ fn anyone_releases_after_expiry() {
 #[should_panic(expected = "Hold not expired")]
 fn stranger_cannot_release_early() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     let id = v.hold(alice(), APP.into(), U128(CREDIT), "job".into(), T0 + 600);
     ctx(bob(), T0 + 599);
     v.release(id);
@@ -288,9 +312,9 @@ fn stranger_cannot_release_early() {
 #[should_panic(expected = "Hold expired")]
 fn capture_after_expiry_fails() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     let id = v.hold(alice(), APP.into(), U128(CREDIT), "job".into(), T0 + 600);
-    ctx(operator(), T0 + 600);
+    ctx(signer(), T0 + 600);
     v.capture(id, U128(CREDIT));
 }
 
@@ -298,14 +322,14 @@ fn capture_after_expiry_fails() {
 #[should_panic(expected = "Bad expiry")]
 fn hold_longer_than_a_day_fails() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     v.hold(alice(), APP.into(), U128(CREDIT), "job".into(), T0 + MAX_HOLD_SECONDS + 1);
 }
 
 #[test]
 fn release_after_revoke_does_not_restore_limit() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     let id = v.hold(alice(), APP.into(), U128(20 * CREDIT), "job".into(), T0 + 600);
     ctx(alice(), T0);
     v.revoke_app(APP.into());
@@ -320,7 +344,7 @@ fn release_after_revoke_does_not_restore_limit() {
 #[test]
 fn refund_moves_earnings_back_to_user() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     v.charge(alice(), APP.into(), U128(10 * CREDIT), "c".into());
     let earned = v.earnings_of(APP.into()).0;
     v.refund(APP.into(), alice(), U128(5 * CREDIT), "r".into());
@@ -330,11 +354,21 @@ fn refund_moves_earnings_back_to_user() {
 }
 
 #[test]
+#[should_panic(expected = "Not app signer")]
+fn operator_cannot_refund() {
+    let mut v = funded();
+    ctx(signer(), T0);
+    v.charge(alice(), APP.into(), U128(10 * CREDIT), "c".into());
+    ctx(operator(), T0);
+    v.refund(APP.into(), alice(), U128(CREDIT), "r".into());
+}
+
+#[test]
 #[should_panic(expected = "Over spent")]
 fn refund_capped_at_spent() {
     let mut v = funded();
     deposit(&mut v, &bob(), 10 * CREDIT);
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     v.charge(alice(), APP.into(), U128(10 * CREDIT), "c".into());
     v.refund(APP.into(), bob(), U128(CREDIT), "r".into());
 }
@@ -455,7 +489,7 @@ fn with_promise_result(caller: AccountId, result: PromiseResult) {
 #[test]
 fn payout_zeroes_earnings_and_failed_transfer_restores_them() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     v.charge(alice(), APP.into(), U128(10 * CREDIT), "c".into());
     let earned = v.earnings_of(APP.into()).0;
 
@@ -475,7 +509,7 @@ fn payout_zeroes_earnings_and_failed_transfer_restores_them() {
 #[should_panic(expected = "Not authorized")]
 fn stranger_cannot_trigger_payout() {
     let mut v = funded();
-    ctx(operator(), T0);
+    ctx(signer(), T0);
     v.charge(alice(), APP.into(), U128(CREDIT), "c".into());
     ctx(bob(), T0);
     let _ = v.payout(APP.into());
@@ -500,4 +534,264 @@ fn ownership_is_two_step() {
     ctx(bob(), T0);
     v.accept_owner();
     assert_eq!(v.config().owner, bob());
+}
+
+// --- storage (NEP-145) ----------------------------------------------------
+
+fn carol() -> AccountId {
+    acc("carol.testnet")
+}
+
+/// Sets the caller, the block time and the attached NEAR.
+fn ctx_pay(caller: AccountId, at: u64, deposit: NearToken) {
+    let mut b = VMContextBuilder::new();
+    b.current_account_id(acc("vault.testnet"))
+        .predecessor_account_id(caller.clone())
+        .signer_account_id(caller)
+        .attached_deposit(deposit)
+        .block_timestamp(at * 1_000_000_000);
+    testing_env!(b.build());
+}
+
+#[test]
+fn registering_gives_a_storage_balance() {
+    let mut v = setup();
+    assert!(v.storage_balance_of(carol()).is_none());
+
+    let min = v.storage_balance_bounds().min;
+    // One account record is a few hundred bytes at 0.00001 NEAR per byte.
+    assert!(min > NearToken::from_millinear(1) && min < NearToken::from_millinear(10), "min = {min}");
+
+    ctx_pay(operator(), T0, min);
+    let b = v.storage_deposit(Some(carol()), None);
+    assert_eq!(b.total, min);
+    assert_eq!(b.available, NearToken::from_yoctonear(0));
+    let read = v.storage_balance_of(carol()).unwrap();
+    assert_eq!((read.total, read.available), (b.total, b.available));
+}
+
+#[test]
+#[should_panic(expected = "Recipient not registered")]
+fn send_to_unregistered_account_fails() {
+    let mut v = funded();
+    ctx(alice(), T0);
+    v.send(carol(), U128(CREDIT));
+}
+
+#[test]
+fn deposit_for_unregistered_user_is_refunded() {
+    let mut v = setup();
+    ctx(usdt(), T0);
+    let r = v.ft_on_transfer(alice(), U128(5 * CREDIT), r#"{"user":"carol.testnet"}"#.into());
+    assert!(matches!(r, PromiseOrValue::Value(U128(n)) if n == 5 * CREDIT));
+    assert_eq!(v.balance_of(carol()).0, 0);
+    assert!(v.storage_balance_of(carol()).is_none());
+    assert_backed(&v, 0);
+}
+
+#[test]
+#[should_panic(expected = "Unknown app")]
+fn revoking_an_unknown_app_fails() {
+    let mut v = setup();
+    ctx(alice(), T0);
+    v.revoke_app("x".repeat(500));
+}
+
+#[test]
+#[should_panic(expected = "Insufficient storage")]
+fn approving_needs_storage_beyond_the_minimum() {
+    let mut v = setup();
+    let min = v.storage_balance_bounds().min;
+    ctx_pay(operator(), T0, min);
+    v.storage_deposit(Some(carol()), None);
+    ctx(carol(), T0);
+    v.approve_app(APP.into(), U128(CREDIT), None);
+}
+
+#[test]
+fn approving_an_app_is_paid_from_the_users_storage_balance() {
+    let mut v = setup();
+    let before = v.storage_balance_of(alice()).unwrap().available;
+    approve(&mut v, &alice(), 10 * CREDIT, None);
+    let after = v.storage_balance_of(alice()).unwrap().available;
+    assert!(after < before);
+    // One limit entry is around a hundred bytes: well under 0.005 NEAR.
+    assert!(before.saturating_sub(after) < NearToken::from_millinear(5));
+    // Approving again replaces the entry, so it adds no state and costs nothing.
+    approve(&mut v, &alice(), 20 * CREDIT, None);
+    assert_eq!(v.storage_balance_of(alice()).unwrap().available, after);
+}
+
+#[test]
+#[should_panic(expected = "Recipient not registered")]
+fn claim_to_unregistered_account_fails() {
+    let mut v = funded();
+    let (sk, pk) = claim_key();
+    ctx(alice(), T0);
+    v.create_claim(U128(CREDIT), pk.clone(), T0 + 3600);
+    let sig = sign_claim(&v, &sk, &pk, &carol());
+    ctx(operator(), T0);
+    v.claim(pk, carol(), sig);
+}
+
+/// Registers carol with only the minimum, so any state her calls add has nothing to pay from.
+fn carol_with_minimum_storage(v: &mut Vault) {
+    let min = v.storage_balance_bounds().min;
+    ctx_pay(operator(), T0, min);
+    v.storage_deposit(Some(carol()), None);
+}
+
+#[test]
+#[should_panic(expected = "Insufficient storage")]
+fn creating_a_claim_is_paid_by_the_creator() {
+    let mut v = setup();
+    carol_with_minimum_storage(&mut v);
+    deposit(&mut v, &carol(), 10 * CREDIT);
+    let (_, pk) = claim_key();
+    ctx(carol(), T0);
+    v.create_claim(U128(CREDIT), pk, T0 + 3600);
+}
+
+#[test]
+fn revoking_an_app_never_approved_writes_nothing() {
+    let mut v = setup();
+    carol_with_minimum_storage(&mut v);
+    ctx(carol(), T0);
+    v.revoke_app(APP.into());
+    assert_eq!(v.limit_of(carol(), APP.into()).version, 0);
+}
+
+#[test]
+#[should_panic(expected = "Not registered")]
+fn registering_an_app_is_paid_by_the_caller() {
+    ctx(owner(), T0);
+    let mut v = Vault::new(usdt(), owner(), Some(operator()), acc("fees.testnet"));
+    ctx(operator(), T0);
+    v.register_app(APP.into(), payout_acc(), signer(), 500, None);
+}
+
+// --- app signer -----------------------------------------------------------
+
+#[test]
+#[should_panic(expected = "Not app signer")]
+fn operator_cannot_hold() {
+    let mut v = funded();
+    ctx(operator(), T0);
+    v.hold(alice(), APP.into(), U128(CREDIT), "job".into(), T0 + 600);
+}
+
+#[test]
+#[should_panic(expected = "Not app signer")]
+fn operator_cannot_capture() {
+    let mut v = funded();
+    ctx(signer(), T0);
+    let id = v.hold(alice(), APP.into(), U128(CREDIT), "job".into(), T0 + 600);
+    ctx(operator(), T0);
+    v.capture(id, U128(CREDIT));
+}
+
+#[test]
+fn app_signer_releases_early() {
+    let mut v = funded();
+    ctx(signer(), T0);
+    let id = v.hold(alice(), APP.into(), U128(20 * CREDIT), "job".into(), T0 + 600);
+    v.release(id);
+    assert_eq!(v.balance_of(alice()).0, 100 * CREDIT);
+    assert_backed(&v, 100 * CREDIT);
+}
+
+#[test]
+#[should_panic(expected = "Not authorized")]
+fn owner_cannot_change_an_apps_signer() {
+    let mut v = setup();
+    ctx(owner(), T0);
+    v.set_app_signer(APP.into(), owner());
+}
+
+#[test]
+#[should_panic(expected = "Not authorized")]
+fn operator_cannot_change_an_apps_signer() {
+    let mut v = setup();
+    ctx(operator(), T0);
+    v.set_app_signer(APP.into(), operator());
+}
+
+#[test]
+#[should_panic(expected = "Not app signer")]
+fn payout_account_rotates_the_signer_and_the_old_one_stops_working() {
+    let mut v = funded();
+    register(&mut v, &payout_acc());
+    let new_signer = acc("parley2.apps.testnet");
+    ctx(payout_acc(), T0);
+    v.set_app_signer(APP.into(), new_signer.clone());
+    assert_eq!(v.get_app(APP.into()).unwrap().signer, new_signer);
+    ctx(signer(), T0);
+    v.charge(alice(), APP.into(), U128(CREDIT), "x".into());
+}
+
+/// Moves the app to a new signer registered with only the minimum storage, so its writes have
+/// nothing to pay from.
+fn signer_with_minimum_storage(v: &mut Vault) -> AccountId {
+    let poor = acc("poor.apps.testnet");
+    let min = v.storage_balance_bounds().min;
+    ctx_pay(operator(), T0, min);
+    v.storage_deposit(Some(poor.clone()), None);
+    ctx(payout_acc(), T0);
+    v.set_app_signer(APP.into(), poor.clone());
+    poor
+}
+
+#[test]
+#[should_panic(expected = "Insufficient storage")]
+fn charges_are_paid_from_the_signers_storage() {
+    let mut v = funded();
+    let poor = signer_with_minimum_storage(&mut v);
+    ctx(poor, T0);
+    v.charge(alice(), APP.into(), U128(CREDIT), "x".into());
+}
+
+#[test]
+#[should_panic(expected = "Insufficient storage")]
+fn holds_are_paid_from_the_signers_storage() {
+    let mut v = funded();
+    let poor = signer_with_minimum_storage(&mut v);
+    ctx(poor, T0);
+    v.hold(alice(), APP.into(), U128(CREDIT), "job".into(), T0 + 600);
+}
+
+#[test]
+fn a_charge_draws_down_the_signers_storage_not_the_users() {
+    let mut v = funded();
+    let user_before = v.storage_balance_of(alice()).unwrap().available;
+    let signer_before = v.storage_balance_of(signer()).unwrap().available;
+    ctx(signer(), T0);
+    v.charge(alice(), APP.into(), U128(CREDIT), "x".into());
+    assert_eq!(v.storage_balance_of(alice()).unwrap().available, user_before);
+    assert!(v.storage_balance_of(signer()).unwrap().available < signer_before);
+}
+
+#[test]
+#[should_panic(expected = "Not authorized")]
+fn owner_cannot_take_over_an_app_through_its_payout() {
+    let mut v = setup();
+    ctx(owner(), T0);
+    v.set_app_payout(APP.into(), owner());
+}
+
+#[test]
+#[should_panic(expected = "Not registered")]
+fn a_longer_signer_is_paid_for_by_the_payout_account() {
+    let mut v = setup();
+    ctx(payout_acc(), T0);
+    v.set_app_signer(APP.into(), acc("a-much-longer-signer-account-name-for-this-app.apps.testnet"));
+}
+
+#[test]
+fn a_registered_payout_account_can_move_to_a_longer_signer() {
+    let mut v = setup();
+    register(&mut v, &payout_acc());
+    let before = v.storage_balance_of(payout_acc()).unwrap().available;
+    ctx(payout_acc(), T0);
+    v.set_app_signer(APP.into(), acc("a-much-longer-signer-account-name-for-this-app.apps.testnet"));
+    assert!(v.storage_balance_of(payout_acc()).unwrap().available < before);
 }

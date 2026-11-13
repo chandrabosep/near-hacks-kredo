@@ -14,10 +14,12 @@ before(async () => {
   chain = createFakeChain();
   db = await openDb();
   relayer = createRelayer({ chain, db, vault: chain.vault });
+  // The vault takes each new app's state from the caller's storage balance: the relayer's.
+  await relayer.write({ method: "storage_deposit", args: { account_id: chain.relayerId }, deposit: 10n ** 23n });
 });
 
 const register = (i: number) =>
-  relayer.write({ method: "register_app", args: { app: `app-${i}`, payout: "payout.testnet", fee_bps: 500, max_charge: null } }, { app: `app-${i}` });
+  relayer.write({ method: "register_app", args: { app: `app-${i}`, payout: "payout.testnet", signer: `app-${i}.apps.testnet`, fee_bps: 500, max_charge: null } }, { app: `app-${i}` });
 
 test("concurrent writes go out one by one, and each records what it burnt", async () => {
   const results = await Promise.all([0, 1, 2, 3, 4].map(register));
@@ -32,13 +34,14 @@ test("concurrent writes go out one by one, and each records what it burnt", asyn
 });
 
 test("a contract panic becomes a RelayerError named after it, and the gas is still recorded", async () => {
+  // The relayer is an operator, and operators can't charge: only the app's own signer can.
   await assert.rejects(
     relayer.write({ method: "charge", args: { user: "alice.testnet", app: "app-0", amount: "10000", ref_id: "r1" } }),
-    (err: unknown) => err instanceof RelayerError && err.reason === "OverLimit" && !!err.hash,
+    (err: unknown) => err instanceof RelayerError && err.reason === "NotAppSigner" && !!err.hash,
   );
   const last = db.data.txs.at(-1)!;
   assert.equal(last.status, "reverted");
-  assert.equal(last.error, "Over limit");
+  assert.equal(last.error, "Not app signer");
   assert.ok(last.fee > 0n);
 });
 

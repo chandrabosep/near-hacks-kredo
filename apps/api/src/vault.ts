@@ -2,10 +2,11 @@
 import type { AccountId, Chain } from "./near.js";
 
 export type Limit = { remaining: bigint; expiry: number; version: number };
-export type OnchainApp = { payout: AccountId; feeBps: number; maxCharge: bigint; active: boolean };
+export type OnchainApp = { payout: AccountId; signer: AccountId; feeBps: number; maxCharge: bigint; active: boolean };
 export type OnchainHold = { user: AccountId; app: string; amount: bigint; expiry: number; status: "Open" | "Captured" | "Released" };
 export type OnchainClaim = { from: AccountId; amount: bigint; expiry: number; status: "Open" | "Claimed" | "Cancelled" };
-export type Totals = { balances: bigint; held: bigint; claims: bigint; earnings: bigint; fees: bigint; liabilities: bigint };
+export type StorageBalance = { total: bigint; available: bigint };
+export type Totals ={ balances: bigint; held: bigint; claims: bigint; earnings: bigint; fees: bigint; liabilities: bigint };
 
 type U128 = string;
 
@@ -24,8 +25,8 @@ export function createVault(chain: Chain, vault: AccountId, usdt: AccountId) {
     },
 
     async getApp(app: string): Promise<OnchainApp | undefined> {
-      const a = await v<{ payout: string; fee_bps: number; max_charge: U128; active: boolean } | null>("get_app", { app });
-      return a ? { payout: a.payout, feeBps: a.fee_bps, maxCharge: BigInt(a.max_charge), active: a.active } : undefined;
+      const a = await v<{ payout: string; signer: string; fee_bps: number; max_charge: U128; active: boolean } | null>("get_app", { app });
+      return a ? { payout: a.payout, signer: a.signer, feeBps: a.fee_bps, maxCharge: BigInt(a.max_charge), active: a.active } : undefined;
     },
 
     earningsOf: async (app: string) => BigInt(await v<U128>("earnings_of", { app })),
@@ -43,6 +44,15 @@ export function createVault(chain: Chain, vault: AccountId, usdt: AccountId) {
     claimMessage: (claimKey: string, to: AccountId) => v<string>("claim_message", { claim_key: claimKey, to }),
 
     isOperator: (account: AccountId) => v<boolean>("is_operator", { account }),
+
+    /** An account's NEP-145 storage balance on the vault, in yoctoNEAR. Undefined when not registered. */
+    async storageOf(account: AccountId): Promise<StorageBalance | undefined> {
+      const s = await v<{ total: U128; available: U128 } | null>("storage_balance_of", { account_id: account });
+      return s ? { total: BigInt(s.total), available: BigInt(s.available) } : undefined;
+    },
+
+    /** The least a registration costs on the vault, in yoctoNEAR. */
+    storageMin: async () => BigInt((await v<{ min: U128 }>("storage_balance_bounds")).min),
 
     async totals(): Promise<Totals> {
       const t = await v<Record<keyof Totals, U128>>("totals");

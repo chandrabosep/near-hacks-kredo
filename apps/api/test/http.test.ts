@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { NextFunction, Request, Response } from "express";
-import { HttpError, perIp, rateLimit, slidingWindow } from "../src/http.js";
+import { errorHandler, HttpError, perIp, rateLimit, slidingWindow } from "../src/http.js";
+import { reasonCode, RelayerError } from "../src/relayer.js";
 
 function run(limit: ReturnType<typeof rateLimit>, method = "POST", app = "app-1") {
   const headers: Record<string, string> = {};
@@ -48,4 +49,16 @@ test("perIp answers 429 per address, not per app", () => {
   assert.match((blocked.error as HttpError).message, /Too many claims/);
   assert.ok(Number(blocked.headers["Retry-After"]) > 0);
   assert.equal(call("2.2.2.2").error, undefined);
+});
+
+test("vault storage panics get their own clear errors", () => {
+  for (const panic of ["Recipient not registered", "Insufficient storage", "Not registered"]) {
+    let status = 0;
+    let body: { code?: string; error?: string } = {};
+    const res = { status: (s: number) => ((status = s), res), json: (b: typeof body) => (body = b) } as unknown as Response;
+    errorHandler(new RelayerError(reasonCode(panic), "Tx1"), {} as Request, res, (() => undefined) as NextFunction);
+    assert.equal(status, 422, panic);
+    assert.equal(body.code, reasonCode(panic));
+    assert.match(body.error!, /vault/, "a plain-language message, not the raw panic");
+  }
 });

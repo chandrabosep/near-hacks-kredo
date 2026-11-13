@@ -10,7 +10,16 @@
 //! Users never sign typed data. They call `approve_app`, `revoke_app`, `send` and `create_claim`
 //! directly, as NEAR meta transactions (NEP-366) that the Kredo relayer pays gas for, so the
 //! contract reads the user from `predecessor_account_id`.
+//!
+//! Apps sign their own charges the same way. Each app has a signer account, normally a
+//! sub-account whose only key is a function-call key for `charge`, `hold`, `capture`, `release`
+//! and `refund` on this vault. Only that account can charge for the app; the Kredo operator and
+//! owner can't, and only the app's payout account can move it to a new signer.
+//!
+//! Storage follows NEP-145: an account is registered with a NEAR deposit before the vault holds
+//! state for it, and state a call adds is paid from the storage balance of whoever made the call.
 
+use near_contract_standards::storage_management::{StorageBalance, StorageBalanceBounds, StorageManagement};
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde_json::{json, Value};
 use near_sdk::store::{LookupMap, LookupSet};
@@ -26,7 +35,7 @@ pub const UNITS_PER_CREDIT: u128 = 10_000;
 /// Highest network fee an app can be set to: 20%.
 pub const MAX_FEE_BPS: u16 = 2_000;
 const BPS: u128 = 10_000;
-/// Longest a hold can last. Caps how long even a leaked operator key could freeze credits.
+/// Longest a hold can last. Caps how long even a leaked app signer key could freeze credits.
 pub const MAX_HOLD_SECONDS: u64 = 86_400;
 const MAX_ID_LEN: usize = 64;
 const MAX_REF_LEN: usize = 128;
@@ -53,6 +62,7 @@ enum StorageKey {
     Earnings,
     Spent,
     Refs,
+    Storage,
 }
 
 #[near(serializers = [borsh, json])]
@@ -60,6 +70,9 @@ enum StorageKey {
 pub struct App {
     /// Receives the company's USDT earnings.
     pub payout: AccountId,
+    /// The only account that can charge, hold, capture or refund for this app: normally a
+    /// sub-account whose only key is a function-call key limited to those methods on the vault.
+    pub signer: AccountId,
     /// Network fee taken from each charge, in basis points.
     pub fee_bps: u16,
     /// Largest single charge or hold, in units. 0 means no cap.
@@ -143,6 +156,15 @@ pub struct Config {
     pub paused: bool,
 }
 
+/// NEAR an account has put down for its state in the vault (NEP-145), in yoctoNEAR.
+/// `total - available` is locked: it paid for the account's record and for the state its calls added.
+#[near(serializers = [borsh])]
+#[derive(Clone, Debug, PartialEq)]
+struct StorageDeposit {
+    total: u128,
+    available: u128,
+}
+
 #[near(serializers = [json])]
 #[derive(Clone, Debug, Default)]
 struct DepositMsg {
@@ -169,6 +191,12 @@ pub struct Vault {
     spent: LookupMap<(AccountId, String), u128>,
     /// Charge, hold and refund references already used per app.
     refs: LookupSet<(String, String)>,
+    /// NEP-145 storage deposits. An account must be registered here before the vault holds
+    /// any state for it, so the vault never pays for state someone else creates.
+    storage: LookupMap<AccountId, StorageDeposit>,
+    /// Bytes one account's registration takes (its storage record and its balance entry),
+    /// measured at init with the longest possible account id.
+    account_storage_bytes: u64,
     total_balances: u128,
     total_held: u128,
     total_claims: u128,
@@ -195,12 +223,15 @@ impl Vault {
             earnings: LookupMap::new(StorageKey::Earnings),
             spent: LookupMap::new(StorageKey::Spent),
             refs: LookupSet::new(StorageKey::Refs),
+            storage: LookupMap::new(StorageKey::Storage),
+            account_storage_bytes: 0,
             total_balances: 0,
             total_held: 0,
             total_claims: 0,
             total_earnings: 0,
             protocol_fees: 0,
         };
+        v.measure_account_storage();
         if let Some(op) = operator {
             v.operators.insert(op.clone());
             emit("operator_set", json!({ "account": op, "allowed": true }));
@@ -262,14 +293,16 @@ impl Vault {
 
     /// Registers a company's app. A registered app still can't charge anyone until that
     /// user approves a limit for it.
-    pub fn register_app(&mut self, app: String, payout: AccountId, fee_bps: u16, max_charge: Option<U128>) {
+    pub fn register_app(&mut self, app: String, payout: AccountId, signer: AccountId, fee_bps: u16, max_charge: Option<U128>) {
         self.only_owner_or_operator();
         assert_id(&app, "app");
         require!(!self.apps.contains_key(&app), "App exists");
         require!(fee_bps <= MAX_FEE_BPS, "Fee too high");
         let max_charge = max_charge.unwrap_or(U128(0));
-        self.apps.insert(app.clone(), App { payout: payout.clone(), fee_bps, max_charge, active: true });
-        emit("app_registered", json!({ "app": app, "payout": payout, "fee_bps": fee_bps, "max_charge": max_charge }));
+        let mark = self.storage_mark();
+        self.apps.insert(app.clone(), App { payout: payout.clone(), signer: signer.clone(), fee_bps, max_charge, active: true });
+        self.pay_storage(&env::predecessor_account_id(), mark);
+        emit("app_registered", json!({ "app": app, "payout": payout, "signer": signer, "fee_bps": fee_bps, "max_charge": max_charge }));
     }
 
     /// Changes an app's fee and per-charge cap. Owner only, so a leaked operator key can't
@@ -283,15 +316,30 @@ impl Vault {
         emit("app_terms_set", json!({ "app": app, "fee_bps": fee_bps, "max_charge": max_charge }));
     }
 
-    /// Moves an app's payouts to a new account. Only the current payout account or the owner,
-    /// never an operator.
+    /// Moves an app's payouts to a new account. Only the current payout account: the payout
+    /// account also controls the app's signer, so if the owner could set it, Kredo could take
+    /// over an app's charges.
     pub fn set_app_payout(&mut self, app: String, payout: AccountId) {
         let caller = env::predecessor_account_id();
-        let owner = self.owner.clone();
+        let mark = self.storage_mark();
         let a = self.app_mut(&app);
-        require!(caller == a.payout || caller == owner, "Not authorized");
+        require!(caller == a.payout, "Not authorized");
         a.payout = payout.clone();
+        // A longer account id makes the app's record bigger: the payout account pays for it.
+        self.pay_storage(&caller, mark);
         emit("app_payout_set", json!({ "app": app, "payout": payout }));
+    }
+
+    /// Moves an app's charges to a new signer, for example after a leaked key. Only the app's
+    /// payout account, never the owner or an operator, so Kredo can't take over an app's charges.
+    pub fn set_app_signer(&mut self, app: String, signer: AccountId) {
+        let caller = env::predecessor_account_id();
+        let mark = self.storage_mark();
+        let a = self.app_mut(&app);
+        require!(caller == a.payout, "Not authorized");
+        a.signer = signer.clone();
+        self.pay_storage(&caller, mark);
+        emit("app_signer_set", json!({ "app": app, "signer": signer }));
     }
 
     /// An inactive app can't charge or hold, but can still refund and be paid out.
@@ -320,6 +368,11 @@ impl Vault {
         };
         let user = parsed.user.unwrap_or_else(|| sender_id.clone());
         require!(amount.0 >= UNITS_PER_CREDIT, "Below minimum deposit");
+        if !self.storage.contains_key(&user) {
+            // Nobody paid for this user's state, so the vault won't create it. All of it goes back.
+            emit("deposit_refunded", json!({ "user": user, "payer": sender_id, "amount": amount, "reason": "not_registered" }));
+            return PromiseOrValue::Value(amount);
+        }
         self.add_balance(&user, amount.0);
         self.total_balances += amount.0;
         emit("deposited", json!({ "user": user, "payer": sender_id, "amount": amount }));
@@ -337,36 +390,42 @@ impl Vault {
         self.active_app(&app);
         let user = env::predecessor_account_id();
         let expiry = expiry.unwrap_or(0);
+        let mark = self.storage_mark();
         let key = (user.clone(), app.clone());
         let version = self.limits.get(&key).map(|l| l.version).unwrap_or(0) + 1;
         self.limits.insert(key, Limit { remaining: limit, expiry, version });
+        self.pay_storage(&user, mark);
         emit("app_approved", json!({ "user": user, "app": app, "limit": limit, "expiry": expiry }));
     }
 
     /// Removes an app's limit. Works even while paused, so a user can always cut an app off.
     pub fn revoke_app(&mut self, app: String) {
+        require!(self.apps.contains_key(&app), "Unknown app");
         let user = env::predecessor_account_id();
         let key = (user.clone(), app.clone());
-        let version = self.limits.get(&key).map(|l| l.version).unwrap_or(0) + 1;
+        // Nothing approved means nothing to revoke, and no new state for the vault to pay for.
+        let Some(version) = self.limits.get(&key).map(|l| l.version + 1) else { return };
         self.limits.insert(key, Limit { remaining: U128(0), expiry: 0, version });
         emit("app_revoked", json!({ "user": user, "app": app }));
     }
 
     // ---------------------------------------------------------------------
-    // Charges (operator)
+    // Charges (signed by the app's own signer)
     // ---------------------------------------------------------------------
 
     /// Instant charge for a finished action, such as one chat message. Only within the limit the
-    /// user approved for this app. The contract rejects anything above it, even from our operator.
+    /// user approved for this app, and only from the app's own signer: no Kredo key can charge.
     /// `ref_id` is the app's unique id for this charge; a second charge with it fails.
     pub fn charge(&mut self, user: AccountId, app: String, amount: U128, ref_id: String) -> U128 {
-        self.only_operator();
+        self.only_app_signer(&app);
         self.when_not_paused();
+        let mark = self.storage_mark();
         self.use_ref(&app, &ref_id);
         self.consume_limit(&user, &app, amount.0);
         self.debit(&user, amount.0);
         self.total_balances -= amount.0;
         let fee = self.earn(&user, &app, amount.0);
+        self.pay_storage(&env::predecessor_account_id(), mark);
         emit("charged", json!({ "user": user, "app": app, "ref_id": ref_id, "amount": amount, "fee": U128(fee) }));
         U128(fee)
     }
@@ -378,10 +437,11 @@ impl Vault {
     /// Reserves credits at the start of a long job and uses up the user's limit now.
     /// `expiry` is unix seconds, at most `MAX_HOLD_SECONDS` away. Returns the hold id.
     pub fn hold(&mut self, user: AccountId, app: String, amount: U128, ref_id: String, expiry: u64) -> String {
-        self.only_operator();
+        self.only_app_signer(&app);
         self.when_not_paused();
         let now = now();
         require!(expiry > now && expiry <= now + MAX_HOLD_SECONDS, "Bad expiry");
+        let mark = self.storage_mark();
         self.use_ref(&app, &ref_id);
         self.consume_limit(&user, &app, amount.0);
         self.debit(&user, amount.0);
@@ -394,6 +454,7 @@ impl Vault {
             hold_id.clone(),
             Hold { user: user.clone(), app: app.clone(), amount, expiry, limit_version, status: HoldStatus::Open },
         );
+        self.pay_storage(&env::predecessor_account_id(), mark);
         emit(
             "held",
             json!({ "hold_id": hold_id, "user": user, "app": app, "ref_id": ref_id, "amount": amount, "expiry": expiry }),
@@ -404,14 +465,15 @@ impl Vault {
     /// The job succeeded. Charges `actual` (at most the held amount) and returns the rest.
     /// Only before the hold expires: after that the user can take it back.
     pub fn capture(&mut self, hold_id: String, actual: U128) -> U128 {
-        self.only_operator();
         self.when_not_paused();
         let h = self.holds.get(&hold_id).cloned().unwrap_or_else(|| env::panic_str("Hold not open"));
+        self.only_app_signer(&h.app);
         require!(h.status == HoldStatus::Open, "Hold not open");
         require!(now() < h.expiry, "Hold expired");
         require!(actual.0 > 0, "Zero amount");
         require!(actual.0 <= h.amount.0, "Over held");
 
+        let mark = self.storage_mark();
         self.set_hold_status(&hold_id, HoldStatus::Captured);
         self.total_held -= h.amount.0;
         let returned = h.amount.0 - actual.0;
@@ -419,6 +481,7 @@ impl Vault {
             self.return_to_user(&h, returned);
         }
         let fee = self.earn(&h.user, &h.app, actual.0);
+        self.pay_storage(&env::predecessor_account_id(), mark);
         emit(
             "captured",
             json!({ "hold_id": hold_id, "actual": actual, "fee": U128(fee), "returned": U128(returned) }),
@@ -426,13 +489,18 @@ impl Vault {
         U128(fee)
     }
 
-    /// The job failed, or the hold ran out. The operator can release at any time. After expiry
-    /// anyone can, even while paused, so held credits always come back.
+    /// The job failed, or the hold ran out. The app's signer or the operator can release at any
+    /// time, since releasing only returns credits to the user. After expiry anyone can, even while
+    /// paused, so held credits always come back.
     pub fn release(&mut self, hold_id: String) {
         let h = self.holds.get(&hold_id).cloned().unwrap_or_else(|| env::panic_str("Hold not open"));
         require!(h.status == HoldStatus::Open, "Hold not open");
         let caller = env::predecessor_account_id();
-        require!(now() >= h.expiry || self.operators.contains(&caller), "Hold not expired");
+        let app_signer = self.apps.get(&h.app).map(|a| a.signer.clone());
+        require!(
+            now() >= h.expiry || self.operators.contains(&caller) || app_signer.as_ref() == Some(&caller),
+            "Hold not expired"
+        );
 
         self.set_hold_status(&hold_id, HoldStatus::Released);
         self.total_held -= h.amount.0;
@@ -441,16 +509,16 @@ impl Vault {
     }
 
     // ---------------------------------------------------------------------
-    // Refunds (operator)
+    // Refunds (signed by the app's own signer)
     // ---------------------------------------------------------------------
 
     /// Gives credits back to a user out of the app's unpaid earnings. The network fee already
     /// taken stays, so the company covers it. Capped at what this user spent with this app.
     pub fn refund(&mut self, app: String, user: AccountId, amount: U128, ref_id: String) {
-        self.only_operator();
+        self.only_app_signer(&app);
         self.when_not_paused();
         require!(amount.0 > 0, "Zero amount");
-        require!(self.apps.contains_key(&app), "Unknown app");
+        let mark = self.storage_mark();
         self.use_ref(&app, &ref_id);
         let key = (user.clone(), app.clone());
         let spent = self.spent.get(&key).copied().unwrap_or(0);
@@ -463,6 +531,7 @@ impl Vault {
         self.total_earnings -= amount.0;
         self.add_balance(&user, amount.0);
         self.total_balances += amount.0;
+        self.pay_storage(&env::predecessor_account_id(), mark);
         emit("refunded", json!({ "app": app, "user": user, "ref_id": ref_id, "amount": amount }));
     }
 
@@ -476,6 +545,7 @@ impl Vault {
         require!(amount.0 > 0, "Zero amount");
         let from = env::predecessor_account_id();
         require!(from != to, "Same account");
+        require!(self.storage.contains_key(&to), "Recipient not registered");
         self.debit(&from, amount.0);
         self.add_balance(&to, amount.0);
         emit("sent", json!({ "from": from, "to": to, "amount": amount }));
@@ -495,10 +565,12 @@ impl Vault {
         let id = String::from(&claim_key);
         require!(!self.claims.contains_key(&id), "Claim exists");
         let from = env::predecessor_account_id();
+        let mark = self.storage_mark();
         self.debit(&from, amount.0);
         self.total_balances -= amount.0;
         self.total_claims += amount.0;
         self.claims.insert(id.clone(), Claim { from: from.clone(), amount, expiry, status: ClaimStatus::Open });
+        self.pay_storage(&from, mark);
         emit("claim_created", json!({ "claim_key": id, "from": from, "amount": amount, "expiry": expiry }));
     }
 
@@ -511,6 +583,7 @@ impl Vault {
         require!(c.status == ClaimStatus::Open, "Claim not open");
         require!(now() < c.expiry, "Claim expired");
         require!(verify_claim(&claim_key, &self.claim_message(id.clone(), to.clone()), &signature.0), "Bad signature");
+        require!(self.storage.contains_key(&to), "Recipient not registered");
 
         self.claims.get_mut(&id).unwrap().status = ClaimStatus::Claimed;
         self.total_claims -= c.amount.0;
@@ -690,10 +763,130 @@ impl Vault {
 }
 
 // -------------------------------------------------------------------------
+// Storage (NEP-145)
+// -------------------------------------------------------------------------
+
+#[near]
+impl StorageManagement for Vault {
+    /// Registers `account_id` (default: the caller), or adds to its storage balance. Anyone can
+    /// pay for anyone, which is how the Kredo relayer sets up users who never hold NEAR.
+    #[payable]
+    fn storage_deposit(&mut self, account_id: Option<AccountId>, registration_only: Option<bool>) -> StorageBalance {
+        let amount = env::attached_deposit().as_yoctonear();
+        let account = account_id.unwrap_or_else(env::predecessor_account_id);
+        let min = self.storage_min();
+        let registration_only = registration_only.unwrap_or(false);
+        let mut refund = 0;
+        let deposit = match self.storage.get(&account).cloned() {
+            Some(mut d) => {
+                if registration_only {
+                    refund = amount;
+                } else {
+                    d.total += amount;
+                    d.available += amount;
+                }
+                d
+            }
+            None => {
+                require!(amount >= min, "Below minimum storage deposit");
+                let kept = if registration_only { min } else { amount };
+                refund = amount - kept;
+                if !self.balances.contains_key(&account) {
+                    self.balances.insert(account.clone(), 0);
+                }
+                emit("storage_registered", json!({ "account": account, "by": env::predecessor_account_id() }));
+                StorageDeposit { total: kept, available: kept - min }
+            }
+        };
+        self.storage.insert(account, deposit.clone());
+        if refund > 0 {
+            Promise::new(env::predecessor_account_id()).transfer(NearToken::from_yoctonear(refund)).detach();
+        }
+        to_storage_balance(&deposit)
+    }
+
+    #[payable]
+    fn storage_withdraw(&mut self, _amount: Option<NearToken>) -> StorageBalance {
+        env::panic_str("Not supported")
+    }
+
+    #[payable]
+    fn storage_unregister(&mut self, _force: Option<bool>) -> bool {
+        env::panic_str("Not supported")
+    }
+
+    fn storage_balance_bounds(&self) -> StorageBalanceBounds {
+        StorageBalanceBounds { min: NearToken::from_yoctonear(self.storage_min()), max: None }
+    }
+
+    fn storage_balance_of(&self, account_id: AccountId) -> Option<StorageBalance> {
+        self.storage.get(&account_id).map(to_storage_balance)
+    }
+}
+
+fn to_storage_balance(d: &StorageDeposit) -> StorageBalance {
+    StorageBalance { total: NearToken::from_yoctonear(d.total), available: NearToken::from_yoctonear(d.available) }
+}
+
+// -------------------------------------------------------------------------
 // Internal
 // -------------------------------------------------------------------------
 
 impl Vault {
+    /// Starts measuring the state a call adds. Pair with `pay_storage`.
+    fn storage_mark(&mut self) -> u64 {
+        self.flush_all();
+        env::storage_usage()
+    }
+
+    /// Takes the cost of the state added since `mark` from `payer`'s storage balance, so the
+    /// vault's own NEAR never pays for it. State that shrinks is not refunded.
+    fn pay_storage(&mut self, payer: &AccountId, mark: u64) {
+        self.flush_all();
+        let added = env::storage_usage().saturating_sub(mark);
+        if added == 0 {
+            return;
+        }
+        let cost = added as u128 * env::storage_byte_cost().as_yoctonear();
+        let mut d = self.storage.get(payer).cloned().unwrap_or_else(|| env::panic_str("Not registered"));
+        require!(d.available >= cost, "Insufficient storage");
+        d.available -= cost;
+        self.storage.insert(payer.clone(), d);
+        self.storage.flush();
+    }
+
+    /// Writes buffered map entries now, so `env::storage_usage()` counts them.
+    /// (`LookupSet` writes straight away.)
+    fn flush_all(&mut self) {
+        self.apps.flush();
+        self.balances.flush();
+        self.limits.flush();
+        self.holds.flush();
+        self.claims.flush();
+        self.earnings.flush();
+        self.spent.flush();
+        self.storage.flush();
+    }
+
+    fn storage_min(&self) -> u128 {
+        self.account_storage_bytes as u128 * env::storage_byte_cost().as_yoctonear()
+    }
+
+    /// Measures one registration with the longest possible account id, then removes it.
+    fn measure_account_storage(&mut self) {
+        let probe: AccountId = "a".repeat(64).parse().unwrap();
+        let before = env::storage_usage();
+        self.storage.insert(probe.clone(), StorageDeposit { total: u128::MAX, available: u128::MAX });
+        self.balances.insert(probe.clone(), u128::MAX);
+        self.storage.flush();
+        self.balances.flush();
+        self.account_storage_bytes = env::storage_usage() - before;
+        self.storage.remove(&probe);
+        self.balances.remove(&probe);
+        self.storage.flush();
+        self.balances.flush();
+    }
+
     fn liabilities(&self) -> u128 {
         self.total_balances + self.total_held + self.total_claims + self.total_earnings + self.protocol_fees
     }
@@ -702,8 +895,10 @@ impl Vault {
         require!(env::predecessor_account_id() == self.owner, "Not owner");
     }
 
-    fn only_operator(&self) {
-        require!(self.operators.contains(&env::predecessor_account_id()), "Not operator");
+    /// Charges are signed by the app itself. No Kredo key, operator or owner, can make one.
+    fn only_app_signer(&self, app: &String) {
+        let a = self.apps.get(app).unwrap_or_else(|| env::panic_str("Unknown app"));
+        require!(env::predecessor_account_id() == a.signer, "Not app signer");
     }
 
     fn only_owner_or_operator(&self) {
