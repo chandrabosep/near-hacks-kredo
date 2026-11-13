@@ -2,7 +2,7 @@
 
 **One line:** One balance for every AI app. Buy credits once, in any partner app, and spend the leftover in every other one. Every credit is provably backed.
 
-**For judges:** We moved the credit balance out of each company's database and into a contract the user controls. A credit works in any app, no app can take more than the user approved, and nobody, including us, can issue a credit that isn't backed.
+**In one line:** We moved the credit balance out of each company's database and into a contract the user controls. A credit works in any app, no app can take more than the user approved, and nobody, including us, can issue a credit that isn't backed.
 
 The build plan is in [plan.md](plan.md).
 
@@ -51,7 +51,7 @@ A database could show a shared balance. It could not promise any of these.
 
 1. **The user's limit is enforced by the contract, not by us.** When a user connects an app, they sign a spending limit. The contract rejects any charge above it, even one sent from our own operator key. A compromised server can't drain a wallet.
 2. **Held credits always come back.** A long job reserves credits. If it succeeds, the company captures them. If it fails, or the company disappears, anyone can release the hold after it expires. No app can trap a user's credits.
-3. **Every credit is provably backed.** Each credit is backed by $0.01 of USDT in one vault contract on Whitechain. Credits are created only when USDT arrives. There is no admin mint, and the reserve is never lent out. The contract holds the invariant below, and a public reserves page shows it live.
+3. **Every credit is provably backed.** Each credit is backed by $0.01 of USDT in one vault contract on NEAR. Credits are created only when USDT arrives. There is no admin mint, and the reserve is never lent out. The contract holds the invariant below, and a public reserves page shows it live.
 
 ```
 vault USDT = user balances + held + claims + company earnings + fees
@@ -75,7 +75,7 @@ Only registered companies can withdraw USDT. Users spend credits but don't cash 
 
 ## What the user sees onchain
 
-Nothing. Users only use the apps. Our backend turns their actions into Whitechain transactions and pays the gas, so nobody holds a gas token or sees a crypto step.
+Nothing. Users only use the apps. Our backend turns their actions into NEAR transactions and pays the gas, so nobody holds a gas token or sees a crypto step.
 
 Buying, connecting or revoking an app, charges, holds, sends and claim links all settle onchain within seconds. Company payouts settle when the company clicks Withdraw, or on a schedule. Our backend submits every transaction, but the contract only accepts charges within the limit each user signed for each app, and every charge can be checked from the wallet.
 
@@ -83,7 +83,7 @@ Buying, connecting or revoking an app, charges, holds, sends and claim links all
 
 | Piece | What it does |
 |---|---|
-| CreditVault contract | Holds the USDT and every balance, app limit, hold, charge and payout, on Whitechain |
+| Vault contract | Holds the USDT and every balance, app limit, hold, charge and payout, on NEAR |
 | Connect screen | A hosted approval screen, like "Sign in with Google": "Video Studio wants up to 200 credits." Email login, no crypto knowledge needed. |
 | Buy page | Buy credits from inside any partner app |
 | User wallet | Balance, connected apps and limits, revoke, send, claim links, and activity |
@@ -107,11 +107,7 @@ Buying, connecting or revoking an app, charges, holds, sends and claim links all
 
 **Our gap:** the user holds the balance, companies price their own services, the contract enforces every limit, and we pay each company.
 
-## Hackathon pitch (ETHGlobal Mumbai)
-
-**Sponsor:** Whitechain. All its tracks count as one partner prize, so we enter both:
-- **Scale, Payments Nobody Notices ($3k):** the payer sees no crypto steps and the business side pays gas.
-- **Operate, Stablecoin Payments for Business ($5k):** a merchant payment flow with a drop-in piece, shown from both the merchant and customer views.
+## Scope
 
 **Not in scope:** other chains, AI agents, user cash-out, card payments, batched charges, promo credits, and a tradable token.
 

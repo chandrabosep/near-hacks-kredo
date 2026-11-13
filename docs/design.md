@@ -2,7 +2,7 @@
 
 Visual language for every surface we ship: landing page, connect screen, buy page, wallet, company dashboard, reserves page, app directory, and the demo apps' credit widgets.
 
-The theme follows whitechain.io: white paper surfaces framed by hairlines, one electric blue, deep navy ink, a lime accent for terminals and callouts, and animated fields of tiny plus glyphs and leaf-shaped dither dots. Everything below is measured from the live site so it can be rebuilt exactly.
+The theme: white paper surfaces framed by hairlines, one electric blue, deep navy ink, a lime accent for terminals and callouts, and animated fields of tiny plus glyphs and leaf-shaped dither dots. Everything below is specified exactly, so any surface can be rebuilt from this file.
 
 Stack assumption: Tailwind v4 with the `@theme` block at the end of this file. Canvas effects are plain TypeScript, no library.
 
@@ -25,35 +25,35 @@ Stack assumption: Tailwind v4 with the `@theme` block at the end of this file. C
 
 | Token | Hex | Use |
 |---|---|---|
-| `wc-blue` | `#0066FF` | Primary buttons, links, highlights, selection |
-| `wc-blue-2` | `#3385FF` | Button hover, dark surface accents |
-| `wc-navy` | `#080A28` | Logo mark, primary dark button, strong text |
-| `wc-ink` / `wc-text-1` | `#07081E` | Body headings and paragraphs |
-| `wc-ink-2` | `#000A47` | Stat numbers in the glass panel |
-| `wc-ink-3` | `#001078` | Reserved deep accent |
-| `wc-text-2` | `#4A5567` | Secondary paragraph text |
-| `wc-text-muted` | `#45464D` | Nav links, eyebrow labels, descriptions |
-| `wc-icon-muted` | `#6A6A72` | Icons at rest, disclaimers |
-| `wc-mute` | `#97A2B6` | Placeholder level grays |
-| `wc-navy-mute` | `#5A6B93` | Terminal comments and labels |
-| `wc-surface` | `#FFFFFF` | Page and tile background |
-| `wc-bg` | `#F8FAF9` | Hover background for link tiles, header fill |
-| `wc-surface-2` | `#E3E8EF` | Frame border, secondary button, skeletons |
-| `wc-neutral-80` | `#F5F5F5` | Chip background, inset panels |
-| `wc-neutral-30` | `#D2D3D8` | Disabled strokes |
-| `wc-neutral-20` | `#5E6073` | Disabled text |
-| `wc-neutral-15` | `#323346` | Dark button hover |
-| `wc-border` | `#C7D0DC` | Outline buttons, inputs |
-| `wc-border-light` | `#E6E6EC` | Hairline grid gaps and section dividers |
-| `wc-dither-1` | `#DFE5EC` | Lightest dither dot, hero radial wash |
-| `wc-lime` | `#DCF218` | Terminal prompt, cursor, accent button |
-| `wc-lime-2` | `#E6F84A` | Accent hover |
-| `wc-lime-3` | `#C8DD15` | Accent active |
-| `wc-mint` | `#68ECBC` | Success states |
-| `wc-mint-2` | `#60E9B1` | Success hover |
-| `wc-mint-pastel` | `#A4F4D7` | Text on dark primary hover |
-| `wc-error` | `#E24137` | Errors |
-| `wc-warning` | `#ED7536` | Warnings |
+| `kr-blue` | `#0066FF` | Primary buttons, links, highlights, selection |
+| `kr-blue-2` | `#3385FF` | Button hover, dark surface accents |
+| `kr-navy` | `#080A28` | Logo mark, primary dark button, strong text |
+| `kr-ink` / `kr-text-1` | `#07081E` | Body headings and paragraphs |
+| `kr-ink-2` | `#000A47` | Stat numbers in the glass panel |
+| `kr-ink-3` | `#001078` | Reserved deep accent |
+| `kr-text-2` | `#4A5567` | Secondary paragraph text |
+| `kr-text-muted` | `#45464D` | Nav links, eyebrow labels, descriptions |
+| `kr-icon-muted` | `#6A6A72` | Icons at rest, disclaimers |
+| `kr-mute` | `#97A2B6` | Placeholder level grays |
+| `kr-navy-mute` | `#5A6B93` | Terminal comments and labels |
+| `kr-surface` | `#FFFFFF` | Page and tile background |
+| `kr-bg` | `#F8FAF9` | Hover background for link tiles, header fill |
+| `kr-surface-2` | `#E3E8EF` | Frame border, secondary button, skeletons |
+| `kr-neutral-80` | `#F5F5F5` | Chip background, inset panels |
+| `kr-neutral-30` | `#D2D3D8` | Disabled strokes |
+| `kr-neutral-20` | `#5E6073` | Disabled text |
+| `kr-neutral-15` | `#323346` | Dark button hover |
+| `kr-border` | `#C7D0DC` | Outline buttons, inputs |
+| `kr-border-light` | `#E6E6EC` | Hairline grid gaps and section dividers |
+| `kr-dither-1` | `#DFE5EC` | Lightest dither dot, hero radial wash |
+| `kr-lime` | `#DCF218` | Terminal prompt, cursor, accent button |
+| `kr-lime-2` | `#E6F84A` | Accent hover |
+| `kr-lime-3` | `#C8DD15` | Accent active |
+| `kr-mint` | `#68ECBC` | Success states |
+| `kr-mint-2` | `#60E9B1` | Success hover |
+| `kr-mint-pastel` | `#A4F4D7` | Text on dark primary hover |
+| `kr-error` | `#E24137` | Errors |
+| `kr-warning` | `#ED7536` | Warnings |
 
 ### 2.2 Dark surfaces
 
@@ -61,14 +61,14 @@ Used for the closing CTA band, the footer, and the terminal.
 
 | Token | Hex | Use |
 |---|---|---|
-| `wc-bg-dark` | `#000722` | Dark page background, input wells |
-| `wc-surface-dark` | `#000933` | Dark section and terminal fill |
-| `wc-border-dark` | `#1E3D80` | Dark borders, terminal chrome dots |
-| `wc-border-dark-muted` | `#122A5E` | Dark hairlines |
-| `wc-text-dark-1` | `#FFFFFF` | Dark headings |
-| `wc-text-dark-2` | `#9FB2CC` | Dark body and links |
-| `wc-text-dark-3` | `#6A7F9C` | Dark labels, placeholder |
-| `wc-selection-dark` | `#001A4D` | Selection on dark |
+| `kr-bg-dark` | `#000722` | Dark page background, input wells |
+| `kr-surface-dark` | `#000933` | Dark section and terminal fill |
+| `kr-border-dark` | `#1E3D80` | Dark borders, terminal chrome dots |
+| `kr-border-dark-muted` | `#122A5E` | Dark hairlines |
+| `kr-text-dark-1` | `#FFFFFF` | Dark headings |
+| `kr-text-dark-2` | `#9FB2CC` | Dark body and links |
+| `kr-text-dark-3` | `#6A7F9C` | Dark labels, placeholder |
+| `kr-selection-dark` | `#001A4D` | Selection on dark |
 
 ### 2.3 Canvas palettes
 
@@ -131,13 +131,13 @@ One family does everything. Weight 600 for headings, 500 for labels and buttons,
 
 ### 3.3 Specific headline treatments
 
-- Hero H1: `type-hero`, `text-wc-text-1`, `text-balance`, `tracking-[-0.02em]`.
+- Hero H1: `type-hero`, `text-kr-text-1`, `text-balance`, `tracking-[-0.02em]`.
 - Section H2: `type-section font-semibold text-black`, max width 42rem (`max-w-2xl`).
-- Two-tone H2 (the "Everyone talks about going onchain" pattern): line one 20px/30px black, line two 32px/1.15 `text-wc-blue` with `tracking-[-0.01em]`, 24px gap between them. From 640px: 24px/36px and 40px/52px.
+- Two-tone H2 (the "Everyone talks about going onchain" pattern): line one 20px/30px black, line two 32px/1.15 `text-kr-blue` with `tracking-[-0.01em]`, 24px gap between them. From 640px: 24px/36px and 40px/52px.
 - Dark CTA H2: 40px, from 640px 56px, line height 1.06, white.
 - Stat number: 40px, from 640px 48px, weight 300, line height 1, black. Label under it 15px/22.5px weight 500.
-- Numbered step box: 64px square, 1px `wc-border-light`, number 13px weight 500, boxes overlap by 1px (`-mt-px`).
-- Eyebrow above an H2: 13px/19.5px weight 500 `wc-text-muted`, inside a 24px tall row, 20px gap to the H2.
+- Numbered step box: 64px square, 1px `kr-border-light`, number 13px weight 500, boxes overlap by 1px (`-mt-px`).
+- Eyebrow above an H2: 13px/19.5px weight 500 `kr-text-muted`, inside a 24px tall row, 20px gap to the H2.
 
 ### 3.4 Copy voice
 
@@ -145,7 +145,7 @@ One family does everything. Weight 600 for headings, 500 for labels and buttons,
 - Sentence case everywhere. No all caps except the 0.08em group labels.
 - Three-beat lines are fine: "Cheaper. Faster. Simpler."
 - Numbers are written as figures with a unit: "40M+", "<$0.01", "1875".
-- Buttons are verbs: "Start building", "Become a partner", "Explore WBT", "Talk to sales".
+- Buttons are verbs: "Start building", "Become a partner", "Explore the network", "Talk to sales".
 - Tile subtitles are short fragments with an ampersand: "Guides & RPC reference", "Programs & support".
 
 For this product:
@@ -153,7 +153,7 @@ For this product:
 | Slot | Copy |
 |---|---|
 | Hero H1 | One balance. Every AI app. |
-| Hero lead | Buy credits once, in any partner app, and spend the leftover in every other one. Every credit is backed by USDT on Whitechain. |
+| Hero lead | Buy credits once, in any partner app, and spend the leftover in every other one. Every credit is backed by USDT on NEAR. |
 | Stats | `1 credit = $0.01` · `0 crypto steps` · `100% backed` |
 | Two-tone H2 | Everyone sells their own credits. / We made one that works everywhere. |
 | Section H2s | Built for real products. / Add it in about 20 lines. / Every credit is provably backed. / Your next app already has a balance. |
@@ -168,13 +168,13 @@ For this product:
 The whole page sits inside a bordered frame, like a sheet of paper.
 
 ```
-body            bg wc-surface
+body            bg kr-surface
 .container      max-width 1400px, margin auto, padding-inline 32px from 1024px
-.frame          border 1px wc-surface-2, bg wc-surface, overflow hidden
-  section       border-top 1px wc-border-light (every section after the first)
+.frame          border 1px kr-surface-2, bg kr-surface, overflow hidden
+  section       border-top 1px kr-border-light (every section after the first)
 ```
 
-Header is fixed, 64px tall, 72px from 1024px, inside the same container with its own 1px `wc-surface-2` border, background `wc-bg` at 70% with `backdrop-blur(24px) saturate(150%)`. Page content starts with `padding-top: 64px` (72px from 1024px) plus `env(safe-area-inset-top)`. Sections use `scroll-margin-top` of the same value.
+Header is fixed, 64px tall, 72px from 1024px, inside the same container with its own 1px `kr-surface-2` border, background `kr-bg` at 70% with `backdrop-blur(24px) saturate(150%)`. Page content starts with `padding-top: 64px` (72px from 1024px) plus `env(safe-area-inset-top)`. Sections use `scroll-margin-top` of the same value.
 
 ### 4.2 Spacing
 
@@ -193,8 +193,8 @@ Header is fixed, 64px tall, 72px from 1024px, inside the same container with its
 Tiles never have their own borders. The parent grid carries the border color as its background and tiles are white:
 
 ```html
-<div class="grid grid-cols-1 gap-px border-t border-wc-border-light bg-wc-border-light md:grid-cols-2 lg:grid-cols-4">
-  <div class="bg-wc-surface px-6 py-10 sm:px-8 lg:px-16 lg:py-14">…</div>
+<div class="grid grid-cols-1 gap-px border-t border-kr-border-light bg-kr-border-light md:grid-cols-2 lg:grid-cols-4">
+  <div class="bg-kr-surface px-6 py-10 sm:px-8 lg:px-16 lg:py-14">…</div>
 </div>
 ```
 
@@ -225,18 +225,18 @@ Tailwind defaults: 640, 768, 1024, 1280, 1536. The hero switches to a two-column
 
 ### 5.1 Button
 
-Base: `inline-flex items-center justify-center gap-2 font-display font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-wc-blue/40 disabled:opacity-50 disabled:pointer-events-none rounded-control`
+Base: `inline-flex items-center justify-center gap-2 font-display font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-kr-blue/40 disabled:opacity-50 disabled:pointer-events-none rounded-control`
 
 | Variant | Classes |
 |---|---|
-| `default` | `bg-wc-blue text-white hover:bg-wc-blue-2 hover:shadow-[0_2px_4px_0_rgba(0,0,0,0.16),0_12px_16px_0_rgba(0,68,255,0.24)]` |
-| `primary` | `bg-wc-navy font-semibold text-wc-surface hover:bg-wc-neutral-15 hover:text-wc-mint-pastel` |
-| `secondary` | `bg-wc-surface-2 text-wc-text-1 hover:bg-wc-border/70` |
-| `outline` | `border border-wc-border bg-transparent text-wc-text-1 hover:bg-wc-surface-2/60` |
-| `outline` on white, blue text | add `bg-wc-surface text-wc-blue` (used for "Join the community", "Explore WBT") |
-| `ghost` | `bg-transparent text-wc-text-1 hover:bg-wc-surface-2/60` |
-| `link` | `bg-transparent text-wc-blue underline-offset-2 hover:underline` |
-| `accent` | `bg-wc-lime font-semibold text-wc-surface-dark hover:bg-wc-lime-2 hover:shadow-[0_2px_4px_0_rgba(0,0,0,0.16),0_12px_16px_0_rgba(220,242,24,0.24)] active:bg-wc-lime-3` |
+| `default` | `bg-kr-blue text-white hover:bg-kr-blue-2 hover:shadow-[0_2px_4px_0_rgba(0,0,0,0.16),0_12px_16px_0_rgba(0,68,255,0.24)]` |
+| `primary` | `bg-kr-navy font-semibold text-kr-surface hover:bg-kr-neutral-15 hover:text-kr-mint-pastel` |
+| `secondary` | `bg-kr-surface-2 text-kr-text-1 hover:bg-kr-border/70` |
+| `outline` | `border border-kr-border bg-transparent text-kr-text-1 hover:bg-kr-surface-2/60` |
+| `outline` on white, blue text | add `bg-kr-surface text-kr-blue` (used for "Join the community", "Explore the network") |
+| `ghost` | `bg-transparent text-kr-text-1 hover:bg-kr-surface-2/60` |
+| `link` | `bg-transparent text-kr-blue underline-offset-2 hover:underline` |
+| `accent` | `bg-kr-lime font-semibold text-kr-surface-dark hover:bg-kr-lime-2 hover:shadow-[0_2px_4px_0_rgba(0,0,0,0.16),0_12px_16px_0_rgba(220,242,24,0.24)] active:bg-kr-lime-3` |
 
 | Size | Classes |
 |---|---|
@@ -245,7 +245,7 @@ Base: `inline-flex items-center justify-center gap-2 font-display font-medium tr
 | `md` | `h-10 px-4 text-body` (default) |
 | `lg` | `h-11 px-[18px] text-body` |
 
-Header uses `default md` next to `outline md`. Hero uses `default md` and `outline md` with `bg-wc-surface`. Section CTAs use `lg`. On mobile, buttons stack full width with 16px gap, then go inline with 20px gap.
+Header uses `default md` next to `outline md`. Hero uses `default md` and `outline md` with `bg-kr-surface`. Section CTAs use `lg`. On mobile, buttons stack full width with 16px gap, then go inline with 20px gap.
 
 Optional `scramble` prop: on hover the label is re-typed with random glyphs (see 7.6). Optional `chevron` prop: arrow icon nudges up-right on hover.
 
@@ -255,8 +255,8 @@ Optional `scramble` prop: on hover the label is re-typed with random glyphs (see
 [logo 120px]  Builders  Blog  Bridge            [x] [tg] [dc]  [Start building]
 ```
 
-- Nav links: 16px weight 500 `wc-text-muted`, hover `wc-navy`, gap 24px (32px from 1280px).
-- Social icons: 18px, `wc-navy`, hover `wc-blue`, gap 20px.
+- Nav links: 16px weight 500 `kr-text-muted`, hover `kr-navy`, gap 24px (32px from 1280px).
+- Social icons: 18px, `kr-navy`, hover `kr-blue`, gap 20px.
 - Mobile: `default sm` button plus a 40px square menu toggle.
 
 ### 5.3 Hero
@@ -264,11 +264,11 @@ Optional `scramble` prop: on hover the label is re-typed with random glyphs (see
 Two columns from 768px. Left: H1, lead, two buttons, padded 24px (32/56 from 768, 64/64 from 1024). Right: a glass panel pinned to the bottom (`self-end`).
 
 Background layers, bottom to top:
-1. Placeholder wash while the canvas loads: `bg-[radial-gradient(85%_85%_at_100%_100%,var(--color-wc-dither-1)_0%,transparent_70%)]`.
+1. Placeholder wash while the canvas loads: `bg-[radial-gradient(85%_85%_at_100%_100%,var(--color-kr-dither-1)_0%,transparent_70%)]`.
 2. `DitherField` with `focus {x:1, y:1}`, `radius 0.85`, `gap 22`, `glyph "plus"`. Between 768 and 1024px it is masked with `linear-gradient(to right, transparent 380px, #000 500px)` so it stays clear of the text.
-3. On mobile the text column gets `bg-gradient-to-b from-wc-surface/64 from-70% via-wc-surface/64 via-90% to-transparent` so copy stays readable over the dots.
+3. On mobile the text column gets `bg-gradient-to-b from-kr-surface/64 from-70% via-kr-surface/64 via-90% to-transparent` so copy stays readable over the dots.
 
-Glass panel: `.glass-surface` = `bg white/80, border white/70, backdrop-blur(12px)`, padding 24px (32 from 768, 40 from 1024), 24px vertical gap. Contains a 15px semibold title in `wc-ink-2`, a 15px medium line in `wc-navy`, then two stats (24px weight 400 `wc-ink-2` number, 15px medium `wc-navy` label).
+Glass panel: `.glass-surface` = `bg white/80, border white/70, backdrop-blur(12px)`, padding 24px (32 from 768, 40 from 1024), 24px vertical gap. Contains a 15px semibold title in `kr-ink-2`, a 15px medium line in `kr-navy`, then two stats (24px weight 400 `kr-ink-2` number, 15px medium `kr-navy` label).
 
 Dark variant `.glass-surface-dark` = `bg #000722/70, border #1E3D80/70, blur 12px`.
 
@@ -278,57 +278,57 @@ Three columns from 640px. Each stat is `flex-col-reverse` so the number is read 
 
 ### 5.5 Feature tile with image dots
 
-Desktop (from 1024px): a 270px tall stage, centered, `DotGridTwinkle` plus-grid behind an `ImageLeafletField` of 188px that renders a monochrome PNG as leaf dots (`cell 5`, `fitPx 188`). Below the stage: 20px/30px semibold title, 16px body in `wc-text-muted`, optional chip.
+Desktop (from 1024px): a 270px tall stage, centered, `DotGridTwinkle` plus-grid behind an `ImageLeafletField` of 188px that renders a monochrome PNG as leaf dots (`cell 5`, `fitPx 188`). Below the stage: 20px/30px semibold title, 16px body in `kr-text-muted`, optional chip.
 
 Mobile: 80px dot image (`cell 3`, `fitPx 80`) left of the text, 24px gap.
 
 ### 5.6 Link tile
 
 ```html
-<a class="group flex h-full flex-col bg-wc-surface px-6 py-10 transition-colors hover:bg-wc-bg sm:px-8 lg:px-16 lg:py-14">
+<a class="group flex h-full flex-col bg-kr-surface px-6 py-10 transition-colors hover:bg-kr-bg sm:px-8 lg:px-16 lg:py-14">
   <div class="flex items-center justify-between">
     <span class="text-[18px] font-semibold leading-[27px] text-black">Docs</span>
-    <ArrowUpRight class="size-[15px] text-wc-icon-muted transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-wc-blue" />
+    <ArrowUpRight class="size-[15px] text-kr-icon-muted transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-kr-blue" />
   </div>
-  <p class="mt-1.5 text-[15px] leading-[24.375px] text-wc-text-muted">Guides & RPC reference</p>
+  <p class="mt-1.5 text-[15px] leading-[24.375px] text-kr-text-muted">Guides & RPC reference</p>
 </a>
 ```
 
 ### 5.7 Partner logo tile
 
-`h-36 min-w-[45%] flex-1 items-center justify-center bg-wc-surface p-10`. Logo scales to 1.07 on hover over 200ms ease-out. An optional highlight layer fades in a plus-pattern background (see 6.7) over 1000ms when the tile is active.
+`h-36 min-w-[45%] flex-1 items-center justify-center bg-kr-surface p-10`. Logo scales to 1.07 on hover over 200ms ease-out. An optional highlight layer fades in a plus-pattern background (see 6.7) over 1000ms when the tile is active.
 
 ### 5.8 Marquee
 
-A row of 112px tall cells, each with `border-r border-wc-border-light` and 32px horizontal padding. The track is duplicated once for a seamless loop and masked with `linear-gradient(90deg, transparent, #000 8%, #000 82%, transparent)`. Speed: 38s per loop, 44s for the reverse row. A 28px square `outline xs` play/pause button sits top-right above the track. Pauses on hover, focus, and when the tab is hidden.
+A row of 112px tall cells, each with `border-r border-kr-border-light` and 32px horizontal padding. The track is duplicated once for a seamless loop and masked with `linear-gradient(90deg, transparent, #000 8%, #000 82%, transparent)`. Speed: 38s per loop, 44s for the reverse row. A 28px square `outline xs` play/pause button sits top-right above the track. Pauses on hover, focus, and when the tab is hidden.
 
 ### 5.9 Terminal
 
 ```
-┌ ● ● ●  whitechain – zsh                              copy ┐
+┌ ● ● ●  kredo – zsh                                   copy ┐
 │                                                           │
 │  # comment in navy-mute                                   │
-│  $ npm create whitechain@latest my-dapp     ($ in lime)   │
-│  │ chain    Whitechain – EVM on the OP Stack              │
-│  ◆ contracts deployed to testnet in 4.05s                 │
+│  $ npm i kredo                              ($ in lime)   │
+│  │ network  NEAR testnet                                │
+│  ◆ first charge settled in 2.1s                         │
 │                                                           │
 │  [ascii art, 10px mono, blue]                             │
 │  $ ▍  (lime cursor, pulses)                               │
 └───────────────────────────────────────────────────────────┘
 ```
 
-- Window: `rounded-[10px] border border-wc-border-dark bg-wc-surface-dark shadow-terminal`.
+- Window: `rounded-[10px] border border-kr-border-dark bg-kr-surface-dark shadow-terminal`.
 - `shadow-terminal` = `0 24px 70px -30px rgba(0,9,51,0.7)`.
-- Chrome bar: 3 dots of 12px `bg-wc-border-dark`, title 13px `wc-navy-mute`, border-bottom `wc-border-dark-muted`, padding 12px 20px 13px.
-- Body: 24px padding, 13px mono, line height 1.7. Prompt `$` and `◆` in `wc-lime`, commands white, labels `wc-navy-mute`, values `wc-text-dark-2`.
-- Cursor: 7x15px `bg-wc-lime` with `animate-pulse`.
-- Copy button: 13px `wc-navy-mute`, hover white, shows "copied" for 1.6s.
+- Chrome bar: 3 dots of 12px `bg-kr-border-dark`, title 13px `kr-navy-mute`, border-bottom `kr-border-dark-muted`, padding 12px 20px 13px.
+- Body: 24px padding, 13px mono, line height 1.7. Prompt `$` and `◆` in `kr-lime`, commands white, labels `kr-navy-mute`, values `kr-text-dark-2`.
+- Cursor: 7x15px `bg-kr-lime` with `animate-pulse`.
+- Copy button: 13px `kr-navy-mute`, hover white, shows "copied" for 1.6s.
 
 For our product the terminal shows the 20-line integration:
 
 ```
 $ npm i kredo
-│ network  Whitechain · USDT settled
+│ network  NEAR · USDT settled
 │ gas      paid by the relayer, never by users
 │ limit    enforced onchain, per app
 ◆ first charge settled in 2.1s
@@ -336,28 +336,28 @@ $ npm i kredo
 
 ### 5.10 Dark CTA band
 
-`border-t border-wc-border-dark-muted bg-wc-surface-dark text-wc-surface`, padding 96px vertical (144 from 640px), centered. Behind it a `DotGridTwinkle` with `ink #6A7F9C`, at 60% opacity below 1024px. H2 40/56px, 18px lead, then `default lg` plus `outline lg bg-wc-surface text-wc-blue`.
+`border-t border-kr-border-dark-muted bg-kr-surface-dark text-kr-surface`, padding 96px vertical (144 from 640px), centered. Behind it a `DotGridTwinkle` with `ink #6A7F9C`, at 60% opacity below 1024px. H2 40/56px, 18px lead, then `default lg` plus `outline lg bg-kr-surface text-kr-blue`.
 
 ### 5.11 Footer
 
-Dark. Inside the container, `border-x border-wc-border-dark-muted`.
+Dark. Inside the container, `border-x border-kr-border-dark-muted`.
 
-1. Newsletter block: H2 28px/40px white, label 17px `wc-text-dark-2`, input well `rounded-xl border border-wc-border-dark bg-wc-bg-dark p-[5px]` containing a transparent input (placeholder `wc-text-dark-3`) and a `secondary md` submit.
+1. Newsletter block: H2 28px/40px white, label 17px `kr-text-dark-2`, input well `rounded-xl border border-kr-border-dark bg-kr-bg-dark p-[5px]` containing a transparent input (placeholder `kr-text-dark-3`) and a `secondary md` submit.
 2. Glyph band: 144px tall (296 from 640px), `DitherField` with `invert true`, `focus {0.5, 0.5}`, `radius 0.75`, `gap 22`, `glyph "plus"`, dark dither ramp, `ink #9FB2CC`. The 80px white brand glyph sits centered on top. Inverted means dots are dark at the center and brighten toward the edges, so the glyph sits in a calm pool.
-3. Link columns: 2 columns, 4 from 768px. Heading 13px `wc-text-dark-3`, links 16px `wc-text-dark-2` hover white, 16px vertical gap.
+3. Link columns: 2 columns, 4 from 768px. Heading 13px `kr-text-dark-3`, links 16px `kr-text-dark-2` hover white, 16px vertical gap.
 4. Legal: 12px caption, copyright line.
 
 ### 5.12 Chip
 
-`inline-flex rounded-[20px] bg-wc-neutral-80 px-2 py-0.5 text-[14px] font-medium leading-[22.5px] text-wc-text-2`.
+`inline-flex rounded-[20px] bg-kr-neutral-80 px-2 py-0.5 text-[14px] font-medium leading-[22.5px] text-kr-text-2`.
 
 ### 5.13 Accordion disclaimer
 
-Right-aligned 12px `wc-icon-muted` trigger with a 16px chevron that rotates 180° over 200ms.
+Right-aligned 12px `kr-icon-muted` trigger with a 16px chevron that rotates 180° over 200ms.
 
 ### 5.14 Skeleton
 
-`animate-pulse bg-wc-surface-2`, radius 14px for text lines, 0 for images.
+`animate-pulse bg-kr-surface-2`, radius 14px for text lines, 0 for images.
 
 ### 5.15 Brand mark
 
@@ -493,7 +493,7 @@ Where it is used:
 
 ### 6.6 Image dots (`ImageLeafletField`, `ImageLeafletMorph`)
 
-Turns a monochrome PNG into a field of leaf dots whose size follows the image's darkness. Used for the three feature tile illustrations, the WBT panel, and the 404 page.
+Turns a monochrome PNG into a field of leaf dots whose size follows the image's darkness. Used for the three feature tile illustrations, the network panel, and the 404 page.
 
 Sampling:
 
@@ -526,7 +526,7 @@ Presets:
 |---|---|---|---|
 | Feature tile, desktop | 5 | 188 | leaflet ramp |
 | Feature tile, mobile | 3 | 80 | leaflet ramp |
-| WBT panel (3 images, timer) | 8 | contain | leaflet ramp |
+| Network panel (3 images, timer) | 8 | contain | leaflet ramp |
 | 404 glyph | 8 | 320 | leaflet ramp |
 
 Source images are black shapes on transparent, roughly 400 to 800px wide. Simple silhouettes work best: a shield, a chain link, a coin.
@@ -557,7 +557,7 @@ const plusPattern = ({ color = "#030712", opacity = 0.21, pitch = 44, size = 12,
 
 ### 6.9 ASCII coin (optional)
 
-A spinning brand glyph rendered as 46x26 characters from the ramp `" .,:;irsXA253hMHGS#9B&@"`, 10px mono, `wc-blue`, inside the terminal. Rotation speed `0.55 + 1.9 * (1 - |cos θ|)` so it lingers face-on. Skip unless there is time.
+A spinning brand glyph rendered as 46x26 characters from the ramp `" .,:;irsXA253hMHGS#9B&@"`, 10px mono, `kr-blue`, inside the terminal. Rotation speed `0.55 + 1.9 * (1 - |cos θ|)` so it lingers face-on. Skip unless there is time.
 
 ### 6.10 Placement rules
 
@@ -611,20 +611,20 @@ Stat numbers count from 0 to the target over 1400ms with `1 - (1 - p)³` easing,
 
 A paragraph whose words fade in as it scrolls into the viewport. Progress `p` runs from 0 when the top is at 95% of the viewport to 1 when it reaches `endFraction` of the viewport height. Word `i` of `n` has `opacity = 0.18 + 0.82 * clamp01(p * n - i)`, so words light up left to right with a 150ms opacity transition. Resting opacity for unrevealed text is 0.18.
 
-The list variant draws a 12px `wc-blue` square before each line that scales from 0.4 to 1 and fades 0 to 1 with the same progress.
+The list variant draws a 12px `kr-blue` square before each line that scales from 0.4 to 1 and fades 0 to 1 with the same progress.
 
 ### 7.6 Scramble hover
 
-On `mouseenter` of a `.group`, the label is retyped: every 22ms the active index advances (every second tick), the active character shows a random glyph from `ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&@$*+=/<>` in `text-wc-lime`, characters before it are real, after it are invisible. Width is locked so layout does not shift. On leave it snaps back.
+On `mouseenter` of a `.group`, the label is retyped: every 22ms the active index advances (every second tick), the active character shows a random glyph from `ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&@$*+=/<>` in `text-kr-lime`, characters before it are real, after it are invisible. Width is locked so layout does not shift. On leave it snaps back.
 
 ### 7.7 Micro interactions
 
 | Element | Behaviour |
 |---|---|
-| Link tile arrow | `translate(2px, -2px)` and color to `wc-blue`, 150ms |
+| Link tile arrow | `translate(2px, -2px)` and color to `kr-blue`, 150ms |
 | Partner logo | `scale(1.07)`, 200ms ease-out |
-| Blue button | background to `wc-blue-2`, blue glow shadow |
-| Nav link | color to `wc-navy` |
+| Blue button | background to `kr-blue-2`, blue glow shadow |
+| Nav link | color to `kr-navy` |
 | Accordion chevron | `rotate(180deg)`, 200ms |
 | Terminal cursor | `pulse` 2s, opacity to 0.5 at 50% |
 | Sticky onchain header | pins at 88px from the top on 1024px and up while its list scrolls |
@@ -637,7 +637,7 @@ Under `prefers-reduced-motion: reduce`: `rise`, `marquee`, and `pulse` are remov
 
 ## 8. Page skeleton
 
-Section order for the landing page, each separated by a `wc-border-light` hairline:
+Section order for the landing page, each separated by a `kr-border-light` hairline:
 
 1. **Hero**: dither field, H1, lead, two buttons, glass stats panel.
 2. **Stats**: three count-up numbers.
@@ -662,7 +662,7 @@ Do
 - Put a period at the end of every headline.
 - Use the hairline grid for any set of equal items.
 - Keep dot opacity under 0.22 away from the focus point.
-- Use `wc-blue` only for actions and one highlighted line per screen.
+- Use `kr-blue` only for actions and one highlighted line per screen.
 - Use lime only inside terminals, cursors, and the accent button.
 
 Don't
@@ -686,44 +686,44 @@ Don't
   --font-sans: "Onest", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  --color-wc-blue: #0066ff;
-  --color-wc-blue-2: #3385ff;
-  --color-wc-navy: #080a28;
-  --color-wc-ink: #07081e;
-  --color-wc-ink-2: #000a47;
-  --color-wc-ink-3: #001078;
-  --color-wc-text-1: #07081e;
-  --color-wc-text-2: #4a5567;
-  --color-wc-text-muted: #45464d;
-  --color-wc-icon-muted: #6a6a72;
-  --color-wc-mute: #97a2b6;
-  --color-wc-navy-mute: #5a6b93;
-  --color-wc-surface: #ffffff;
-  --color-wc-bg: #f8faf9;
-  --color-wc-surface-2: #e3e8ef;
-  --color-wc-neutral-80: #f5f5f5;
-  --color-wc-neutral-30: #d2d3d8;
-  --color-wc-neutral-20: #5e6073;
-  --color-wc-neutral-15: #323346;
-  --color-wc-border: #c7d0dc;
-  --color-wc-border-light: #e6e6ec;
-  --color-wc-dither-1: #dfe5ec;
-  --color-wc-lime: #dcf218;
-  --color-wc-lime-2: #e6f84a;
-  --color-wc-lime-3: #c8dd15;
-  --color-wc-mint: #68ecbc;
-  --color-wc-mint-2: #60e9b1;
-  --color-wc-mint-pastel: #a4f4d7;
-  --color-wc-error: #e24137;
-  --color-wc-warning: #ed7536;
+  --color-kr-blue: #0066ff;
+  --color-kr-blue-2: #3385ff;
+  --color-kr-navy: #080a28;
+  --color-kr-ink: #07081e;
+  --color-kr-ink-2: #000a47;
+  --color-kr-ink-3: #001078;
+  --color-kr-text-1: #07081e;
+  --color-kr-text-2: #4a5567;
+  --color-kr-text-muted: #45464d;
+  --color-kr-icon-muted: #6a6a72;
+  --color-kr-mute: #97a2b6;
+  --color-kr-navy-mute: #5a6b93;
+  --color-kr-surface: #ffffff;
+  --color-kr-bg: #f8faf9;
+  --color-kr-surface-2: #e3e8ef;
+  --color-kr-neutral-80: #f5f5f5;
+  --color-kr-neutral-30: #d2d3d8;
+  --color-kr-neutral-20: #5e6073;
+  --color-kr-neutral-15: #323346;
+  --color-kr-border: #c7d0dc;
+  --color-kr-border-light: #e6e6ec;
+  --color-kr-dither-1: #dfe5ec;
+  --color-kr-lime: #dcf218;
+  --color-kr-lime-2: #e6f84a;
+  --color-kr-lime-3: #c8dd15;
+  --color-kr-mint: #68ecbc;
+  --color-kr-mint-2: #60e9b1;
+  --color-kr-mint-pastel: #a4f4d7;
+  --color-kr-error: #e24137;
+  --color-kr-warning: #ed7536;
 
-  --color-wc-bg-dark: #000722;
-  --color-wc-surface-dark: #000933;
-  --color-wc-border-dark: #1e3d80;
-  --color-wc-border-dark-muted: #122a5e;
-  --color-wc-text-dark-1: #ffffff;
-  --color-wc-text-dark-2: #9fb2cc;
-  --color-wc-text-dark-3: #6a7f9c;
+  --color-kr-bg-dark: #000722;
+  --color-kr-surface-dark: #000933;
+  --color-kr-border-dark: #1e3d80;
+  --color-kr-border-dark-muted: #122a5e;
+  --color-kr-text-dark-1: #ffffff;
+  --color-kr-text-dark-2: #9fb2cc;
+  --color-kr-text-dark-3: #6a7f9c;
 
   --radius-control: 14px;
   --radius-card: 24px;
@@ -758,8 +758,8 @@ Don't
 
 @layer base {
   html { font-size: 16px; scroll-behavior: smooth; }
-  body { font-family: var(--font-display); background: var(--color-wc-surface); color: var(--color-wc-text-1); }
-  ::selection { background: var(--color-wc-blue-2); color: var(--color-wc-surface); }
+  body { font-family: var(--font-display); background: var(--color-kr-surface); color: var(--color-kr-text-1); }
+  ::selection { background: var(--color-kr-blue-2); color: var(--color-kr-surface); }
 }
 
 @utility type-hero    { font-size: clamp(2.5rem, 2.28rem + 0.9vw, 3rem); line-height: 1.06; }
@@ -767,9 +767,9 @@ Don't
 @utility rounded-control { border-radius: var(--radius-control); }
 @utility pt-section-t { padding-top: var(--spacing-section-t); }
 @utility pb-section-t { padding-bottom: var(--spacing-section-t); }
-@utility glass-surface { background: color-mix(in srgb, var(--color-wc-surface) 80%, transparent); border-color: color-mix(in srgb, var(--color-wc-surface) 70%, transparent); backdrop-filter: blur(12px); }
-@utility glass-surface-dark { background: color-mix(in srgb, var(--color-wc-bg-dark) 70%, transparent); border-color: color-mix(in srgb, var(--color-wc-border-dark) 70%, transparent); backdrop-filter: blur(12px); }
-@utility shadow-terminal { box-shadow: 0 24px 70px -30px color-mix(in srgb, var(--color-wc-surface-dark) 70%, transparent); }
+@utility glass-surface { background: color-mix(in srgb, var(--color-kr-surface) 80%, transparent); border-color: color-mix(in srgb, var(--color-kr-surface) 70%, transparent); backdrop-filter: blur(12px); }
+@utility glass-surface-dark { background: color-mix(in srgb, var(--color-kr-bg-dark) 70%, transparent); border-color: color-mix(in srgb, var(--color-kr-border-dark) 70%, transparent); backdrop-filter: blur(12px); }
+@utility shadow-terminal { box-shadow: 0 24px 70px -30px color-mix(in srgb, var(--color-kr-surface-dark) 70%, transparent); }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-rise, .animate-marquee, .animate-marquee-reverse { animation: none; }

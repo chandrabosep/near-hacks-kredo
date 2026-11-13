@@ -1,125 +1,80 @@
-# Kredo: Build Plan (ETHGlobal Mumbai)
+# Kredo: Build Plan
 
 **What we're building:** buy credits once, in any partner app, and spend the leftover in every other one. Each company is paid in USDT for what its users spend. The product story is in [overview.md](overview.md).
 
-**Chain:** Whitechain only (OP Stack L2, Sepolia testnet, chain ID 1874). Credits are backed 1:1 by the official Whitechain test USDT.
-
-**Submission closes Saturday 7 Nov, 9:00 am IST.** No late entries.
+**Chain:** NEAR testnet. Credits are backed 1:1 by a NEP-141 test USDT with 6 decimals, the same shape as USDt on NEAR mainnet (`usdt.tether-token.near`).
 
 **Checkboxes** are ticked only when the work is merged to `main`.
 
 ---
 
-## 1. Event rules we must follow
-
-Hard rules from the event page. Breaking one can disqualify us.
-
-- [ ] Commit history shows the work happening during the event. No single giant commit.
-- [ ] Public GitHub repo with steady commits.
-- [ ] Demo video: 2 to 4 minutes, 720p or better, narrated by a person. No AI voiceover, no music over text slides, no phone recording, no sped-up footage.
-- [ ] At submission, choose "Finalist and Partner Prizes".
-
----
-
-## 2. Prize targets
-
-| Target | What it needs from us |
-|---|---|
-| **Whitechain: Scale, Payments Nobody Notices ($3k). Strongest track.** | The payer sees no crypto steps, and the business side pays gas. Judges ask directly: who pays gas, how the relayer gets WBT, what stops a drain. |
-| **Whitechain: Operate, Stablecoin Payments for Business ($5k)** | A drop-in piece a separate app adds in about 20 lines, shown from both the merchant and the customer view. Extra credit for flows past the first payment: refunds, holds, CSV export. |
-| **ETHGlobal Finalist (top 10)** | Technicality, Originality, Practicality, Usability, WOW. 7 minutes: 4 minute demo, 3 minute Q&A. |
-
-All Whitechain tracks count as one partner prize, so we enter both Scale and Operate. ENS is optional, only if there's time.
-
----
-
-## 3. Rules everyone builds against
+## 1. Rules everyone builds against
 
 | Rule | Value |
 |---|---|
 | 1 credit | $0.01 |
-| Internal unit | USDT's smallest unit. Whitechain test USDT has **6 decimals**, so **1 credit = 10,000 units.** Store and send every amount in units; divide only for display. |
-| Backing | Credits are created only when USDT arrives in the vault. No admin mint. |
-| Network fee | Taken at each charge (e.g. 5% = 500 bps, set per app). The user pays exactly the listed price. |
-| Who can be paid out | Registered companies only |
+| Internal unit | USDT's smallest unit. USDT has **6 decimals**, so **1 credit = 10,000 units.** Store and send every amount in units; divide only for display. |
+| Backing | Credits are created only when USDT arrives in the vault through `ft_transfer_call`. No admin mint. |
+| Network fee | Taken at each charge (e.g. 5% = 500 bps, set per app, capped at 20%). The user pays exactly the listed price. |
+| Who can be paid out | Registered apps only |
 | Expiry | Credits never expire |
-| Gas | Our relayer pays it in WBT. Users and companies never hold WBT. |
+| Gas | Our relayer pays it. Users and companies never hold NEAR. |
 | Source of truth | The chain. Our database is a fast copy for answering requests instantly. |
 
 **Backing check, enforced in the contract:**
 ```
-USDT held by CreditVault == Σ user balances + Σ held + Σ claims + Σ company earnings + protocol fees
+usdt.ft_balance_of(vault) >= Σ user balances + Σ held + Σ claims + Σ app earnings + protocol fees
 ```
 
-### 3a. Whitechain test USDT (checked onchain and in the verified source, 5 Nov)
+### 1a. Accounts on testnet
 
 | | |
 |---|---|
-| Address | `0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7` (EIP-1967 proxy) |
-| Implementation | `0x26425662D126412128967ECf0a02EC48573026F7`, `TetherTokenV2`, verified |
-| Name / symbol / decimals | `Tether USD` / `USDT` / **6** |
-| EIP-712 domain | name `Tether USD`, version `1`, chainId `1874`, verifyingContract = the proxy |
-| Gasless entry points | EIP-2612 `permit` and EIP-3009 `receiveWithAuthorization` (`to` must be `msg.sender`) |
-| Minting | Owner only. **No USDT faucet.** Get test USDT from the Whitechain booth. The WBT faucet (`faucet.testnet.whitechain.io`, GitHub login, once per 24h) gives gas only. |
-| RPC / explorer | `https://rpc.testnet.whitechain.io` / `https://explorer.testnet.whitechain.io` (Blockscout: `forge verify-contract --verifier blockscout`) |
+| Vault | `vault.kredo-network.testnet` |
+| Test USDT | `usdt.kredo-network.testnet` (NEP-141, `USDT`, **6** decimals, owner-only mint for the faucet) |
+| Owner and fee recipient | `kredo-network.testnet` |
+| Operator (relayer) | `relayer.kredo-network.testnet` |
+| RPC / explorer | `https://test.rpc.fastnear.com` / `https://testnet.nearblocks.io` |
 
-The mock USDT is for local Foundry tests only. It mirrors this surface so tests sign exactly what the real token checks. **Never deploy it to Whitechain** (the deploy script refuses on chain 1874).
-
-### 3b. Whitechain qualification checklist (hard requirements for every track)
-
-- [x] Contracts deployed on Whitechain Sepolia (1874) and **verified** on the explorer
-- [x] At least one **USDT payment settled on Whitechain in the main flow**, with the explorer link in the README. Self-minted test tokens don't count.
-- [x] README line: why this flow needs onchain stablecoin settlement on Whitechain, and what a normal payment rail couldn't do. (A rail can't stop us over-charging or over-issuing. The contract does.)
-- [x] README covers setup, architecture and **current limitations**
-- [ ] 2 to 4 minute video showing **each party**: customer, merchant, and the relayer's gas view
-- [ ] Whitechain feedback doc (RPC limits, faucet, explorer verification, anything that bit us)
+Users never sign typed data. They call `approve_app`, `revoke_app`, `send` and `create_claim` directly, as meta transactions (NEP-366) that the relayer pays gas for, so the contract reads the user from `predecessor_account_id`.
 
 ---
 
-## 4. Core build (milestone 0)
+## 2. Core build (milestone 0)
 
 The contract, backend, SDK, hosted pages and first demo app, running locally. Each bullet is roughly one commit. Run the tests at every commit.
 
 Never commit secrets, local data or build output. Commit example env files instead.
 
 **Scaffold**
-- [x] npm workspaces: `apps/web` (Next.js, Tailwind, shadcn), `apps/api` (Express, viem)
-- [x] Foundry project with the Whitechain testnet RPC
-- [x] `forge-std` and OpenZeppelin as git submodules
+- [x] npm workspaces: `apps/web` (Next.js, Tailwind, shadcn), `apps/api` (Express)
+- [x] Cargo workspace for the contracts, on `near-sdk` 5
 
-**Vault: core** (built in slices, each with its tests)
-- [x] mock USDT with 6 decimals, the `Tether USD` / `1` domain, `permit`, `receiveWithAuthorization`
-- [x] vault skeleton: storage, running totals, owner/operator roles, `pause()`, `checkBacking()`
-- [x] app registry (`registerApp`, payout address, `feeBps`) and its tests
-- [x] `deposit` and tests, including the backing check
-- [x] `depositWithPermit` (try/catch around permit) and `depositWithAuthorization`, with tests: relayed by a stranger, after a front-run permit, bad signature, nonce replay, wrong `to`
-
-**Vault: limits and charges**
-- [x] EIP-712 `approveApp` / `revokeApp`, signed or direct, with tests
-- [x] `charge` with the limit check, fee split and per-charge cap. Tests: over-limit reverts **even from the operator key**, charge after revoke reverts.
-- [x] `hold` → `capture` / `release`. Anyone can release after expiry. A partial capture returns the unused part to the limit. Tests for each.
-- [x] `refund` and tests
-
-**Vault: transfers and payouts**
-- [x] `send` (user to user, signed) and tests
-- [x] `createClaim` / `claim` / `cancelClaim` and tests
-- [x] `payout(app)`, `withdrawFees()` and tests. The backing check is asserted after every test.
-- [x] fork test against the real Whitechain USDT
-- [x] deploy script: defaults to the official USDT on 1874 and refuses the mock there
-- [x] contracts README and example env
+**Contracts**
+- [x] test USDT: NEP-141 with 6 decimals, storage management and an owner mint
+- [x] vault state, running totals, owner/operator roles, `pause()`, two-step ownership
+- [x] app registry (`register_app`, payout account, `fee_bps`, `max_charge`)
+- [x] deposits through `ft_on_transfer`, for yourself or someone else; other tokens and dust are refunded
+- [x] `approve_app` / `revoke_app` with an optional expiry
+- [x] `charge` with the limit check, fee split and per-charge cap. Over-limit fails **even from the operator**, and every `ref` is single use.
+- [x] `hold` → `capture` / `release`. Anyone can release after expiry. A partial capture returns the unused part.
+- [x] `refund`, capped at what the user spent with that app
+- [x] `send`, and claim links: `create_claim` / `claim` / `cancel_claim`, signed with an ed25519 claim key
+- [x] `payout(app)` and `withdraw_fees()`, restoring the balance if the USDT transfer fails
+- [x] unit tests for each, with the backing check asserted after every one
+- [x] deploy both contracts to testnet and record them in `contracts/deployments/testnet.json`
 
 **Backend: foundation**
 - [x] project setup, config and example env
-- [x] ABI generation from the contracts
-- [x] JSON-file database and store
-- [x] relayer queue (serial nonces, receipt wait, gas recorded per tx)
-- [x] user login with Privy: email code, embedded wallet, identity token verified on the backend
+- [x] database and store
+- [x] relayer queue (ordered sends, receipt wait, gas recorded per transaction)
+- [x] user login with Privy: email code, identity token verified on the backend
 
 **Backend: API**
 - [x] server bootstrap and `/v1/health`
 - [x] auth routes (Privy for users, API keys for companies, admin token)
 - [x] pricing and price routes (flat, per-unit, `quote`)
-- [x] buy routes (permit typed data, relayed deposit)
+- [x] buy routes
 - [x] connection routes (approve/revoke)
 - [x] charge, hold, capture, release and refund routes
 - [x] send, claim and convert routes
@@ -127,7 +82,7 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] rate limits (120 writes/min per API key, 429 with retry-after)
 
 **Indexer**
-- [x] log indexer: `eth_getLogs` paged by 1,000 blocks, 2s poll, backing-check alarm
+- [x] event indexer with a short poll and a backing-check alarm
 - [x] expired-hold sweeper and HMAC-signed webhooks
 - [x] user and merchant activity, stats
 
@@ -149,31 +104,26 @@ Never commit secrets, local data or build output. Commit example env files inste
 - [x] `<ConnectCreditsButton/>`, `<BuyCreditsButton/>`
 - [x] `<CreditsBalance/>` dropdown
 
-**Video app**
-- [ ] app scaffold (Vite, server)
-- [ ] hold on start, capture on success, release on failure
-
 **Dev scripts**
-- [x] local dev script (anvil → deploy → backend)
-- [x] Whitechain deploy and start scripts
+- [x] local dev script
 - [x] README: setup and the SDK usage page
 
 Tag `m0-core` when everything above runs locally.
 
 ---
 
-## 5. Architecture
+## 3. Architecture
 
 ```
- Demo apps (video / chat / 3D)          Hosted pages (ours)
-   frontend kit ─────────────────────►  Connect · Buy · Wallet · Dashboard
+ Demo apps (chat / images and video)     Hosted pages (ours)
+   frontend kit ─────────────────────►  Connect · Buy · Account · Dashboard
    backend kit ──┐                                │
                  ▼                                ▼
             ┌─────────────── OUR BACKEND ───────────────┐
             │ REST API · database · relayer · indexer   │
             └──────────────────────┬────────────────────┘
                                    ▼
-                  WHITECHAIN: CreditVault (USDT)
+                  NEAR: Kredo vault (USDT)
           balances, app limits, holds, charges, payouts
 ```
 
@@ -192,36 +142,29 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 
 ---
 
-## 6. Build steps after milestone 0
+## 4. Build steps after milestone 0
 
-### Step 1: Wallets and testnet funds
-- [ ] Wallets: deployer, operator/relayer, fee recipient (keys never committed)
-- [ ] WBT for gas from the faucet; test USDT from the Whitechain booth (a few thousand, spread over the demo user wallets)
-- [ ] Ask the booth: does the vault design count as "USDT payments settled on Whitechain"?
-- [x] Record the real gas cost of one `charge()`
+### Step 1: Accounts and testnet funds
+- [x] Accounts: owner, operator/relayer, fee recipient (keys never committed)
+- [x] Test USDT minted to the faucet and the demo users
+- [ ] Record the real gas cost of one `charge`
 
-**Done when:** everyone can run the repo and the wallets hold testnet funds.
+### Step 2: Contracts live on testnet
+- [x] Deploy the vault and test USDT
+- [x] Put the accounts and a real deposit transaction in the README
 
-### Step 2: Deploy CreditVault to Whitechain
-- [x] Deploy against the official test USDT; commit the deploy broadcast
-- [x] Verify on the Whitechain explorer
-- [x] Put the vault address and a real deposit tx link in the README
-
-**Done when:** the verified contract is on the explorer. Tag `m1-contract-deployed`.
-
-### Step 3: Backend on Whitechain, gas economics and anti-drain
-- [x] Run the backend against Whitechain; a curl charge appears on the explorer and in the database (tag `m2-charge-end-to-end`)
+### Step 3: Gas economics and anti-drain
 - [x] Relayer retries
-- [x] Ops panel (hidden route): relayer WBT balance, txs today, WBT spent today, days of runway
-- [x] Daily WBT budget with auto-pause, per-tx gas ceiling
+- [x] Ops panel (hidden route): relayer balance, transactions today, gas spent today, days of runway
+- [x] Daily gas budget with auto-pause, per-transaction gas ceiling
 - [x] Per-IP limits on signup and claim; minimum amounts on charge and send
-- [x] README "Relayer security" section, updated with the real numbers
+- [x] README "Gas and safety" section
 
 ### Step 4: SDK test mode and starter app
 - [x] Test mode: test API keys that work with fake credits
 - [x] A bare starter app; count its lines for the "about 20 lines" claim
 
-**Done when:** a brand-new app integrates using only the README. This is the Operate drop-in piece.
+**Done when:** a brand-new app integrates using only the README.
 
 ### Step 5: Company dashboard
 - [x] Register an app, get test and live API keys
@@ -229,22 +172,25 @@ Webhooks: charge.succeeded, hold.captured, hold.released, connection.revoked
 - [x] "What you earn" preview: dollar value and payout after fee
 - [x] Light mode: set the rate from the company's own credits
 - [x] Revenue, charges and unpaid earnings
-- [x] **Withdraw** button that pays USDT on Whitechain
-- [x] Gas line: "Your charges cost N WBT in gas this period, covered by your network fee"
+- [x] **Withdraw** button that pays USDT
+- [x] Gas line: "Your charges cost N in gas this period, covered by your network fee"
 - [x] CSV export of charges, refunds and payouts
 
-**Done when:** a company can register, set prices, see a charge arrive and withdraw USDT. Tag `m3-dashboard-payouts`.
+**Done when:** a company can register, set prices, see a charge arrive and withdraw USDT.
 
 ### Step 6: Demo apps, built only with the public SDK
 - [x] Parley (chat): `charge()` per message, refund if the model fails
-- [ ] Second and third demo apps, to be picked (one using `hold()`/`capture()`, one using a per-unit price with `quote()`)
+- [x] Lumen (images and video): per-image charges, `hold()`/`capture()` per second of video
 - [x] Each app has the balance pill, connect and buy buttons
-- [ ] Real AI keys; until then each app runs in demo mode
-- [ ] Demo apps registered on Whitechain
+- [x] Real AI keys, with a demo mode when none are set
 
-**Done when:** one user buys credits once and spends them in all three demo apps. Tag `m4-three-apps`.
-
-### Step 7: Reserves page and app directory
+### Step 7: Reserves page and ecosystem
 - [x] Reserves page: the vault's USDT next to total credits outstanding, live from the chain
-- [x] App directory: every app with its prices
-- [ ] (Optional) ENS names for apps, with prices in their records
+- [x] Ecosystem page: every app with its prices
+
+### Step 8: Everything on NEAR
+- [x] Relayer and indexer on `near-api-js`: operator calls, signed delegates, events from outcomes
+- [x] Hosted pages sign in with a Privy NEAR wallet and sign every action as a delegate action
+- [x] API tests against an in-memory NEAR chain with the vault's rules
+- [ ] SDK end-to-end script run against testnet
+- [ ] Demo apps registered on the testnet vault
