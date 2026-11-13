@@ -46,6 +46,12 @@ const CONTRACT_ERRORS: Record<string, string> = {
   DepositRefunded: "The vault turned the deposit down, so the USDT went back to your wallet.",
   PayoutFailed: "The USDT transfer failed, so the earnings stay in the vault. Check the payout account can hold USDT.",
   NotAuthorized: "That account isn't allowed to do this.",
+  // Vault storage (NEP-145). The API registers and tops up accounts before these calls, so these
+  // only show if that step failed or raced. Trying again sets the account up first.
+  NotRegistered: "This account isn't set up on the vault yet. Try again in a moment.",
+  RecipientNotRegistered: "The recipient's account isn't set up on the vault yet. Try again in a moment.",
+  InsufficientStorage: "This account needs more vault storage for that. Try again in a moment.",
+  BelowMinimumStorageDeposit: "Not enough NEAR attached to set up this account on the vault.",
 };
 
 /** The relayer's own limits. Nothing was sent, so nothing was spent. */

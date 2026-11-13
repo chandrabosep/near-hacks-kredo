@@ -14,6 +14,8 @@ before(async () => {
   chain = createFakeChain();
   db = await openDb();
   relayer = createRelayer({ chain, db, vault: chain.vault });
+  // The vault takes each new app's state from the caller's storage balance: the relayer's.
+  await relayer.write({ method: "storage_deposit", args: { account_id: chain.relayerId }, deposit: 10n ** 23n });
 });
 
 const register = (i: number) =>

@@ -31,6 +31,8 @@ let appId: string;
 const alice = newUserKey();
 const bob = newUserKey();
 const dana = newUserKey();
+const erin = newUserKey();
+const carol = newUserKey();
 const payout = "payout.kredo.test";
 
 /** Fake Privy: the token is the user's name. */
@@ -38,6 +40,8 @@ const users: Record<string, { user: ReturnType<typeof newUserKey>; email: string
   alice: { user: alice, email: "alice@example.com" },
   bob: { user: bob, email: "bob@example.com" },
   dana: { user: dana, email: "dana@example.com" },
+  erin: { user: erin, email: "erin@example.com" },
+  carol: { user: carol, email: "carol@example.com" },
 };
 const verifier: UserVerifier = async (token) => {
   const u = users[token];
@@ -72,6 +76,9 @@ async function act(user: string, action: string, input: Json) {
 }
 
 const usdtOf = (account: string) => chain.view<string>(chain.usdt, "ft_balance_of", { account_id: account });
+const storageOf = (account: string) => chain.view<{ total: string; available: string } | null>(chain.vault, "storage_balance_of", { account_id: account });
+/** What the relayer sent since `since`, by function name, oldest first. */
+const relayedSince = (since: number) => ctx.db.data.txs.slice(since).map((t) => t.fn);
 
 before(async () => {
   const config = loadConfig({
@@ -589,6 +596,66 @@ describe("api", () => {
 
     // Alice already holds USDT, so she doesn't need any.
     assert.equal((await call("POST", "/v1/me/faucet", { user: "alice" })).body.code, "faucet_not_needed");
+  });
+
+  // ---------------------------------------------------------------- vault storage (NEP-145)
+
+  test("buying as a new user registers them on the vault first, paid by the relayer", async () => {
+    chain.mint(erin.account, 5_000_000n);
+    assert.equal(await storageOf(erin.account), null);
+
+    const since = ctx.db.data.txs.length;
+    const res = await act("erin", "buy", { credits: 100 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(relayedSince(since), ["activate_account", "storage_deposit", "ft_transfer_call"]);
+    assert.equal((await storageOf(erin.account))?.available, ctx.config.vaultStorage.headroom.toString(), "registered with the headroom");
+    assert.equal((await call("GET", "/v1/me", { user: "erin" })).body.balance.credits, "100");
+
+    const again = ctx.db.data.txs.length;
+    assert.equal((await act("erin", "buy", { credits: 10 })).status, 201);
+    assert.deepEqual(relayedSince(again), ["ft_transfer_call"], "registered once");
+  });
+
+  test("sending to an account the vault hasn't seen registers the recipient first", async () => {
+    const frank = newUserKey().account;
+    assert.equal(await storageOf(frank), null);
+
+    const since = ctx.db.data.txs.length;
+    const res = await act("alice", "send", { to: frank, credits: 5 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(relayedSince(since), ["storage_deposit", "send"]);
+    assert.ok(await storageOf(frank));
+    assert.equal(await ctx.vault.balanceOf(frank), 50_000n);
+  });
+
+  test("approving an app with too little storage left tops the user up first", async () => {
+    chain.mint(carol.account, 0n); // registered with the USDT token, so the only storage_deposit below is the vault's
+    // Carol is registered with only the minimum, so a new limit can't be paid from her storage.
+    const { min } = await chain.view<{ min: string }>(chain.vault, "storage_balance_bounds");
+    await ctx.relayer.write({ method: "storage_deposit", args: { account_id: carol.account, registration_only: true }, deposit: BigInt(min) });
+    assert.equal((await storageOf(carol.account))?.available, "0");
+
+    const since = ctx.db.data.txs.length;
+    const res = await act("carol", "connect", { app: appId, credits: 20 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(relayedSince(since), ["activate_account", "storage_deposit", "approve_app"]);
+    const after = (await storageOf(carol.account))!;
+    assert.equal(after.total, (BigInt(min) + ctx.config.vaultStorage.topUp).toString(), "topped up once");
+    assert.ok(BigInt(after.available) < ctx.config.vaultStorage.topUp, "the new limit was paid from it");
+
+    // Plenty left now: changing the same limit adds no state and needs no top-up.
+    const again = ctx.db.data.txs.length;
+    assert.equal((await act("carol", "connect", { app: appId, credits: 30 })).status, 201);
+    assert.deepEqual(relayedSince(again), ["approve_app"]);
+  });
+
+  test("the same account is registered once, however many ask at the same time", async () => {
+    const someone = newUserKey().account;
+    const since = ctx.db.data.txs.length;
+    await Promise.all([ctx.storage.ensureRegistered(someone), ctx.storage.ensureRegistered(someone), ctx.storage.ensureHeadroom(someone)]);
+    assert.deepEqual(relayedSince(since), ["storage_deposit"]);
+    await ctx.storage.ensureRegistered(someone);
+    assert.equal(ctx.db.data.txs.length, since + 1, "known accounts aren't asked about again");
   });
 
   // ---------------------------------------------------------------- test mode

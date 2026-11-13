@@ -5,6 +5,7 @@ import type { KeyPairString } from "near-api-js";
 import { z } from "zod";
 import { accountIdSchema, keyFromCredentials, parseNear, TGAS, type AccountId } from "./near.js";
 import type { RelayerLimits } from "./relayer.js";
+import type { StoragePolicy } from "./storage.js";
 import { creditsToUnits } from "./units.js";
 
 export const NETWORKS = {
@@ -59,6 +60,14 @@ const envSchema = z.object({
   MAX_TX_TGAS: z.coerce.number().int().min(10).max(300).default(300),
   /** NEAR sent to a new user's implicit account so it exists onchain and can sign. */
   USER_ACCOUNT_NEAR: near.default(parseNear("0.01")),
+  /**
+   * Vault storage (NEP-145) the relayer pays for users, in NEAR. A new account is registered with
+   * the vault's minimum plus the headroom. Before a call that adds the user's own state (an app
+   * limit, a claim link: roughly 0.002 NEAR each), it's topped up when less than TOP_UP_BELOW is left.
+   */
+  VAULT_STORAGE_HEADROOM: near.default(parseNear("0.005")),
+  VAULT_STORAGE_TOP_UP_BELOW: near.default(parseNear("0.0025")),
+  VAULT_STORAGE_TOP_UP: near.default(parseNear("0.005")),
   /** Smallest charge or hold, and smallest send or claim link, in credits. Dust would only burn gas. */
   MIN_CHARGE_CREDITS: z.string().regex(/^\d+(\.\d{1,4})?$/).default("1"),
   MIN_SEND_CREDITS: z.string().regex(/^\d+(\.\d{1,4})?$/).default("1"),
@@ -101,6 +110,8 @@ export type Config = {
   relayerLimits: RelayerLimits;
   /** yoctoNEAR sent to activate a new user's account. */
   userAccountYocto: bigint;
+  /** Vault storage the relayer pays for users, in yoctoNEAR. */
+  vaultStorage: StoragePolicy;
   indexerIntervalMs: number;
   /** In USDT units. */
   minChargeUnits: bigint;
@@ -149,6 +160,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new Error("APP_DAILY_GAS_BUDGET can't be above RELAYER_DAILY_BUDGET");
   }
 
+  // One registration or one top-up must always leave enough for the next entry.
+  if (e.VAULT_STORAGE_HEADROOM < e.VAULT_STORAGE_TOP_UP_BELOW || e.VAULT_STORAGE_TOP_UP < e.VAULT_STORAGE_TOP_UP_BELOW) {
+    throw new Error("VAULT_STORAGE_HEADROOM and VAULT_STORAGE_TOP_UP can't be below VAULT_STORAGE_TOP_UP_BELOW");
+  }
+
   if ((e.PRIVY_APP_ID === undefined) !== (e.PRIVY_APP_SECRET === undefined)) {
     throw new Error("Set both PRIVY_APP_ID and PRIVY_APP_SECRET, or neither");
   }
@@ -177,6 +193,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       minBalance: e.RELAYER_MIN_BALANCE,
     },
     userAccountYocto: e.USER_ACCOUNT_NEAR,
+    vaultStorage: { headroom: e.VAULT_STORAGE_HEADROOM, topUpBelow: e.VAULT_STORAGE_TOP_UP_BELOW, topUp: e.VAULT_STORAGE_TOP_UP },
     indexerIntervalMs: e.INDEXER_INTERVAL_MS,
     minChargeUnits: creditsToUnits(e.MIN_CHARGE_CREDITS),
     minSendUnits: creditsToUnits(e.MIN_SEND_CREDITS),

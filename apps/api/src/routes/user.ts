@@ -23,7 +23,7 @@ const DAY = 86_400;
 
 export function userRoutes(ctx: Context): Router {
   const r = Router();
-  const { store, relayer, config, vault, meta, chain } = ctx;
+  const { store, relayer, config, vault, meta, chain, storage } = ctx;
 
   // Only these paths need a Privy login. Everything else falls through to the next router.
   r.use(["/me", "/claims/:claimKey/redeem"], requireUser(ctx.verifier, store, config.signupsPerIpPerHour));
@@ -269,10 +269,25 @@ export function userRoutes(ctx: Context): Router {
     }
     if (p.meta.action !== action) throw new HttpError(400, `That request is for "${String(p.meta.action)}"`, "wrong_action");
     const app = typeof p.meta.app === "string" ? p.meta.app : undefined;
-    const result = await relayer.send(u.address, [{ kind: "delegate", delegate: p.delegate, signature: p.signature }], {
-      fn: String(p.meta.method),
-      app,
-    });
+    const relay = () =>
+      relayer.send(u.address, [{ kind: "delegate", delegate: p.delegate, signature: p.signature }], {
+        fn: String(p.meta.method),
+        app,
+      });
+    // The vault holds nothing for an account nobody paid storage for, and takes a user's new limit or
+    // claim link from their own storage balance. The relayer registers and tops up first.
+    let result;
+    if (action === "buy") {
+      await storage.ensureRegistered(u.address);
+      result = await relay();
+    } else if (action === "send") {
+      await storage.ensureRegistered(String(p.meta.to));
+      result = await relay();
+    } else if (action === "connect" || action === "claim") {
+      result = await storage.withHeadroom(u.address, relay);
+    } else {
+      result = await relay();
+    }
     const { hash } = result;
 
     switch (action) {
@@ -293,7 +308,10 @@ export function userRoutes(ctx: Context): Router {
       }
       case "buy": {
         // If the vault turned the deposit down, the token refunds it, and there's no deposited event.
-        if (!result.events.some((e) => e.event === "deposited")) throw new RelayerError("DepositRefunded", hash);
+        if (!result.events.some((e) => e.event === "deposited")) {
+          const refunded = result.events.find((e) => e.event === "deposit_refunded");
+          throw new RelayerError(refunded?.data.reason === "not_registered" ? "NotRegistered" : "DepositRefunded", hash);
+        }
         return void res.status(201).json({ amount: amount(BigInt(String(p.meta.amount))), ...txInfo(ctx, hash) });
       }
     }
@@ -315,6 +333,7 @@ export function userRoutes(ctx: Context): Router {
     const to = me(res);
     const before = await vault.getClaim(claimKey);
     if (!before || before.status !== "Open") throw new RelayerError("ClaimNotOpen");
+    await storage.ensureRegistered(to);
     const { hash } = await relayer.write({
       method: "claim",
       args: { claim_key: claimKey, to, signature: Buffer.from(sig.replace(/^0x/, ""), "hex").toString("base64") },

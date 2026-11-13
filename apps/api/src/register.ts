@@ -11,6 +11,8 @@ export async function registerApp(
   const feeBps = input.feeBps ?? ctx.config.networkFeeBps;
   const { app, apiKey } = ctx.store.createApp({ name: input.name, payout: input.payout, feeBps, owner: input.owner, companyId: input.companyId, profile: input.profile });
   try {
+    // The vault takes the new app's state from the caller's storage balance: here, the relayer's.
+    await ctx.storage.ensureHeadroom(ctx.relayer.operator);
     const { hash } = await ctx.relayer.write(
       {
         method: "register_app",
