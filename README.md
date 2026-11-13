@@ -37,8 +37,6 @@ Timeline, with outside records:
 | `kredo@0.2.0` and `0.2.1` published (NEAR) | 13 Nov 17:46 to 17:49 | [npm](https://www.npmjs.com/package/kredo?activeTab=versions) |
 | NEAR port committed | 13 Nov | commits after `ethglobal-final` |
 
-**An earlier copy of this repo.** The first copy of this repo, created 13 Nov 16:38 UTC, had a recreated history whose commit dates (8 to 12 Nov) did not match when the work was done. It was deleted and replaced by this one, which keeps the real history. The `gitHead` recorded on npm for `kredo@0.2.0`, `kredo@0.2.1` and `kredo-react@0.2.0` points at commits in that deleted copy; the code in those packages is identical to `packages/` here.
-
 **New for NEAR** (everything else, such as the hosted pages, dashboard, docs site, SDK surface and the Parley and Lumen demos, was carried over and only adapted for NEAR account IDs):
 
 - **Vault contract rewritten in Rust** ([contracts/vault](contracts/vault/src/lib.rs)): deposits through `ft_transfer_call`, per-app limits, charge, hold, capture and release, refunds, transfers, claim links and payouts, with NEP-297 events and 37 unit tests. It replaces the Solidity `CreditVault` and its Foundry tests, which are removed.
