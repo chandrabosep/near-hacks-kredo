@@ -59,7 +59,7 @@ export function Ecosystem() {
       <Hero apps={ranked} stats={stats} />
 
       {/* Filters, sort and search: one hairline row of cells, like the grid below. */}
-      <div className="sticky top-16 z-20 grid border-b border-wc-border-light bg-wc-surface/95 backdrop-blur-md lg:top-[76px] lg:grid-cols-[1fr_auto_360px]">
+      <div className="sticky top-16 z-20 grid border-b border-kr-border-light bg-kr-surface/95 backdrop-blur-md lg:top-[76px] lg:grid-cols-[1fr_auto_360px]">
         <nav aria-label="Categories" className="flex h-14 gap-7 overflow-x-auto px-6 sm:px-8 lg:px-16">
           <Tab active={category === "all"} onClick={() => setCategory("all")} count={ranked.length}>
             All
@@ -72,14 +72,14 @@ export function Ecosystem() {
               </Tab>
             ))}
         </nav>
-        <div className="hidden h-14 items-center gap-1 border-l border-wc-border-light px-6 text-[14px] lg:flex">
-          <span className="mr-2 text-wc-icon-muted">Sort</span>
+        <div className="hidden h-14 items-center gap-1 border-l border-kr-border-light px-6 text-[14px] lg:flex">
+          <span className="mr-2 text-kr-icon-muted">Sort</span>
           {(["used", "new"] as const).map((k) => (
             <button
               key={k}
               type="button"
               onClick={() => setSort(k)}
-              className={cn("rounded-[8px] px-2.5 py-1 font-medium transition-colors", sort === k ? "bg-wc-surface-2 text-wc-text-1" : "text-wc-text-muted hover:text-wc-navy")}
+              className={cn("rounded-[8px] px-2.5 py-1 font-medium transition-colors", sort === k ? "bg-kr-surface-2 text-kr-text-1" : "text-kr-text-muted hover:text-kr-navy")}
             >
               {k === "used" ? "Most used" : "Newest"}
             </button>
@@ -95,10 +95,10 @@ export function Ecosystem() {
       )}
 
       {!apps && !error && (
-        <div className="grid gap-px bg-wc-border-light md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-px bg-kr-border-light md:grid-cols-2 xl:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="bg-wc-surface p-8">
-              <div className="h-48 animate-pulse rounded-control bg-wc-surface-2" />
+            <div key={i} className="bg-kr-surface p-8">
+              <div className="h-48 animate-pulse rounded-control bg-kr-surface-2" />
             </div>
           ))}
         </div>
@@ -106,21 +106,21 @@ export function Ecosystem() {
 
       {apps && shown.length === 0 && (
         <div className="px-6 py-20 text-center sm:px-8 lg:px-16">
-          <p className="text-[18px] font-medium text-wc-text-1">No apps match that.</p>
-          <button type="button" className="mt-2 text-[15px] font-medium text-wc-blue hover:underline" onClick={() => (setQuery(""), setCategory("all"))}>
+          <p className="text-[18px] font-medium text-kr-text-1">No apps match that.</p>
+          <button type="button" className="mt-2 text-[15px] font-medium text-kr-blue hover:underline" onClick={() => (setQuery(""), setCategory("all"))}>
             Show every app
           </button>
         </div>
       )}
 
       {shown.length > 0 && (
-        <div className="grid auto-rows-fr gap-px bg-wc-border-light md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid auto-rows-fr gap-px bg-kr-border-light md:grid-cols-2 xl:grid-cols-3">
           {shown.map((app) => (
             <AppCard key={app.id} app={app} badge={app.id === topId ? "Most used" : now && now - Date.parse(app.listedAt) < NEW_FOR_MS ? "New" : undefined} />
           ))}
           {/* Keep the hairline grid even. */}
           {Array.from({ length: (3 - (shown.length % 3)) % 3 }, (_, i) => (
-            <div key={i} className="hidden bg-wc-surface xl:block" />
+            <div key={i} className="hidden bg-kr-surface xl:block" />
           ))}
         </div>
       )}
@@ -132,17 +132,17 @@ export function Ecosystem() {
 
 function Hero({ apps, stats }: { apps: DirectoryApp[]; stats?: Stats }) {
   return (
-    <section className="relative overflow-hidden border-b border-wc-border-light">
+    <section className="relative overflow-hidden border-b border-kr-border-light">
       <div aria-hidden className="bg-plus pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,#000,transparent)]" />
       <div className="relative grid gap-10 px-6 pt-section-t pb-12 sm:px-8 lg:grid-cols-[1fr_auto] lg:gap-16 lg:px-16 lg:pb-16">
         <div className="motion-safe:animate-rise">
-          <p className="inline-flex items-center gap-2 rounded-[20px] border border-wc-border-light bg-wc-surface px-3 py-1 text-[13px] font-medium text-wc-text-2">
-            <span className="size-1.5 rounded-full bg-wc-mint-2" />
-            {apps.length ? `${apps.length} ${apps.length === 1 ? "app" : "apps"} live on Whitechain` : "Live on Whitechain"}
+          <p className="inline-flex items-center gap-2 rounded-[20px] border border-kr-border-light bg-kr-surface px-3 py-1 text-[13px] font-medium text-kr-text-2">
+            <span className="size-1.5 rounded-full bg-kr-mint-2" />
+            {apps.length ? `${apps.length} ${apps.length === 1 ? "app" : "apps"} live on NEAR` : "Live on NEAR"}
           </p>
-          <h1 className="type-hero mt-6 max-w-2xl font-semibold text-balance text-wc-text-1">Every app on the network.</h1>
-          <p className="mt-5 max-w-2xl text-[17px] leading-[1.625] text-wc-text-muted">
-            One balance works in every app below. Each app can spend only what you approve for it, and every charge settles on Whitechain.
+          <h1 className="type-hero mt-6 max-w-2xl font-semibold text-balance text-kr-text-1">Every app on the network.</h1>
+          <p className="mt-5 max-w-2xl text-[17px] leading-[1.625] text-kr-text-muted">
+            One balance works in every app below. Each app can spend only what you approve for it, and every charge settles on NEAR.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/buy" className={buttonVariants({ size: "lg" })}>
@@ -154,7 +154,7 @@ function Hero({ apps, stats }: { apps: DirectoryApp[]; stats?: Stats }) {
           </div>
         </div>
         {/* Live network numbers, top right. */}
-        <div className="grid grid-cols-2 self-start overflow-hidden rounded-[16px] border border-wc-border-light bg-wc-surface lg:w-[420px]">
+        <div className="grid grid-cols-2 self-start overflow-hidden rounded-[16px] border border-kr-border-light bg-kr-surface lg:w-[420px]">
           <Metric label="Apps" value={stats ? String(stats.apps) : undefined} />
           <Metric label="Funded users" value={stats ? String(stats.users) : undefined} />
           <Metric label="Spent across apps" value={stats ? fmtCredits(stats.spent, { unit: false }) : undefined} />
@@ -167,9 +167,9 @@ function Hero({ apps, stats }: { apps: DirectoryApp[]; stats?: Stats }) {
 
 function Metric({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="border-wc-border-light px-6 py-5 odd:border-r [&:nth-child(-n+2)]:border-b">
-      <p className="text-[28px] leading-none text-wc-text-1">{value ?? <span className="inline-block h-7 w-14 animate-pulse rounded bg-wc-surface-2 align-middle" />}</p>
-      <p className="mt-2 text-[14px] text-wc-text-muted">{label}</p>
+    <div className="border-kr-border-light px-6 py-5 odd:border-r [&:nth-child(-n+2)]:border-b">
+      <p className="text-[28px] leading-none text-kr-text-1">{value ?? <span className="inline-block h-7 w-14 animate-pulse rounded bg-kr-surface-2 align-middle" />}</p>
+      <p className="mt-2 text-[14px] text-kr-text-muted">{label}</p>
     </div>
   );
 }
@@ -191,10 +191,10 @@ function SearchBox({ value, onChange, results }: { value: string; onChange: (v: 
   }, []);
 
   return (
-    <div className="group/search relative border-t border-wc-border-light transition-colors focus-within:bg-wc-bg lg:border-t-0 lg:border-l">
+    <div className="group/search relative border-t border-kr-border-light transition-colors focus-within:bg-kr-bg lg:border-t-0 lg:border-l">
       <InputGroup className="h-14 rounded-none border-0 px-4 sm:px-6 has-[[data-slot=input-group-control]:focus-visible]:border-0 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
         <InputGroupAddon>
-          <Search className="size-[18px] text-wc-icon-muted group-focus-within/input-group:text-wc-blue" />
+          <Search className="size-[18px] text-kr-icon-muted group-focus-within/input-group:text-kr-blue" />
         </InputGroupAddon>
         <InputGroupInput
           ref={ref}
@@ -204,16 +204,16 @@ function SearchBox({ value, onChange, results }: { value: string; onChange: (v: 
           onKeyDown={(e) => e.key === "Escape" && (onChange(""), e.currentTarget.blur())}
           placeholder="Search the network"
           aria-label="Search the network"
-          className="h-full text-[15px] text-wc-text-1 md:text-[15px] placeholder:text-wc-icon-muted [&::-webkit-search-cancel-button]:hidden"
+          className="h-full text-[15px] text-kr-text-1 md:text-[15px] placeholder:text-kr-icon-muted [&::-webkit-search-cancel-button]:hidden"
         />
         <InputGroupAddon align="inline-end">
           {results !== undefined && (
-            <InputGroupText className="text-[13px] font-normal text-wc-text-muted" aria-live="polite">
+            <InputGroupText className="text-[13px] font-normal text-kr-text-muted" aria-live="polite">
               {results} {results === 1 ? "result" : "results"}
             </InputGroupText>
           )}
           {value ? (
-            <InputGroupButton size="icon-xs" aria-label="Clear search" onClick={() => onChange("")} className="rounded-full text-wc-icon-muted hover:text-wc-navy">
+            <InputGroupButton size="icon-xs" aria-label="Clear search" onClick={() => onChange("")} className="rounded-full text-kr-icon-muted hover:text-kr-navy">
               <X />
             </InputGroupButton>
           ) : (
@@ -222,7 +222,7 @@ function SearchBox({ value, onChange, results }: { value: string; onChange: (v: 
         </InputGroupAddon>
       </InputGroup>
       {/* The focused field gets the same blue edge as the active tab. */}
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-wc-blue opacity-0 transition-opacity group-focus-within/search:opacity-100" />
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-kr-blue opacity-0 transition-opacity group-focus-within/search:opacity-100" />
     </div>
   );
 }
@@ -235,12 +235,12 @@ function Tab({ active, onClick, count, children }: { active: boolean; onClick: (
       aria-pressed={active}
       className={cn(
         "relative flex shrink-0 items-center gap-1.5 text-[15px] font-medium whitespace-nowrap transition-colors",
-        active ? "text-wc-text-1" : "text-wc-text-muted hover:text-wc-navy",
+        active ? "text-kr-text-1" : "text-kr-text-muted hover:text-kr-navy",
       )}
     >
       {children}
-      <span className={cn("font-mono text-[11px]", active ? "text-wc-blue" : "text-wc-icon-muted")}>{count}</span>
-      <span className={cn("absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-wc-blue transition-opacity", active ? "opacity-100" : "opacity-0")} />
+      <span className={cn("font-mono text-[11px]", active ? "text-kr-blue" : "text-kr-icon-muted")}>{count}</span>
+      <span className={cn("absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-kr-blue transition-opacity", active ? "opacity-100" : "opacity-0")} />
     </button>
   );
 }
@@ -258,58 +258,58 @@ function AppCard({ app, badge }: { app: DirectoryApp; badge?: string }) {
   return (
     <Wrapper
       {...(app.website ? { href: app.website, target: "_blank", rel: "noreferrer" } : {})}
-      className="group flex h-full flex-col bg-wc-surface px-6 py-8 transition-colors hover:bg-wc-bg sm:px-8 lg:px-10"
+      className="group flex h-full flex-col bg-kr-surface px-6 py-8 transition-colors hover:bg-kr-bg sm:px-8 lg:px-10"
     >
       {/* Header: 56px. */}
       <div className="flex h-14 items-center gap-4">
         <BrandLogo src={app.logoUrl} name={app.name} className="size-14 rounded-[16px] text-[22px]" />
         <div className="min-w-0 flex-1">
           <div className="flex h-7 items-center gap-2">
-            <p className="truncate text-[19px] font-semibold text-wc-text-1">{app.name}</p>
+            <p className="truncate text-[19px] font-semibold text-kr-text-1">{app.name}</p>
             {badge && (
-              <span className={cn("shrink-0 rounded-[20px] px-2 py-0.5 text-[11px] font-semibold", badge === "New" ? "bg-wc-mint-pastel text-wc-navy" : "bg-wc-blue/10 text-wc-blue")}>{badge}</span>
+              <span className={cn("shrink-0 rounded-[20px] px-2 py-0.5 text-[11px] font-semibold", badge === "New" ? "bg-kr-mint-pastel text-kr-navy" : "bg-kr-blue/10 text-kr-blue")}>{badge}</span>
             )}
           </div>
-          <p className="h-5 truncate text-[14px] leading-5 text-wc-text-muted">{app.company ? `by ${app.company.name}` : "Independent app"}</p>
+          <p className="h-5 truncate text-[14px] leading-5 text-kr-text-muted">{app.company ? `by ${app.company.name}` : "Independent app"}</p>
         </div>
-        <ArrowUpRight className={cn("size-4 shrink-0 self-start text-wc-icon-muted transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-wc-blue", !app.website && "invisible")} />
+        <ArrowUpRight className={cn("size-4 shrink-0 self-start text-kr-icon-muted transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-kr-blue", !app.website && "invisible")} />
       </div>
 
       {/* Tags: 24px, always present. */}
       <div className="mt-5 flex h-6 gap-2 overflow-hidden">
         {(tags.length ? tags : ["Uncategorised"]).map((t) => (
-          <span key={t} className={cn("flex h-6 shrink-0 items-center rounded-[20px] px-2.5 text-[12px] font-medium", tags.length ? "bg-wc-surface-2 text-wc-text-2" : "border border-dashed border-wc-border text-wc-icon-muted")}>
+          <span key={t} className={cn("flex h-6 shrink-0 items-center rounded-[20px] px-2.5 text-[12px] font-medium", tags.length ? "bg-kr-surface-2 text-kr-text-2" : "border border-dashed border-kr-border text-kr-icon-muted")}>
             {t}
           </span>
         ))}
       </div>
 
       {/* Description: two lines, 48px. */}
-      <p className={cn("mt-4 line-clamp-2 h-12 text-[15px] leading-6", app.description ? "text-wc-text-2" : "text-wc-icon-muted")}>{app.description ?? "No description yet."}</p>
+      <p className={cn("mt-4 line-clamp-2 h-12 text-[15px] leading-6", app.description ? "text-kr-text-2" : "text-kr-icon-muted")}>{app.description ?? "No description yet."}</p>
 
       {/* Price: one 44px row, the first price and how many more. */}
-      <div className="mt-5 mb-5 flex h-11 items-center justify-between gap-4 border-y border-wc-border-light text-[14px]">
+      <div className="mt-5 mb-5 flex h-11 items-center justify-between gap-4 border-y border-kr-border-light text-[14px]">
         {first ? (
           <>
             <span className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-mono text-[13px] text-wc-text-2">{first[0]}</span>
-              {prices.length > 1 && <span className="shrink-0 text-[12px] text-wc-icon-muted">+{prices.length - 1} more</span>}
+              <span className="truncate font-mono text-[13px] text-kr-text-2">{first[0]}</span>
+              {prices.length > 1 && <span className="shrink-0 text-[12px] text-kr-icon-muted">+{prices.length - 1} more</span>}
             </span>
-            <span className="shrink-0 font-medium text-wc-text-1">{describePrice(first[1])}</span>
+            <span className="shrink-0 font-medium text-kr-text-1">{describePrice(first[1])}</span>
           </>
         ) : (
-          <span className="text-[13px] text-wc-icon-muted">{app.exchangeRate ? "Sells its own credits for ours" : "No prices listed yet"}</span>
+          <span className="text-[13px] text-kr-icon-muted">{app.exchangeRate ? "Sells its own credits for ours" : "No prices listed yet"}</span>
         )}
       </div>
 
       {/* Footer: 20px, pinned to the bottom. */}
-      <div className="mt-auto flex h-5 shrink-0 items-center justify-between gap-4 text-[13px] leading-5 text-wc-text-muted">
+      <div className="mt-auto flex h-5 shrink-0 items-center justify-between gap-4 text-[13px] leading-5 text-kr-text-muted">
         <span className="truncate">
           {app.usage.charges > 0
             ? `${app.usage.charges} ${app.usage.charges === 1 ? "charge" : "charges"} · ${app.usage.payingUsers} paying ${app.usage.payingUsers === 1 ? "user" : "users"}`
             : "No charges yet"}
         </span>
-        {app.website && <span className="shrink-0 truncate font-medium text-wc-blue">{hostOf(app.website)}</span>}
+        {app.website && <span className="shrink-0 truncate font-medium text-kr-blue">{hostOf(app.website)}</span>}
       </div>
     </Wrapper>
   );
@@ -317,12 +317,12 @@ function AppCard({ app, badge }: { app: DirectoryApp; badge?: string }) {
 
 function BuildBand() {
   return (
-    <section className="relative overflow-hidden bg-wc-surface-dark text-wc-text-dark-2">
+    <section className="relative overflow-hidden bg-kr-surface-dark text-kr-text-dark-2">
       <div className="relative px-6 py-16 sm:px-8 lg:px-16 lg:py-20">
-        <p className="text-[13px] font-medium text-wc-text-dark-3">For builders</p>
+        <p className="text-[13px] font-medium text-kr-text-dark-3">For builders</p>
         <h2 className="type-section mt-3 max-w-xl font-semibold text-white">Your app could be here.</h2>
         <p className="mt-4 max-w-lg text-[16px] leading-7">
-          Join the network in about 20 lines. Users who already hold a balance can pay you on day one, and you&apos;re paid in USDT on Whitechain.
+          Join the network in about 20 lines. Users who already hold a balance can pay you on day one, and you&apos;re paid in USDT on NEAR.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/dashboard" className={buttonVariants({ size: "lg" })}>

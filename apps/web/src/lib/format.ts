@@ -18,10 +18,11 @@ export function usd(a: Amount | string): string {
   return `$${Number(whole).toLocaleString("en-US")}.${cents}`;
 }
 
-/** 0xA81a…e3EF */
-export function short(address: string | undefined, chars = 4): string {
-  if (!address) return "";
-  return `${address.slice(0, chars + 2)}…${address.slice(-chars)}`;
+/** A long NEAR account, shortened: "7755c1f0…c2e4". Named accounts under 24 characters stay whole. */
+export function short(account: string | undefined, chars = 4): string {
+  if (!account) return "";
+  if (account.length <= 24) return account;
+  return `${account.slice(0, chars + 2)}…${account.slice(-chars)}`;
 }
 
 /** "just now", "5 min ago", "3 h ago", then a date. */
@@ -59,4 +60,12 @@ export function safeReturnTo(raw: string | null): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** yoctoNEAR as NEAR, to `digits` places. */
+export function formatNear(yocto: string, digits = 4): string {
+  const v = BigInt(yocto);
+  const whole = v / BigInt(10) ** BigInt(24);
+  const frac = (v % BigInt(10) ** BigInt(24)).toString().padStart(24, "0").slice(0, digits);
+  return `${whole}.${frac}`;
 }

@@ -104,13 +104,13 @@ export function ApiKeys({ base }: { base: string }) {
       </Panel>
 
       {!keys ? (
-        <div className="h-24 animate-pulse rounded-control bg-wc-surface-2" />
+        <div className="h-24 animate-pulse rounded-control bg-kr-surface-2" />
       ) : (
         <Panel title="Your keys" lead={`${active.length} active${revoked.length ? `, ${revoked.length} revoked` : ""}`} flush>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-[14px]">
-            <thead className="bg-wc-bg text-[13px] text-wc-text-muted">
-              <tr className="border-b border-wc-border-light">
+            <thead className="bg-kr-bg text-[13px] text-kr-text-muted">
+              <tr className="border-b border-kr-border-light">
                 <th className="py-3 pl-4 font-medium">Name</th>
                 <th className="py-3 font-medium">Key</th>
                 <th className="py-3 font-medium">Created</th>
@@ -118,18 +118,18 @@ export function ApiKeys({ base }: { base: string }) {
                 <th className="py-3 pr-4" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-wc-border-light">
+            <tbody className="divide-y divide-kr-border-light">
               {[...active, ...revoked].map((k) => (
-                <tr key={k.id} className={cn(k.revokedAt && "text-wc-icon-muted")}>
+                <tr key={k.id} className={cn(k.revokedAt && "text-kr-icon-muted")}>
                   <td className="py-3 pl-4">
-                    <span className="font-medium text-wc-text-1">{k.name}</span>
-                    <span className={cn("ml-2 rounded-[20px] px-2 py-0.5 text-[12px] font-medium", k.mode === "live" ? "bg-wc-blue/10 text-wc-blue" : "bg-wc-neutral-80 text-wc-text-2")}>
+                    <span className="font-medium text-kr-text-1">{k.name}</span>
+                    <span className={cn("ml-2 rounded-[20px] px-2 py-0.5 text-[12px] font-medium", k.mode === "live" ? "bg-kr-blue/10 text-kr-blue" : "bg-kr-neutral-80 text-kr-text-2")}>
                       {k.mode === "live" ? "Live" : "Test"}
                     </span>
                   </td>
                   <td className="py-3 font-mono text-[13px]">{k.prefix}…</td>
-                  <td className="py-3 text-wc-text-muted">{ago(k.createdAt)}</td>
-                  <td className="py-3 text-wc-text-muted">{k.lastUsedAt ? ago(k.lastUsedAt) : "Never"}</td>
+                  <td className="py-3 text-kr-text-muted">{ago(k.createdAt)}</td>
+                  <td className="py-3 text-kr-text-muted">{k.lastUsedAt ? ago(k.lastUsedAt) : "Never"}</td>
                   <td className="py-3 pr-4 text-right">
                     {k.revokedAt ? (
                       <span className="text-[13px]">Revoked {ago(k.revokedAt)}</span>

@@ -43,12 +43,12 @@ export function NewApp() {
         <DashHeader title={`${made.name} is live.`} lead="Registered onchain. Copy your keys now: each is shown only once. Keep them on your server." />
         <div className="max-w-3xl space-y-6 px-6 py-8 sm:px-8 lg:px-12">
           <div>
-            <p className="mb-2 text-[13px] font-medium text-wc-text-muted">Live key, real credits</p>
+            <p className="mb-2 text-[13px] font-medium text-kr-text-muted">Live key, real credits</p>
             <CopyValue value={made.apiKey} />
           </div>
           {made.testKey && (
             <div>
-              <p className="mb-2 text-[13px] font-medium text-wc-text-muted">Test key, fake credits and nothing onchain</p>
+              <p className="mb-2 text-[13px] font-medium text-kr-text-muted">Test key, fake credits and nothing onchain</p>
               <CopyValue value={made.testKey} />
             </div>
           )}
@@ -85,7 +85,7 @@ export function NewApp() {
               placeholder="Your wallet, by default"
               value={form.payout}
               onChange={(e) => set("payout")(e.target.value)}
-              hint="Where your USDT earnings go on Whitechain."
+              hint="Where your USDT earnings go on NEAR."
             />
             {error && (
               <div className="sm:col-span-2">
@@ -101,8 +101,8 @@ export function NewApp() {
           </div>
           </Panel>
         </div>
-        <aside className="border-t border-wc-border-light bg-wc-bg px-6 py-8 sm:px-8 lg:py-10 xl:border-t-0 xl:border-l">
-          <p className="text-[15px] font-semibold text-wc-text-1">What you get</p>
+        <aside className="border-t border-kr-border-light bg-kr-bg px-6 py-8 sm:px-8 lg:py-10 xl:border-t-0 xl:border-l">
+          <p className="text-[15px] font-semibold text-kr-text-1">What you get</p>
           <ul className="mt-5 space-y-5">
             <Point icon={<Check className="size-4" />} title="An onchain identity">
               Your app is registered on the vault, with its own earnings.
@@ -126,10 +126,10 @@ export function NewApp() {
 function Point({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
     <li className="flex gap-3">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-wc-border-light bg-wc-surface text-wc-blue">{icon}</span>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-kr-border-light bg-kr-surface text-kr-blue">{icon}</span>
       <div>
-        <p className="text-[14px] font-medium text-wc-text-1">{title}</p>
-        <p className="mt-0.5 text-[14px] leading-5 text-wc-text-muted">{children}</p>
+        <p className="text-[14px] font-medium text-kr-text-1">{title}</p>
+        <p className="mt-0.5 text-[14px] leading-5 text-kr-text-muted">{children}</p>
       </div>
     </li>
   );

@@ -54,14 +54,14 @@ export function AmountField({
               onClick={() => onChange(q)}
               className={cn(
                 "h-8 rounded-[20px] border px-3 text-[13px] font-medium transition-colors disabled:opacity-40",
-                value === q ? "border-wc-navy bg-wc-navy text-white" : "border-wc-border-light text-wc-text-2 hover:border-wc-border hover:text-wc-navy",
+                value === q ? "border-kr-navy bg-kr-navy text-white" : "border-kr-border-light text-kr-text-2 hover:border-kr-border hover:text-kr-navy",
               )}
             >
               {isMax ? "Max" : q}
             </button>
           );
         })}
-        <span className={cn("ml-auto text-[13px]", over ? "text-wc-error" : "text-wc-icon-muted")}>
+        <span className={cn("ml-auto text-[13px]", over ? "text-kr-error" : "text-kr-icon-muted")}>
           {over ? (overText ?? `You have ${fmtCredits(balance)}`) : (hint ?? "")}
         </span>
       </div>

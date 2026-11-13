@@ -17,16 +17,16 @@ export function CompanySettings() {
     <>
       <DashHeader title="Company" lead="Shown to users on the network page and the connect page, so they know who they're paying." />
 
-      <section className="border-b border-wc-border-light px-6 py-8 sm:px-8 lg:px-12 lg:py-10">
-        <div className="flex items-center gap-4 rounded-[16px] border border-wc-border-light bg-wc-surface p-6">
+      <section className="border-b border-kr-border-light px-6 py-8 sm:px-8 lg:px-12 lg:py-10">
+        <div className="flex items-center gap-4 rounded-[16px] border border-kr-border-light bg-kr-surface p-6">
           <BrandLogo src={company.logoUrl} name={company.name} className="size-14 rounded-[16px] text-[22px]" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[18px] font-semibold text-wc-text-1">{company.name}</p>
-            <p className="truncate text-[14px] text-wc-text-muted">
+            <p className="truncate text-[18px] font-semibold text-kr-text-1">{company.name}</p>
+            <p className="truncate text-[14px] text-kr-text-muted">
               {[company.category && CATEGORIES[company.category], company.website && hostOf(company.website), company.supportEmail].filter(Boolean).join(" · ") || "Add a website and support email"}
             </p>
           </div>
-          <p className="hidden text-[13px] text-wc-icon-muted sm:block">
+          <p className="hidden text-[13px] text-kr-icon-muted sm:block">
             {apps.length} {apps.length === 1 ? "app" : "apps"}
           </p>
         </div>

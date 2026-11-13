@@ -8,7 +8,7 @@ const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["lati
 
 export const metadata: Metadata = {
   title: { default: "Kredo", template: "%s · Kredo" },
-  description: "The shared value network for applications. Users carry one balance across every app, and each app is paid in USDT for what its users spend. Built on Whitechain.",
+  description: "The shared value network for applications. Users carry one balance across every app, and each app is paid in USDT for what its users spend. Built on NEAR.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

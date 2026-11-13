@@ -23,19 +23,19 @@ export function ActivityRow({ e, me, when }: { e: ActivityItem; me: string; when
   const d = describe(e, me);
   const hash = e.txHash ?? e.id.split(":")[0];
   return (
-    <a href={e.explorer} target="_blank" rel="noreferrer" className="group grid h-[72px] grid-cols-[auto_1fr_auto] items-center gap-4 px-4 transition-colors hover:bg-wc-bg sm:grid-cols-[auto_1fr_auto_auto] sm:px-5">
+    <a href={e.explorer} target="_blank" rel="noreferrer" className="group grid h-[72px] grid-cols-[auto_1fr_auto] items-center gap-4 px-4 transition-colors hover:bg-kr-bg sm:grid-cols-[auto_1fr_auto_auto] sm:px-5">
       <span
         className={cn(
           "flex size-10 shrink-0 items-center justify-center rounded-full",
-          d.sign === "+" ? "bg-wc-mint-pastel/60 text-emerald-700" : d.sign === "-" ? "bg-wc-blue/8 text-wc-blue" : "bg-wc-surface-2 text-wc-text-muted",
+          d.sign === "+" ? "bg-kr-mint-pastel/60 text-emerald-700" : d.sign === "-" ? "bg-kr-blue/8 text-kr-blue" : "bg-kr-surface-2 text-kr-text-muted",
         )}
       >
         {iconFor(e.type, d.sign)}
       </span>
 
       <div className="min-w-0">
-        <p className="truncate text-[15px] font-medium text-wc-text-1">{d.title}</p>
-        <p className="truncate text-[13px] text-wc-icon-muted">
+        <p className="truncate text-[15px] font-medium text-kr-text-1">{d.title}</p>
+        <p className="truncate text-[13px] text-kr-icon-muted">
           {d.detail ? `${d.detail} · ` : ""}
           {when === "time" ? clock(e.at) : when}
         </p>
@@ -46,20 +46,20 @@ export function ActivityRow({ e, me, when }: { e: ActivityItem; me: string; when
           <span className="size-1.5 rounded-full bg-emerald-600" />
           Confirmed
         </span>
-        <span className="mt-0.5 font-mono text-[12px] text-wc-icon-muted group-hover:text-wc-blue">{short(hash, 6)}</span>
+        <span className="mt-0.5 font-mono text-[12px] text-kr-icon-muted group-hover:text-kr-blue">{short(hash, 6)}</span>
       </div>
 
       <div className="w-28 text-right">
         {d.amount ? (
           <>
-            <p className={cn("font-mono text-[15px]", d.sign === "+" ? "text-emerald-700" : d.sign === "-" ? "text-wc-text-1" : "text-wc-icon-muted")}>
+            <p className={cn("font-mono text-[15px]", d.sign === "+" ? "text-emerald-700" : d.sign === "-" ? "text-kr-text-1" : "text-kr-icon-muted")}>
               {d.sign === "-" ? "−" : d.sign}
               {credits(d.amount, { unit: false })}
             </p>
-            <p className="text-[12px] text-wc-icon-muted">{usd(d.amount)}</p>
+            <p className="text-[12px] text-kr-icon-muted">{usd(d.amount)}</p>
           </>
         ) : (
-          <p className="text-[13px] text-wc-icon-muted">No change</p>
+          <p className="text-[13px] text-kr-icon-muted">No change</p>
         )}
       </div>
     </a>

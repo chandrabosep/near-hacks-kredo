@@ -23,7 +23,7 @@ export function NetworkStats() {
 
   const v = (x: string | number | undefined) => (s ? x : "…");
   return (
-    <Tiles className="border-t border-wc-border-light sm:grid-cols-2 lg:grid-cols-4">
+    <Tiles className="border-t border-kr-border-light sm:grid-cols-2 lg:grid-cols-4">
       <Tile>
         <Stat label="USDT bought into credits" value={v(s && usd(s.deposited))} />
       </Tile>

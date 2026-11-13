@@ -37,13 +37,13 @@ export function Connections({ connections, apps, onChange }: { connections: Conn
 
   if (active.length === 0 && past.length === 0) {
     return (
-      <div className="flex flex-col items-start gap-4 rounded-[16px] border border-dashed border-wc-border p-8">
-        <span className="flex size-10 items-center justify-center rounded-[12px] bg-wc-blue/8 text-wc-blue">
+      <div className="flex flex-col items-start gap-4 rounded-[16px] border border-dashed border-kr-border p-8">
+        <span className="flex size-10 items-center justify-center rounded-[12px] bg-kr-blue/8 text-kr-blue">
           <Compass className="size-5" />
         </span>
         <div>
-          <p className="text-[16px] font-medium text-wc-text-1">No apps connected yet</p>
-          <p className="mt-1 text-[14px] text-wc-text-muted">When an app asks to connect, you choose its limit and it shows up here.</p>
+          <p className="text-[16px] font-medium text-kr-text-1">No apps connected yet</p>
+          <p className="mt-1 text-[14px] text-kr-text-muted">When an app asks to connect, you choose its limit and it shows up here.</p>
         </div>
         <Link href="/ecosystem" className={buttonVariants({ variant: "outline" })}>
           Explore the network
@@ -61,25 +61,25 @@ export function Connections({ connections, apps, onChange }: { connections: Conn
           {active.map((c) => {
             const p = profile(c.app);
             return (
-              <div key={c.app} className="flex h-full flex-col rounded-[16px] border border-wc-border-light bg-wc-surface p-5">
+              <div key={c.app} className="flex h-full flex-col rounded-[16px] border border-kr-border-light bg-kr-surface p-5">
                 <div className="flex h-12 items-center gap-3">
                   <BrandLogo src={p?.logoUrl} name={c.name} className="size-12 rounded-[14px] text-[18px]" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[16px] font-semibold text-wc-text-1">{c.name}</p>
-                    <p className="truncate text-[13px] text-wc-text-muted">{[p?.company?.name, p?.category && CATEGORIES[p.category]].filter(Boolean).join(" · ") || "Connected"}</p>
+                    <p className="truncate text-[16px] font-semibold text-kr-text-1">{c.name}</p>
+                    <p className="truncate text-[13px] text-kr-text-muted">{[p?.company?.name, p?.category && CATEGORIES[p.category]].filter(Boolean).join(" · ") || "Connected"}</p>
                   </div>
-                  <span className="flex items-center gap-1.5 rounded-[20px] bg-wc-mint-pastel/60 px-2.5 py-0.5 text-[12px] font-medium text-wc-navy">
-                    <span className="size-1.5 rounded-full bg-wc-mint-2" />
+                  <span className="flex items-center gap-1.5 rounded-[20px] bg-kr-mint-pastel/60 px-2.5 py-0.5 text-[12px] font-medium text-kr-navy">
+                    <span className="size-1.5 rounded-full bg-kr-mint-2" />
                     Active
                   </span>
                 </div>
-                <div className="mt-5 flex items-end justify-between gap-4 border-t border-wc-border-light pt-4">
+                <div className="mt-5 flex items-end justify-between gap-4 border-t border-kr-border-light pt-4">
                   <div>
-                    <p className="text-[13px] text-wc-text-muted">Can still spend</p>
-                    <p className="mt-0.5 text-[18px] font-medium text-wc-text-1">
-                      {credits(c.limit)} <span className="text-[14px] font-normal text-wc-text-muted">{usd(c.limit)}</span>
+                    <p className="text-[13px] text-kr-text-muted">Can still spend</p>
+                    <p className="mt-0.5 text-[18px] font-medium text-kr-text-1">
+                      {credits(c.limit)} <span className="text-[14px] font-normal text-kr-text-muted">{usd(c.limit)}</span>
                     </p>
-                    <p className="mt-0.5 h-5 text-[13px] text-wc-icon-muted">{c.expiresAt ? `Until ${new Date(c.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "No expiry"}</p>
+                    <p className="mt-0.5 h-5 text-[13px] text-kr-icon-muted">{c.expiresAt ? `Until ${new Date(c.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "No expiry"}</p>
                   </div>
                   <Button variant="danger" size="sm" disabled={busy !== undefined} onClick={() => disconnect(c.app)}>
                     {busy === c.app && <Spinner />}
@@ -94,10 +94,10 @@ export function Connections({ connections, apps, onChange }: { connections: Conn
 
       {past.length > 0 && (
         <div>
-          <p className="text-[13px] font-medium text-wc-text-muted">Disconnected</p>
+          <p className="text-[13px] font-medium text-kr-text-muted">Disconnected</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {past.map((c) => (
-              <span key={c.app} className="flex h-9 items-center gap-2 rounded-[20px] border border-wc-border-light bg-wc-surface pr-3 pl-1 text-[13px] text-wc-text-muted">
+              <span key={c.app} className="flex h-9 items-center gap-2 rounded-[20px] border border-kr-border-light bg-kr-surface pr-3 pl-1 text-[13px] text-kr-text-muted">
                 <BrandLogo src={profile(c.app)?.logoUrl} name={c.name} className="size-7 rounded-full text-[12px]" />
                 {c.name}
               </span>

@@ -56,13 +56,13 @@ export function SendCredits({ balance, onSent }: { balance: Amount; onSent: () =
           Sent {credits(sent.amount)}. <TxLink href={sent.explorer} />
         </Notice>
       )}
-      <Field label="To" placeholder="friend@example.com or 0x…" value={to} onChange={(e) => (setTo(e.target.value), setReview(undefined))} hint="Anyone who has signed in, by email or wallet address." />
+      <Field label="To" placeholder="friend@example.com or alice.testnet" value={to} onChange={(e) => (setTo(e.target.value), setReview(undefined))} hint="Anyone who has signed in, by email or NEAR account." />
       <AmountField value={amount} onChange={(v) => (setAmount(v), setReview(undefined))} balance={balance} />
       {error && <Notice tone="error">{error}</Notice>}
       {review ? (
-        <div className="space-y-4 rounded-[16px] border border-wc-border-light bg-wc-bg p-5">
-          <p className="text-[13px] font-medium text-wc-text-muted">You&apos;re about to sign</p>
-          <p className="text-[16px] leading-6 text-wc-text-1">{review.summary}</p>
+        <div className="space-y-4 rounded-[16px] border border-kr-border-light bg-kr-bg p-5">
+          <p className="text-[13px] font-medium text-kr-text-muted">You&apos;re about to sign</p>
+          <p className="text-[16px] leading-6 text-kr-text-1">{review.summary}</p>
           <div className="flex gap-3">
             <Button size="lg" className="h-12 flex-1" disabled={busy} onClick={send}>
               {busy && <Spinner />}

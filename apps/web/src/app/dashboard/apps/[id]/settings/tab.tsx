@@ -9,7 +9,7 @@ export function SettingsTab() {
   return (
     <DashSection title="Profile" lead="How the app appears on the network page and the connect page. Empty fields use your company's logo, website and category.">
       <Panel title="App profile" lead="Name, description, category, website and logo.">
-        {info ? <AppProfileForm base={base} info={info} onSaved={refresh} /> : <div className="h-40 animate-pulse rounded-[16px] bg-wc-surface-2" />}
+        {info ? <AppProfileForm base={base} info={info} onSaved={refresh} /> : <div className="h-40 animate-pulse rounded-[16px] bg-kr-surface-2" />}
       </Panel>
     </DashSection>
   );

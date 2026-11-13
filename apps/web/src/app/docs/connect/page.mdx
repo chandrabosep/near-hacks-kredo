@@ -9,7 +9,7 @@ A user approves a spending limit for your app once, on our connect page. After t
 1. You send the user to the connect page.
 2. They sign in with email, choose a limit and approve it.
 3. They come back to your `returnTo` URL with a one-time `code`.
-4. Your server swaps the code for their address and email.
+4. Your server swaps the code for their NEAR account and email.
 
 ```ts
 app.get("/connect", async (req, res) => {
@@ -18,18 +18,18 @@ app.get("/connect", async (req, res) => {
 
 app.get("/callback", async (req, res) => {
   const { user, email } = await credits.exchangeCode(String(req.query.code));
-  req.session.creditsUser = user; // charge this address from now on
+  req.session.creditsUser = user; // charge this account from now on
   req.session.creditsEmail = email; // shown to the user, never used to charge
   res.redirect("/");
 });
 ```
 
-The code works once, for your app only, for 10 minutes. Always swap it on your server, never trust an address sent from the browser.
+The code works once, for your app only, for 10 minutes. Always swap it on your server, never trust an account sent from the browser.
 
 ## Check a user
 
 ```ts
-const u = await credits.user(address);
+const u = await credits.user(account);
 // { balance, connected, limit, spendable }
 ```
 
@@ -45,10 +45,10 @@ res.redirect(credits.buyUrl({ credits: 500, returnTo: "https://your.app/" }));
 
 ## In test mode
 
-There's no connect page in test mode. Make a code from any address:
+There's no connect page in test mode. Make a code from any account:
 
 ```ts
-const { user } = await credits.exchangeCode(`cc_test_${address}`);
+const { user } = await credits.exchangeCode(`cc_test_${account}`);
 ```
 
 Using React? The [React kit](/docs/react) does all of this in a popup.

@@ -20,12 +20,12 @@ export function CopyValue({ value, label, className }: { value: string; label?: 
         }
       }}
       className={cn(
-        "group flex w-full items-center justify-between gap-3 rounded-control border border-wc-border bg-wc-surface px-4 py-3 text-left transition-colors hover:bg-wc-bg",
+        "group flex w-full items-center justify-between gap-3 rounded-control border border-kr-border bg-kr-surface px-4 py-3 text-left transition-colors hover:bg-kr-bg",
         className,
       )}
     >
-      <span className="min-w-0 truncate font-mono text-[13px] text-wc-text-1">{label ?? value}</span>
-      <span className="flex shrink-0 items-center gap-1.5 text-[13px] font-medium text-wc-text-muted group-hover:text-wc-blue">
+      <span className="min-w-0 truncate font-mono text-[13px] text-kr-text-1">{label ?? value}</span>
+      <span className="flex shrink-0 items-center gap-1.5 text-[13px] font-medium text-kr-text-muted group-hover:text-kr-blue">
         {copied ? <Check className="size-[14px]" /> : <Copy className="size-[14px]" />}
         {copied ? "Copied" : "Copy"}
       </span>
@@ -51,7 +51,7 @@ export function CopyButton({ value, label = "Copy", className }: { value: string
         }
       }}
       className={cn(
-        "inline-flex size-7 shrink-0 items-center justify-center rounded-[8px] text-wc-icon-muted transition-colors hover:bg-wc-surface-2 hover:text-wc-blue",
+        "inline-flex size-7 shrink-0 items-center justify-center rounded-[8px] text-kr-icon-muted transition-colors hover:bg-kr-surface-2 hover:text-kr-blue",
         copied && "text-emerald-700 hover:text-emerald-700",
         className,
       )}

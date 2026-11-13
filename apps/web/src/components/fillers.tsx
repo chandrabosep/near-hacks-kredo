@@ -8,10 +8,10 @@ export function Fillers({ count }: { count: number }) {
   return (
     <>
       {Array.from({ length: md }, (_, i) => (
-        <div key={`md${i}`} aria-hidden className="hidden bg-wc-surface md:block lg:hidden" />
+        <div key={`md${i}`} aria-hidden className="hidden bg-kr-surface md:block lg:hidden" />
       ))}
       {Array.from({ length: lg }, (_, i) => (
-        <div key={`lg${i}`} aria-hidden className="hidden bg-wc-surface lg:block" />
+        <div key={`lg${i}`} aria-hidden className="hidden bg-kr-surface lg:block" />
       ))}
     </>
   );

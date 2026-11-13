@@ -18,7 +18,7 @@ import { describePrice, useDirectory } from "@/lib/public";
 type Connected = { app: string; limit: Amount; code: string; explorer?: string };
 
 /**
- * /connect?app=0x...&credits=200&returnTo=https://...
+ * /connect?app=app-3f9c2a1b&credits=200&returnTo=https://...
  *
  * The user gives an app a spending limit. Nothing is spent here. The limit is signed by the
  * user and enforced by the vault contract, so the app can never charge more than this.
@@ -93,36 +93,36 @@ export function ConnectFlow() {
   if (compact) {
     const sessionError = expired ? "Your session expired. Sign out and sign in again." : "We couldn't load your account. Close this and try again.";
     return (
-      <PopupFrame foot="Enforced by the vault contract on Whitechain · No gas or fees">
+      <PopupFrame foot="Enforced by the vault contract on NEAR · No gas or fees">
         <div className="flex items-center gap-3">
           <BrandLogo src={app.logoUrl} name={name} className="size-11 rounded-[12px]" />
           <div className="min-w-0">
-            <h1 className="truncate text-[20px] font-semibold text-wc-text-1">Connect {name}</h1>
-            <p className="text-[14px] text-wc-text-muted">wants to spend from your Kredo balance</p>
+            <h1 className="truncate text-[20px] font-semibold text-kr-text-1">Connect {name}</h1>
+            <p className="text-[14px] text-kr-text-muted">wants to spend from your Kredo balance</p>
           </div>
         </div>
 
         <PopupCard>
           {status === "signed-out" && (
             <>
-              <p className="text-[15px] leading-6 text-wc-text-muted">Sign in with your email to connect {name}. No wallet to install, no gas.</p>
+              <p className="text-[15px] leading-6 text-kr-text-muted">Sign in with your email to connect {name}. No wallet to install, no gas.</p>
               <Button size="lg" className="mt-4 h-11 w-full" onClick={() => login()}>
                 Continue with email
               </Button>
             </>
           )}
-          {status === "loading" && <div className="h-40 animate-pulse rounded-[12px] bg-wc-surface-2" />}
+          {status === "loading" && <div className="h-40 animate-pulse rounded-[12px] bg-kr-surface-2" />}
           {status === "error" && <Notice tone="error">{sessionError}</Notice>}
 
           {status === "ready" && me && done && (
             <div className="py-2 text-center">
-              <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-wc-mint-pastel text-wc-navy">
+              <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-kr-mint-pastel text-kr-navy">
                 <Check className="size-5" />
               </span>
-              <p className="mt-4 text-[17px] font-semibold text-wc-text-1">{name} is connected</p>
-              <p className="mt-1 text-[14px] text-wc-text-muted">It can spend up to {credits(done.limit)}.</p>
+              <p className="mt-4 text-[17px] font-semibold text-kr-text-1">{name} is connected</p>
+              <p className="mt-1 text-[14px] text-kr-text-muted">It can spend up to {credits(done.limit)}.</p>
               {closing ? (
-                <p className="mt-5 text-[14px] text-wc-icon-muted">Taking you back to {name}…</p>
+                <p className="mt-5 text-[14px] text-kr-icon-muted">Taking you back to {name}…</p>
               ) : (
                 back && (
                   <a className={buttonVariants({ size: "lg", className: "mt-5 h-11 w-full" })} href={back}>
@@ -143,18 +143,18 @@ export function ConnectFlow() {
                 suffix={parsed ? `credits · ${usd(creditsToUsd(parsed))}` : "credits"}
                 hint={existing?.connected ? `Currently ${credits(existing.limit)}. This replaces it.` : `Your balance is ${credits(me.balance)}`}
               />
-              <p className="flex gap-2 text-[13px] leading-5 text-wc-text-muted">
-                <ShieldCheck className="mt-px size-4 shrink-0 text-wc-blue" aria-hidden />
+              <p className="flex gap-2 text-[13px] leading-5 text-kr-text-muted">
+                <ShieldCheck className="mt-px size-4 shrink-0 text-kr-blue" aria-hidden />
                 Only {name} can use it, and never more than this. Nothing is spent now. {name} will see your email.
               </p>
               {prices.length > 0 && (
-                <details className="group rounded-[12px] border border-wc-border-light bg-wc-bg text-[13px]">
-                  <summary className="cursor-pointer list-none px-4 py-2.5 font-medium text-wc-text-2 marker:hidden">What {name} charges</summary>
-                  <dl className="divide-y divide-wc-border-light border-t border-wc-border-light">
+                <details className="group rounded-[12px] border border-kr-border-light bg-kr-bg text-[13px]">
+                  <summary className="cursor-pointer list-none px-4 py-2.5 font-medium text-kr-text-2 marker:hidden">What {name} charges</summary>
+                  <dl className="divide-y divide-kr-border-light border-t border-kr-border-light">
                     {prices.slice(0, 6).map(([action, p]) => (
                       <div key={action} className="flex items-center justify-between gap-4 px-4 py-2">
-                        <dt className="truncate font-mono text-[12px] text-wc-text-2">{action}</dt>
-                        <dd className="shrink-0 font-medium text-wc-text-1">{describePrice(p)}</dd>
+                        <dt className="truncate font-mono text-[12px] text-kr-text-2">{action}</dt>
+                        <dd className="shrink-0 font-medium text-kr-text-1">{describePrice(p)}</dd>
                       </div>
                     ))}
                   </dl>
@@ -222,9 +222,9 @@ export function ConnectFlow() {
                   <TxLink href={done.explorer} />
                 </div>
                 {Number(me.balance.credits) === 0 && (
-                  <p className="mt-6 text-[15px] text-wc-text-muted">
+                  <p className="mt-6 text-[15px] text-kr-text-muted">
                     You have no credits yet.{" "}
-                    <Link className="font-medium text-wc-blue hover:underline" href={buyHref}>
+                    <Link className="font-medium text-kr-blue hover:underline" href={buyHref}>
                       Buy some
                     </Link>{" "}
                     to start using {name}.
@@ -241,9 +241,9 @@ export function ConnectFlow() {
                   suffix={parsed ? `credits · ${usd(creditsToUsd(parsed))}` : "credits"}
                   hint={existing?.connected ? `Currently ${credits(existing.limit)}. This replaces it.` : "1 credit = $0.01"}
                 />
-                <ul className="mt-8 space-y-3 text-[15px] leading-[22.5px] text-wc-text-2">
+                <ul className="mt-8 space-y-3 text-[15px] leading-[22.5px] text-kr-text-2">
                   <Point>Only {name} can use this limit, and only up to this amount.</Point>
-                  <Point>The limit is enforced by the vault contract on Whitechain, not by us.</Point>
+                  <Point>The limit is enforced by the vault contract on NEAR, not by us.</Point>
                   <Point>Nothing is spent now. No gas, no fees for you.</Point>
                   <Point>{name} will see your email address.</Point>
                 </ul>
@@ -273,17 +273,17 @@ export function ConnectFlow() {
           </Tile>
 
           <Tile className="lg:px-10">
-            <p className="text-[13px] font-medium text-wc-text-muted">Your balance</p>
+            <p className="text-[13px] font-medium text-kr-text-muted">Your balance</p>
             <p className="mt-2 text-[40px] leading-none font-light text-black">{credits(me.balance, { unit: false })}</p>
-            <p className="mt-2 text-[15px] text-wc-text-muted">credits · {usd(me.balance)}</p>
+            <p className="mt-2 text-[15px] text-kr-text-muted">credits · {usd(me.balance)}</p>
             {prices.length > 0 && (
               <>
-                <p className="mt-10 text-[13px] font-medium text-wc-text-muted">What {name} charges</p>
-                <dl className="mt-3 divide-y divide-wc-border-light border-y border-wc-border-light">
+                <p className="mt-10 text-[13px] font-medium text-kr-text-muted">What {name} charges</p>
+                <dl className="mt-3 divide-y divide-kr-border-light border-y border-kr-border-light">
                   {prices.slice(0, 6).map(([action, p]) => (
                     <div key={action} className="flex items-center justify-between gap-4 py-3 text-[15px]">
-                      <dt className="truncate font-mono text-[13px] text-wc-text-2">{action}</dt>
-                      <dd className="shrink-0 font-medium text-wc-text-1">{describePrice(p)}</dd>
+                      <dt className="truncate font-mono text-[13px] text-kr-text-2">{action}</dt>
+                      <dd className="shrink-0 font-medium text-kr-text-1">{describePrice(p)}</dd>
                     </div>
                   ))}
                 </dl>
@@ -299,7 +299,7 @@ export function ConnectFlow() {
 function Point({ children }: { children: React.ReactNode }) {
   return (
     <li className="flex gap-3">
-      <ShieldCheck className="mt-0.5 size-[18px] shrink-0 text-wc-blue" aria-hidden />
+      <ShieldCheck className="mt-0.5 size-[18px] shrink-0 text-kr-blue" aria-hidden />
       <span>{children}</span>
     </li>
   );
@@ -309,15 +309,15 @@ function Loading({ inline, compact }: { inline?: boolean; compact?: boolean }) {
   if (compact) {
     return (
       <PopupFrame>
-        <div className="h-11 w-56 animate-pulse rounded-control bg-wc-surface-2" />
-        <div className="mt-5 h-64 animate-pulse rounded-[16px] bg-wc-surface-2" />
+        <div className="h-11 w-56 animate-pulse rounded-control bg-kr-surface-2" />
+        <div className="mt-5 h-64 animate-pulse rounded-[16px] bg-kr-surface-2" />
       </PopupFrame>
     );
   }
   const skeleton = (
     <div className={inline ? "px-6 py-14 sm:px-8 lg:px-16" : "px-6 pt-section-t sm:px-8 lg:px-16"}>
-      <div className="h-10 w-72 animate-pulse rounded-control bg-wc-surface-2" />
-      <div className="mt-5 h-5 w-96 max-w-full animate-pulse rounded-control bg-wc-surface-2" />
+      <div className="h-10 w-72 animate-pulse rounded-control bg-kr-surface-2" />
+      <div className="mt-5 h-5 w-96 max-w-full animate-pulse rounded-control bg-kr-surface-2" />
     </div>
   );
   // Inline sits inside a page that already has its frame.
@@ -328,7 +328,7 @@ function Problem({ text, compact }: { text: string; compact?: boolean }) {
   if (compact) {
     return (
       <PopupFrame>
-        <h1 className="text-[20px] font-semibold text-wc-text-1">This link isn&apos;t working</h1>
+        <h1 className="text-[20px] font-semibold text-kr-text-1">This link isn&apos;t working</h1>
         <PopupCard>
           <Notice tone="error">{text}</Notice>
         </PopupCard>

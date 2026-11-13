@@ -63,7 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return (
       <div className="px-6 py-10 sm:px-8 lg:px-12">
         <Notice tone="error">No app with that id on your account.</Notice>
-        <Link href="/dashboard" className="mt-4 inline-block text-[15px] font-medium text-wc-blue hover:underline">
+        <Link href="/dashboard" className="mt-4 inline-block text-[15px] font-medium text-kr-blue hover:underline">
           Back to overview
         </Link>
       </div>
@@ -74,26 +74,26 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider value={{ app, info, base, refresh }}>
-      <div className="border-b border-wc-border-light px-6 pt-8 sm:px-8 lg:px-12 lg:pt-10">
+      <div className="border-b border-kr-border-light px-6 pt-8 sm:px-8 lg:px-12 lg:pt-10">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-4">
             <BrandLogo src={app.logoUrl} name={app.name} className="size-14 rounded-[16px] text-[22px]" />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="truncate text-[28px] leading-tight font-semibold tracking-[-0.02em] text-wc-text-1">{app.name}</h1>
-                <span className="flex items-center gap-1.5 rounded-[20px] bg-wc-mint-pastel/60 px-2 py-0.5 text-[12px] font-medium text-wc-navy">
-                  <span className="size-1.5 rounded-full bg-wc-mint-2" />
+                <h1 className="truncate text-[28px] leading-tight font-semibold tracking-[-0.02em] text-kr-text-1">{app.name}</h1>
+                <span className="flex items-center gap-1.5 rounded-[20px] bg-kr-mint-pastel/60 px-2 py-0.5 text-[12px] font-medium text-kr-navy">
+                  <span className="size-1.5 rounded-full bg-kr-mint-2" />
                   Live
                 </span>
               </div>
-              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-wc-text-muted">
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-kr-text-muted">
                 <span className="inline-flex items-center gap-0.5 font-mono">
                   {short(app.id, 6)}
                   <CopyButton value={app.id} label="Copy app id" className="size-6" />
                 </span>
                 {app.category && <span>· {CATEGORIES[app.category]}</span>}
                 {app.website && (
-                  <a href={app.website} target="_blank" rel="noreferrer" className="hover:text-wc-blue">
+                  <a href={app.website} target="_blank" rel="noreferrer" className="hover:text-kr-blue">
                     · {hostOf(app.website)}
                   </a>
                 )}
@@ -114,10 +114,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={t.label}
                 href={href}
-                className={cn("relative flex h-11 shrink-0 items-center text-[14px] font-medium transition-colors", active ? "text-wc-text-1" : "text-wc-text-muted hover:text-wc-navy")}
+                className={cn("relative flex h-11 shrink-0 items-center text-[14px] font-medium transition-colors", active ? "text-kr-text-1" : "text-kr-text-muted hover:text-kr-navy")}
               >
                 {t.label}
-                <span className={cn("absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-wc-blue transition-opacity", active ? "opacity-100" : "opacity-0")} />
+                <span className={cn("absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-kr-blue transition-opacity", active ? "opacity-100" : "opacity-0")} />
               </Link>
             );
           })}

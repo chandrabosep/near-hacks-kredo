@@ -58,7 +58,7 @@ export function ActivityView() {
     };
   }, [status, load]);
 
-  const rows = useMemo(() => (items && me ? items.map((e) => ({ e, d: describe(e, me.address) })) : []), [items, me]);
+  const rows = useMemo(() => (items && me ? items.map((e) => ({ e, d: describe(e, me.account) })) : []), [items, me]);
 
   const totals = useMemo(() => {
     // Totals in whole units (1 credit = 10,000), so sums stay exact.
@@ -120,7 +120,7 @@ export function ActivityView() {
     <>
       <Hero totals={items ? totals : undefined} />
 
-      <div className="sticky top-16 z-20 grid border-b border-wc-border-light bg-wc-surface/95 backdrop-blur-md lg:top-[76px] lg:grid-cols-[1fr_360px]">
+      <div className="sticky top-16 z-20 grid border-b border-kr-border-light bg-kr-surface/95 backdrop-blur-md lg:top-[76px] lg:grid-cols-[1fr_360px]">
         <nav aria-label="Filter activity" className="flex h-14 gap-7 overflow-x-auto px-6 sm:px-8 lg:px-16">
           {FILTERS.map((f) => (
             <button
@@ -128,18 +128,18 @@ export function ActivityView() {
               type="button"
               aria-pressed={filter === f.key}
               onClick={() => setFilter(f.key)}
-              className={cn("relative flex shrink-0 items-center gap-1.5 text-[15px] font-medium transition-colors", filter === f.key ? "text-wc-text-1" : "text-wc-text-muted hover:text-wc-navy")}
+              className={cn("relative flex shrink-0 items-center gap-1.5 text-[15px] font-medium transition-colors", filter === f.key ? "text-kr-text-1" : "text-kr-text-muted hover:text-kr-navy")}
             >
               {f.label}
-              <span className={cn("font-mono text-[11px]", filter === f.key ? "text-wc-blue" : "text-wc-icon-muted")}>{counts[f.key]}</span>
-              <span className={cn("absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-wc-blue transition-opacity", filter === f.key ? "opacity-100" : "opacity-0")} />
+              <span className={cn("font-mono text-[11px]", filter === f.key ? "text-kr-blue" : "text-kr-icon-muted")}>{counts[f.key]}</span>
+              <span className={cn("absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-kr-blue transition-opacity", filter === f.key ? "opacity-100" : "opacity-0")} />
             </button>
           ))}
         </nav>
-        <div className="group/search relative border-t border-wc-border-light transition-colors focus-within:bg-wc-bg lg:border-t-0 lg:border-l">
+        <div className="group/search relative border-t border-kr-border-light transition-colors focus-within:bg-kr-bg lg:border-t-0 lg:border-l">
           <InputGroup className="h-14 rounded-none border-0 px-4 sm:px-6 has-[[data-slot=input-group-control]:focus-visible]:border-0 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
             <InputGroupAddon>
-              <Search className="size-[18px] text-wc-icon-muted" />
+              <Search className="size-[18px] text-kr-icon-muted" />
             </InputGroupAddon>
             <InputGroupInput
               type="search"
@@ -148,17 +148,17 @@ export function ActivityView() {
               onKeyDown={(e) => e.key === "Escape" && setQuery("")}
               placeholder="Search by app, action or transaction"
               aria-label="Search activity"
-              className="h-full text-[15px] text-wc-text-1 md:text-[15px] placeholder:text-wc-icon-muted [&::-webkit-search-cancel-button]:hidden"
+              className="h-full text-[15px] text-kr-text-1 md:text-[15px] placeholder:text-kr-icon-muted [&::-webkit-search-cancel-button]:hidden"
             />
             {query && (
               <InputGroupAddon align="inline-end">
-                <InputGroupButton size="icon-xs" aria-label="Clear search" onClick={() => setQuery("")} className="rounded-full text-wc-icon-muted hover:text-wc-navy">
+                <InputGroupButton size="icon-xs" aria-label="Clear search" onClick={() => setQuery("")} className="rounded-full text-kr-icon-muted hover:text-kr-navy">
                   <X />
                 </InputGroupButton>
               </InputGroupAddon>
             )}
           </InputGroup>
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-wc-blue opacity-0 transition-opacity group-focus-within/search:opacity-100" />
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-kr-blue opacity-0 transition-opacity group-focus-within/search:opacity-100" />
         </div>
       </div>
 
@@ -166,15 +166,15 @@ export function ActivityView() {
         {!items && (
           <div className="space-y-2">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-[72px] animate-pulse rounded-[14px] bg-wc-surface-2" />
+              <div key={i} className="h-[72px] animate-pulse rounded-[14px] bg-kr-surface-2" />
             ))}
           </div>
         )}
 
         {items && rows.length === 0 && (
-          <div className="flex flex-col items-start gap-4 rounded-[16px] border border-dashed border-wc-border p-8">
-            <p className="text-[16px] font-medium text-wc-text-1">Nothing here yet</p>
-            <p className="text-[14px] text-wc-text-muted">Buy credits or connect an app, and everything that happens shows up here.</p>
+          <div className="flex flex-col items-start gap-4 rounded-[16px] border border-dashed border-kr-border p-8">
+            <p className="text-[16px] font-medium text-kr-text-1">Nothing here yet</p>
+            <p className="text-[14px] text-kr-text-muted">Buy credits or connect an app, and everything that happens shows up here.</p>
             <Link href="/buy" className={buttonVariants()}>
               Buy credits
             </Link>
@@ -183,8 +183,8 @@ export function ActivityView() {
 
         {items && rows.length > 0 && shown.length === 0 && (
           <div className="py-16 text-center">
-            <p className="text-[16px] font-medium text-wc-text-1">No activity matches that.</p>
-            <button type="button" className="mt-2 text-[14px] font-medium text-wc-blue hover:underline" onClick={() => (setQuery(""), setFilter("all"))}>
+            <p className="text-[16px] font-medium text-kr-text-1">No activity matches that.</p>
+            <button type="button" className="mt-2 text-[14px] font-medium text-kr-blue hover:underline" onClick={() => (setQuery(""), setFilter("all"))}>
               Show everything
             </button>
           </div>
@@ -194,14 +194,14 @@ export function ActivityView() {
           {groups.map((g) => (
             <div key={g.label}>
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-[13px] font-semibold tracking-wide text-wc-text-2 uppercase">{g.label}</p>
-                <p className="text-[13px] text-wc-icon-muted">
+                <p className="text-[13px] font-semibold tracking-wide text-kr-text-2 uppercase">{g.label}</p>
+                <p className="text-[13px] text-kr-icon-muted">
                   {g.rows.length} {g.rows.length === 1 ? "event" : "events"}
                 </p>
               </div>
-              <div className="divide-y divide-wc-border-light overflow-hidden rounded-[16px] border border-wc-border-light bg-wc-surface">
+              <div className="divide-y divide-kr-border-light overflow-hidden rounded-[16px] border border-kr-border-light bg-kr-surface">
                 {g.rows.map(({ e }) => (
-                  <ActivityRow key={e.id} e={e} me={me!.address} when="time" />
+                  <ActivityRow key={e.id} e={e} me={me!.account} when="time" />
                 ))}
               </div>
             </div>
@@ -214,15 +214,15 @@ export function ActivityView() {
 
 function Hero({ totals }: { totals?: { received: string; spent: string; count: number } }) {
   return (
-    <section className="relative overflow-hidden border-b border-wc-border-light">
+    <section className="relative overflow-hidden border-b border-kr-border-light">
       <div aria-hidden className="bg-plus pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,#000,transparent)]" />
       <div className="relative grid gap-8 px-6 pt-section-t pb-12 sm:px-8 lg:grid-cols-[1fr_auto] lg:items-end lg:gap-16 lg:px-16">
         <div className="motion-safe:animate-rise">
-          <h1 className="type-hero font-semibold text-wc-text-1">Activity.</h1>
-          <p className="mt-5 max-w-xl text-[17px] leading-[1.625] text-wc-text-muted">Every credit that moved in your account, read straight from the chain.</p>
+          <h1 className="type-hero font-semibold text-kr-text-1">Activity.</h1>
+          <p className="mt-5 max-w-xl text-[17px] leading-[1.625] text-kr-text-muted">Every credit that moved in your account, read straight from the chain.</p>
         </div>
         {totals && (
-          <div className="grid w-full grid-cols-3 overflow-hidden rounded-[16px] border border-wc-border-light bg-wc-surface lg:w-[480px]">
+          <div className="grid w-full grid-cols-3 overflow-hidden rounded-[16px] border border-kr-border-light bg-kr-surface lg:w-[480px]">
             <Total label="Received" value={`+${totals.received}`} tone="in" />
             <Total label="Spent" value={`−${totals.spent}`} />
             <Total label="Events" value={String(totals.count)} />
@@ -235,10 +235,10 @@ function Hero({ totals }: { totals?: { received: string; spent: string; count: n
 
 function Total({ label, value, tone }: { label: string; value: string; tone?: "in" }) {
   return (
-    <div className="border-wc-border-light px-5 py-5 not-first:border-l">
-      <p className="text-[13px] font-medium text-wc-text-muted">{label}</p>
-      <p className={cn("mt-1 font-mono text-[24px] leading-none", tone === "in" ? "text-emerald-700" : "text-wc-text-1")}>{value}</p>
-      <p className="mt-1.5 text-[12px] text-wc-icon-muted">{label === "Events" ? "In this list" : "credits"}</p>
+    <div className="border-kr-border-light px-5 py-5 not-first:border-l">
+      <p className="text-[13px] font-medium text-kr-text-muted">{label}</p>
+      <p className={cn("mt-1 font-mono text-[24px] leading-none", tone === "in" ? "text-emerald-700" : "text-kr-text-1")}>{value}</p>
+      <p className="mt-1.5 text-[12px] text-kr-icon-muted">{label === "Events" ? "In this list" : "credits"}</p>
     </div>
   );
 }

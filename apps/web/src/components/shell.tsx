@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 /** The Kredo mark: a K whose upper arm sends off a credit, and the wordmark. */
 export function Logo({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cn("flex shrink-0 items-center gap-2.5 text-wc-navy", className)} aria-label="Kredo home">
+    <Link href="/" className={cn("flex shrink-0 items-center gap-2.5 text-kr-navy", className)} aria-label="Kredo home">
       <KredoMark className="size-8" />
       <span className="text-[22px] leading-none font-bold tracking-[-0.04em]">kredo</span>
     </Link>
@@ -44,16 +44,16 @@ const NAV = [
 /** Sign in or sign out, from the header. */
 export function Account() {
   const { ready, authenticated, user, login, logout } = usePrivy();
-  if (!ready) return <span className="h-10 w-20 animate-pulse rounded-control bg-wc-surface-2" />;
+  if (!ready) return <span className="h-10 w-20 animate-pulse rounded-control bg-kr-surface-2" />;
   if (!authenticated) {
     return (
-      <Button variant="ghost" size="lg" className="text-[15px] text-wc-text-2" onClick={() => login()}>
+      <Button variant="ghost" size="lg" className="text-[15px] text-kr-text-2" onClick={() => login()}>
         Sign in
       </Button>
     );
   }
   return (
-    <Button variant="ghost" size="lg" className="text-[15px] text-wc-text-2" title={user?.email?.address} onClick={() => logout()}>
+    <Button variant="ghost" size="lg" className="text-[15px] text-kr-text-2" title={user?.email?.address} onClick={() => logout()}>
       Sign out
     </Button>
   );
@@ -63,11 +63,11 @@ export function Header() {
   return (
     <header className="fixed inset-x-0 top-0 z-30">
       <div className="mx-auto max-w-[1400px] lg:px-8">
-        <div className="flex h-16 items-center gap-10 border-x border-b border-wc-surface-2 bg-wc-bg/70 px-6 backdrop-blur-[24px] backdrop-saturate-150 sm:px-8 lg:h-[76px]">
+        <div className="flex h-16 items-center gap-10 border-x border-b border-kr-surface-2 bg-kr-bg/70 px-6 backdrop-blur-[24px] backdrop-saturate-150 sm:px-8 lg:h-[76px]">
           <Logo />
           <nav className="hidden items-center gap-8 md:flex">
             {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className="text-[15px] font-medium text-wc-text-2 transition-colors hover:text-wc-navy">
+              <Link key={n.href} href={n.href} className="text-[15px] font-medium text-kr-text-2 transition-colors hover:text-kr-navy">
                 {n.label}
               </Link>
             ))}
@@ -90,7 +90,7 @@ export function Page({ children }: { children: ReactNode }) {
     <>
       <Header />
       <main className="mx-auto w-full max-w-[1400px] flex-1 pt-16 lg:px-8 lg:pt-[76px]">
-        <div className="min-h-[calc(100vh-76px)] border-x border-wc-surface-2 bg-wc-surface">{children}</div>
+        <div className="min-h-[calc(100vh-76px)] border-x border-kr-surface-2 bg-kr-surface">{children}</div>
       </main>
     </>
   );
@@ -99,11 +99,11 @@ export function Page({ children }: { children: ReactNode }) {
 /** Page title over a quiet plus grid. Headlines end with a period. */
 export function PageTitle({ title, lead, children }: { title: string; lead?: ReactNode; children?: ReactNode }) {
   return (
-    <section className="relative overflow-hidden border-b border-wc-border-light">
+    <section className="relative overflow-hidden border-b border-kr-border-light">
       <div aria-hidden className="bg-plus pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,#000,transparent)]" />
       <div className="relative px-6 pt-section-t pb-12 motion-safe:animate-rise sm:px-8 lg:px-16">
-        <h1 className="type-hero max-w-3xl font-semibold text-balance text-wc-text-1">{title}</h1>
-        {lead && <p className="mt-5 max-w-2xl text-[17px] leading-[1.625] text-wc-text-muted">{lead}</p>}
+        <h1 className="type-hero max-w-3xl font-semibold text-balance text-kr-text-1">{title}</h1>
+        {lead && <p className="mt-5 max-w-2xl text-[17px] leading-[1.625] text-kr-text-muted">{lead}</p>}
         {children && <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:gap-5">{children}</div>}
       </div>
     </section>
@@ -112,11 +112,11 @@ export function PageTitle({ title, lead, children }: { title: string; lead?: Rea
 
 /** Edge-to-edge tiles split by 1px hairlines. */
 export function Tiles({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("grid grid-cols-1 gap-px bg-wc-border-light", className)}>{children}</div>;
+  return <div className={cn("grid grid-cols-1 gap-px bg-kr-border-light", className)}>{children}</div>;
 }
 
 export function Tile({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("bg-wc-surface px-6 py-10 sm:px-8 lg:px-16 lg:py-14", className)}>{children}</div>;
+  return <div className={cn("bg-kr-surface px-6 py-10 sm:px-8 lg:px-16 lg:py-14", className)}>{children}</div>;
 }
 
 /** A big number with its label underneath. Screen readers hear the number first. */
@@ -124,8 +124,8 @@ export function Stat({ label, value, hint }: { label: string; value: ReactNode; 
   return (
     <div className="flex flex-col-reverse gap-2">
       <div>
-        <p className="text-[15px] leading-[22.5px] font-medium text-wc-text-muted">{label}</p>
-        {hint && <p className="mt-1 text-[13px] text-wc-icon-muted">{hint}</p>}
+        <p className="text-[15px] leading-[22.5px] font-medium text-kr-text-muted">{label}</p>
+        {hint && <p className="mt-1 text-[13px] text-kr-icon-muted">{hint}</p>}
       </div>
       <p className="text-[40px] leading-none font-light tracking-[-0.01em] text-black sm:text-[48px]">{value}</p>
     </div>
@@ -139,12 +139,12 @@ export function Notice({ tone = "info", children }: { tone?: "info" | "error" | 
       role={tone === "error" ? "alert" : "status"}
       className={cn(
         "flex items-start gap-3 rounded-control border px-4 py-3 text-[15px] leading-[22.5px]",
-        tone === "error" && "border-wc-error/30 bg-wc-error/5 text-wc-text-1",
-        tone === "success" && "border-wc-mint bg-wc-mint/10 text-wc-text-1",
-        tone === "info" && "border-wc-border-light bg-wc-bg text-wc-text-2",
+        tone === "error" && "border-kr-error/30 bg-kr-error/5 text-kr-text-1",
+        tone === "success" && "border-kr-mint bg-kr-mint/10 text-kr-text-1",
+        tone === "info" && "border-kr-border-light bg-kr-bg text-kr-text-2",
       )}
     >
-      <Icon className={cn("mt-0.5 size-[18px] shrink-0", tone === "error" ? "text-wc-error" : tone === "success" ? "text-emerald-600" : "text-wc-icon-muted")} />
+      <Icon className={cn("mt-0.5 size-[18px] shrink-0", tone === "error" ? "text-kr-error" : tone === "success" ? "text-emerald-600" : "text-kr-icon-muted")} />
       <div className="min-w-0">{children}</div>
     </div>
   );
@@ -158,7 +158,7 @@ export function Spinner({ className }: { className?: string }) {
 export function TxLink({ href, children = "View on explorer" }: { href?: string; children?: ReactNode }) {
   if (!href) return null;
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="group inline-flex items-center gap-1 text-[14px] font-medium text-wc-blue hover:underline">
+    <a href={href} target="_blank" rel="noreferrer" className="group inline-flex items-center gap-1 text-[14px] font-medium text-kr-blue hover:underline">
       {children}
       <ArrowUpRight className="size-[14px] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
     </a>
@@ -170,8 +170,8 @@ export function SignInPanel({ title = "Sign in to continue.", lead }: { title?: 
   const { login } = usePrivy();
   return (
     <Tile>
-      <h2 className="text-heading-xl text-wc-text-1">{title}</h2>
-      <p className="mt-3 max-w-xl text-[16px] leading-[26px] text-wc-text-muted">
+      <h2 className="text-heading-xl text-kr-text-1">{title}</h2>
+      <p className="mt-3 max-w-xl text-[16px] leading-[26px] text-kr-text-muted">
         {lead ?? "Use your email. We send a code, and that's it: no wallet to install, no seed phrase, no gas."}
       </p>
       <Button size="lg" className="mt-8" onClick={() => login()}>
@@ -194,14 +194,14 @@ export function Field({
   const inputId = id ?? auto;
   return (
     <div className={className}>
-      <Label htmlFor={inputId} className="text-[13px] leading-[19.5px] font-medium text-wc-text-muted">
+      <Label htmlFor={inputId} className="text-[13px] leading-[19.5px] font-medium text-kr-text-muted">
         {label}
       </Label>
       <div className="relative mt-2">
         <Input id={inputId} className={cn(fieldInput, suffix && "pr-44")} {...input} />
-        {suffix && <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[15px] text-wc-text-muted">{suffix}</span>}
+        {suffix && <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[15px] text-kr-text-muted">{suffix}</span>}
       </div>
-      {hint && <p className="mt-2 text-[13px] text-wc-icon-muted">{hint}</p>}
+      {hint && <p className="mt-2 text-[13px] text-kr-icon-muted">{hint}</p>}
     </div>
   );
 }
@@ -225,7 +225,7 @@ export function SelectField({
   const id = useId();
   return (
     <div>
-      <Label htmlFor={id} className="text-[13px] leading-[19.5px] font-medium text-wc-text-muted">
+      <Label htmlFor={id} className="text-[13px] leading-[19.5px] font-medium text-kr-text-muted">
         {label}
       </Label>
       <Select items={options} value={value || null} onValueChange={(v) => onChange((v as string | null) ?? "")}>
@@ -240,7 +240,7 @@ export function SelectField({
           ))}
         </SelectContent>
       </Select>
-      {hint && <p className="mt-2 text-[13px] text-wc-icon-muted">{hint}</p>}
+      {hint && <p className="mt-2 text-[13px] text-kr-icon-muted">{hint}</p>}
     </div>
   );
 }
@@ -250,15 +250,15 @@ export function TextareaField({ label, hint, ...props }: React.ComponentProps<"t
   const id = useId();
   return (
     <div>
-      <Label htmlFor={id} className="text-[13px] leading-[19.5px] font-medium text-wc-text-muted">
+      <Label htmlFor={id} className="text-[13px] leading-[19.5px] font-medium text-kr-text-muted">
         {label}
       </Label>
       <Textarea id={id} className={cn(fieldInput, "mt-2 h-auto min-h-24 py-3")} {...props} />
-      {hint && <p className="mt-2 text-[13px] text-wc-icon-muted">{hint}</p>}
+      {hint && <p className="mt-2 text-[13px] text-kr-icon-muted">{hint}</p>}
     </div>
   );
 }
 
 /** Our sizes and colours on top of the shadcn Input. */
 export const fieldInput =
-  "h-12 rounded-control border-wc-border bg-wc-surface px-4 text-[17px] text-wc-text-1 md:text-[17px] placeholder:text-wc-mute focus-visible:border-wc-blue focus-visible:ring-3 focus-visible:ring-wc-blue/20 disabled:bg-wc-bg";
+  "h-12 rounded-control border-kr-border bg-kr-surface px-4 text-[17px] text-kr-text-1 md:text-[17px] placeholder:text-kr-mute focus-visible:border-kr-blue focus-visible:ring-3 focus-visible:ring-kr-blue/20 disabled:bg-kr-bg";

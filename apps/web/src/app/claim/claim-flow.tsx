@@ -2,22 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { isHex, type Hex } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
 import { Notice, PageTitle, SignInPanel, Spinner, Tile, TxLink } from "@/components/shell";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ApiError, useApi } from "@/lib/api";
+import { claimPublicKey, isClaimSecret, signClaim } from "@/lib/claim-key";
 import { credits, usd, type Amount } from "@/lib/format";
 import { useMe } from "@/lib/me";
 import { getPublic } from "@/lib/public";
 
 type Preview = { claimKey: string; amount: Amount; status: "open" | "claimed" | "cancelled" | "expired"; expiresAt: string };
-type Health = { chainId: number; vault: `0x${string}` };
 
-/** The one-time key from /claim#key=0x... It never leaves this browser. null when missing. */
-function keyFromHash(): Hex | null {
+/** The one-time key from /claim#key=... It never leaves this browser. null when missing. */
+function keyFromHash(): string | null {
   const key = new URLSearchParams(window.location.hash.slice(1)).get("key");
-  return key && isHex(key) && key.length === 66 ? key : null;
+  return isClaimSecret(key) ? key : null;
 }
 
 function onHashChange(cb: () => void) {
@@ -28,14 +26,14 @@ function onHashChange(cb: () => void) {
 export function ClaimFlow() {
   // undefined while rendering on the server, where there is no fragment.
   const key = useSyncExternalStore(onHashChange, keyFromHash, () => undefined);
-  const account = useMemo(() => (key ? privateKeyToAccount(key) : undefined), [key]);
+  const claimKey = useMemo(() => (key ? claimPublicKey(key) : undefined), [key]);
 
   const [preview, setPreview] = useState<Preview>();
   const [previewError, setPreviewError] = useState<string>();
   useEffect(() => {
-    if (!account) return;
-    getPublic<Preview>(`/v1/claims/${account.address}`).then(setPreview, (e: Error) => setPreviewError(e.message));
-  }, [account]);
+    if (!claimKey) return;
+    getPublic<Preview>(`/v1/claims/${claimKey}`).then(setPreview, (e: Error) => setPreviewError(e.message));
+  }, [claimKey]);
 
   const { me, status, expired, refresh } = useMe();
   const api = useApi();
@@ -44,19 +42,15 @@ export function ClaimFlow() {
   const [done, setDone] = useState<{ amount: Amount; explorer?: string }>();
 
   async function redeem() {
-    if (!account || !me) return;
+    if (!key || !claimKey || !me) return;
     setBusy(true);
     setError(undefined);
     try {
-      const health = await getPublic<Health>("/v1/health");
-      // The link's key signs who gets the credits, so nobody can redirect them in flight.
-      const signature = await account.signTypedData({
-        domain: { name: "CreditVault", version: "1", chainId: health.chainId, verifyingContract: health.vault },
-        types: { RedeemClaim: [{ name: "claimKey", type: "address" }, { name: "to", type: "address" }] },
-        primaryType: "RedeemClaim",
-        message: { claimKey: account.address, to: me.address as `0x${string}` },
-      });
-      setDone(await api<{ amount: Amount; explorer?: string }>("POST", `/v1/claims/${account.address}/redeem`, { signature }));
+      // The link's key signs the vault's message naming who gets the credits, so nobody can
+      // redirect them in flight.
+      const { message } = await api<{ message: string }>("GET", `/v1/me/claims/${claimKey}/message`);
+      const signature = signClaim(key, message);
+      setDone(await api<{ amount: Amount; explorer?: string }>("POST", `/v1/claims/${claimKey}/redeem`, { signature }));
       // Drop the key from the address bar now that it's spent.
       history.replaceState(null, "", window.location.pathname);
       void refresh();
@@ -102,7 +96,7 @@ export function ClaimFlow() {
       {status === "signed-out" && <SignInPanel title="Sign in to claim." lead="Use your email. Your account and wallet are made for you, with no seed phrase and no gas." />}
       {status === "loading" && (
         <Tile>
-          <div className="h-11 w-48 animate-pulse rounded-control bg-wc-surface-2" />
+          <div className="h-11 w-48 animate-pulse rounded-control bg-kr-surface-2" />
         </Tile>
       )}
       {status === "error" && (
@@ -121,7 +115,7 @@ export function ClaimFlow() {
             {busy && <Spinner />}
             Claim {credits(preview.amount)}
           </Button>
-          <p className="mt-4 text-[13px] text-wc-icon-muted">Goes to {me.email ?? me.address}.</p>
+          <p className="mt-4 text-[13px] text-kr-icon-muted">Goes to {me.email ?? me.account}.</p>
         </Tile>
       )}
     </>

@@ -3,16 +3,18 @@
 import { useIdentityToken, usePrivy, useUser } from "@privy-io/react-auth";
 import { useCallback, useEffect, useState } from "react";
 import { useApi } from "./api";
+import { hasNearWallet } from "./near-wallet";
 import type { Amount } from "./format";
 
 export type Connection = { app: string; name: string; connected: boolean; limit: Amount; expiresAt: string | null };
 export type MyClaim = { claimKey: string; amount: Amount; status: "open" | "claimed" | "cancelled"; expiresAt: string };
 
 export type Me = {
-  address: string;
+  /** The user's NEAR account: the implicit account of their Privy NEAR wallet. */
+  account: string;
   email: string | null;
   balance: Amount;
-  /** Test USDT in the user's own wallet, ready to turn into credits. */
+  /** Test USDT in the user's own NEAR account, ready to turn into credits. */
   walletUsdt: Amount;
   /** Test USDT the network can hand out. Null when the faucet is off. */
   faucet: { usdt: string; claimed: boolean; available: boolean } | null;
@@ -25,7 +27,9 @@ export type Me = {
  * identity token, so pages can show the sign-in step first.
  */
 export function useMe() {
-  const { ready, authenticated } = usePrivy();
+  const { ready, authenticated, user } = usePrivy();
+  // A new user's NEAR wallet is created right after sign-in. Until then there is no account to show.
+  const walletReady = hasNearWallet(user);
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
   const api = useApi();
@@ -34,14 +38,14 @@ export function useMe() {
   const [expired, setExpired] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!identityToken) return;
+    if (!identityToken || !walletReady) return;
     try {
       setMe(await api<Me>("GET", "/v1/me"));
       setError(undefined);
     } catch (err) {
       setError((err as Error).message);
     }
-  }, [api, identityToken]);
+  }, [api, identityToken, walletReady]);
 
   // Privy can restore a session without an identity token. Ask for one, and say so if it never comes.
   useEffect(() => {
@@ -57,7 +61,7 @@ export function useMe() {
   }, [ready, authenticated, identityToken, refreshUser]);
 
   useEffect(() => {
-    if (!identityToken) return;
+    if (!identityToken || !walletReady) return;
     let live = true;
     api<Me>("GET", "/v1/me").then(
       (m) => live && (setMe(m), setError(undefined)),
@@ -66,7 +70,7 @@ export function useMe() {
     return () => {
       live = false;
     };
-  }, [api, identityToken]);
+  }, [api, identityToken, walletReady]);
 
   const status: "loading" | "signed-out" | "ready" | "error" =
     !ready ? "loading" : !authenticated ? "signed-out" : me ? "ready" : error || (expired && !identityToken) ? "error" : "loading";

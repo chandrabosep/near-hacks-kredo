@@ -29,5 +29,5 @@ export type AppStats = {
   paidOut: Amount;
   charges: number;
   payingUsers: number;
-  gas: { transactions: number; wei: string; symbol: string };
+  gas: { transactions: number; yocto: string; symbol: string };
 };

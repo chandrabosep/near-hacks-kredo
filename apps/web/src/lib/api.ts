@@ -1,8 +1,10 @@
 "use client";
 
-import { useIdentityToken, useSignTypedData, type SignTypedDataParams } from "@privy-io/react-auth";
+import { useIdentityToken, usePrivy } from "@privy-io/react-auth";
+import { useSignRawHash } from "@privy-io/react-auth/extended-chains";
 import { useCallback } from "react";
 import { env } from "./env";
+import { nearWalletOf } from "./near-wallet";
 
 export class ApiError extends Error {
   constructor(
@@ -37,17 +39,18 @@ export function useApi() {
 
 export type Action = "buy" | "connect" | "disconnect" | "send" | "claim";
 
-type SignResponse = { summary?: string; request: SignTypedDataParams & { message: Record<string, string> } };
+type SignResponse = { summary?: string; request: { account: string; hash: `0x${string}`; expiresAt: string } };
 
 /**
  * One user action, the way every hosted page does it:
- *   1. ask the API for the EIP-712 message, with a fresh nonce and deadline
- *   2. sign it with the user's Privy wallet, in the browser
- *   3. hand the message and signature back; the relayer submits it and pays the gas
+ *   1. ask the API for the action as a NEAR delegate action (NEP-366), and get back its hash
+ *   2. sign that hash with the user's Privy NEAR wallet, in the browser
+ *   3. hand the hash and signature back; the relayer wraps it in a transaction and pays the gas
  */
 export function useAction() {
   const api = useApi();
-  const { signTypedData } = useSignTypedData();
+  const { signRawHash } = useSignRawHash();
+  const { user } = usePrivy();
 
   /** Step 1 only, so the page can show the summary before the user confirms. */
   const prepare = useCallback((action: Action, input: Record<string, unknown>) => {
@@ -57,10 +60,12 @@ export function useAction() {
   /** Steps 2 and 3, after the user confirms. */
   const confirm = useCallback(
     async <T = unknown>(action: Action, prepared: SignResponse): Promise<T> => {
-      const { signature } = await signTypedData(prepared.request);
-      return api<T>("POST", `/v1/me/submit/${action}`, { message: prepared.request.message, signature });
+      const { hash, account } = prepared.request;
+      // Sign with the wallet as Privy names it; the API derives the same account from its key.
+      const { signature } = await signRawHash({ address: nearWalletOf(user) ?? account, chainType: "near", hash });
+      return api<T>("POST", `/v1/me/submit/${action}`, { hash, signature });
     },
-    [api, signTypedData],
+    [api, signRawHash, user],
   );
 
   return { prepare, confirm };

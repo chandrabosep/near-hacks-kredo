@@ -36,7 +36,7 @@ app.get("/api/credits", async (req, res) => {
   res.json(await credits.session(req.session.creditsUser));
 });
 
-// Back from the connect popup: swap the code for the user's address
+// Back from the connect popup: swap the code for the user's NEAR account
 app.post("/api/credits", async (req, res) => {
   const { user } = await credits.exchangeCode(req.body.code);
   req.session.creditsUser = user;

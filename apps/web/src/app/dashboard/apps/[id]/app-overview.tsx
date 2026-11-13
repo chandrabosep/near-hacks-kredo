@@ -2,12 +2,11 @@
 
 import { ArrowDownLeft, Banknote, CircleCheck, Fuel, Plug, Rocket, Timer, TimerOff, Undo2, Unplug, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { formatEther } from "viem";
 import { Notice, Spinner, TxLink } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { ApiError, useApi } from "@/lib/api";
 import type { ActivityItem } from "@/lib/activity";
-import { ago, credits, short, usd } from "@/lib/format";
+import { ago, credits, short, usd, formatNear } from "@/lib/format";
 import { useIdentityToken } from "@privy-io/react-auth";
 import { env } from "@/lib/env";
 import { cn } from "@/lib/utils";
@@ -67,7 +66,7 @@ export function AppOverview() {
   }
 
   const unpaid = info?.unpaidEarnings ?? app.unpaidEarnings;
-  const gasWbt = stats ? Number(formatEther(BigInt(stats.gas.wei))) : 0;
+  const gasNear = stats ? formatNear(stats.gas.yocto, 5) : "0";
 
   return (
     <>
@@ -77,7 +76,7 @@ export function AppOverview() {
         </div>
       )}
 
-      <div className="grid gap-4 border-b border-wc-border-light px-6 py-8 sm:grid-cols-2 sm:px-8 lg:px-12 lg:py-10 xl:grid-cols-4">
+      <div className="grid gap-4 border-b border-kr-border-light px-6 py-8 sm:grid-cols-2 sm:px-8 lg:px-12 lg:py-10 xl:grid-cols-4">
         <StatCard label="Revenue" value={stats ? usd(stats.revenue) : "…"} hint={stats ? `${credits(stats.revenue)} from ${stats.charges} charges` : undefined} />
         <StatCard
           label="You earned"
@@ -90,7 +89,7 @@ export function AppOverview() {
             {paying ? "Withdrawing" : "Withdraw USDT"}
           </Button>
           {paid && (
-            <p className="mt-2 text-[13px] text-wc-text-2">
+            <p className="mt-2 text-[13px] text-kr-text-2">
               Sent ${paid.usdt} USDT. <TxLink href={paid.explorer} />
             </p>
           )}
@@ -99,10 +98,10 @@ export function AppOverview() {
       </div>
 
       {stats && (
-        <div className="flex items-center gap-3 border-b border-wc-border-light bg-wc-bg px-6 py-4 text-[14px] text-wc-text-2 sm:px-8 lg:px-12">
-          <Fuel className="size-4 shrink-0 text-wc-blue" />
+        <div className="flex items-center gap-3 border-b border-kr-border-light bg-kr-bg px-6 py-4 text-[14px] text-kr-text-2 sm:px-8 lg:px-12">
+          <Fuel className="size-4 shrink-0 text-kr-blue" />
           <p>
-            Your charges cost <strong className="font-medium text-wc-text-1">{gasWbt.toFixed(5)} {stats.gas.symbol}</strong> in gas over {stats.gas.transactions} transactions, covered by the network fee. You and your users never hold gas.
+            Your charges cost <strong className="font-medium text-kr-text-1">{gasNear} {stats.gas.symbol}</strong> in gas over {stats.gas.transactions} transactions, covered by the network fee. You and your users never hold gas.
           </p>
         </div>
       )}
@@ -119,12 +118,12 @@ const KIND: Record<string, { label: string; icon: LucideIcon; tone: string }> = 
   Charged: { label: "Charge", icon: ArrowDownLeft, tone: "bg-emerald-50 text-emerald-700" },
   Captured: { label: "Capture", icon: CircleCheck, tone: "bg-emerald-50 text-emerald-700" },
   Held: { label: "Hold", icon: Timer, tone: "bg-amber-50 text-amber-700" },
-  Released: { label: "Release", icon: TimerOff, tone: "bg-wc-surface-2 text-wc-text-muted" },
-  Refunded: { label: "Refund", icon: Undo2, tone: "bg-red-50 text-wc-error" },
-  PaidOut: { label: "Payout", icon: Banknote, tone: "bg-wc-blue/8 text-wc-blue" },
+  Released: { label: "Release", icon: TimerOff, tone: "bg-kr-surface-2 text-kr-text-muted" },
+  Refunded: { label: "Refund", icon: Undo2, tone: "bg-red-50 text-kr-error" },
+  PaidOut: { label: "Payout", icon: Banknote, tone: "bg-kr-blue/8 text-kr-blue" },
   AppApproved: { label: "Connected", icon: Plug, tone: "bg-violet-50 text-violet-700" },
-  AppRevoked: { label: "Disconnected", icon: Unplug, tone: "bg-wc-surface-2 text-wc-text-muted" },
-  AppRegistered: { label: "Registered", icon: Rocket, tone: "bg-wc-ink/6 text-wc-ink" },
+  AppRevoked: { label: "Disconnected", icon: Unplug, tone: "bg-kr-surface-2 text-kr-text-muted" },
+  AppRegistered: { label: "Registered", icon: Rocket, tone: "bg-kr-ink/6 text-kr-ink" },
 };
 
 function Kind({ type }: { type: string }) {
@@ -142,13 +141,13 @@ function Kind({ type }: { type: string }) {
 }
 
 function ActivityTable({ rows, base, onRefunded }: { rows?: ActivityItem[]; base: string; onRefunded: () => void }) {
-  if (!rows) return <div className="h-24 animate-pulse rounded-control bg-wc-surface-2" />;
-  if (rows.length === 0) return <p className="text-[15px] text-wc-text-muted">Nothing yet. Charges show up here within a few seconds.</p>;
+  if (!rows) return <div className="h-24 animate-pulse rounded-control bg-kr-surface-2" />;
+  if (rows.length === 0) return <p className="text-[15px] text-kr-text-muted">Nothing yet. Charges show up here within a few seconds.</p>;
   return (
-    <div className="overflow-x-auto rounded-[16px] border border-wc-border-light">
+    <div className="overflow-x-auto rounded-[16px] border border-kr-border-light">
       <table className="w-full min-w-[640px] text-left text-[14px]">
-        <thead className="bg-wc-bg text-[13px] text-wc-text-muted">
-          <tr className="border-b border-wc-border-light">
+        <thead className="bg-kr-bg text-[13px] text-kr-text-muted">
+          <tr className="border-b border-kr-border-light">
             <th className="py-3 pl-4 font-medium">When</th>
             <th className="py-3 font-medium">What</th>
             <th className="py-3 font-medium">User</th>
@@ -158,15 +157,15 @@ function ActivityTable({ rows, base, onRefunded }: { rows?: ActivityItem[]; base
             <th className="py-3 pr-4" />
           </tr>
         </thead>
-        <tbody className="divide-y divide-wc-border-light">
+        <tbody className="divide-y divide-kr-border-light">
           {rows.map((r) => (
             <tr key={r.id}>
-              <td className="py-3 pl-4 text-wc-text-muted">{ago(r.at)}</td>
+              <td className="py-3 pl-4 text-kr-text-muted">{ago(r.at)}</td>
               <td className="py-3">
                 <Kind type={r.type} />
               </td>
               <td className="py-3 font-mono text-[13px]">{short(r.user ?? r.to)}</td>
-              <td className="max-w-40 truncate py-3 font-mono text-[13px] text-wc-text-muted">{r.ref ?? r.label ?? ""}</td>
+              <td className="max-w-40 truncate py-3 font-mono text-[13px] text-kr-text-muted">{r.ref ?? r.label ?? ""}</td>
               <td className="py-3 text-right font-mono">{r.amount ? credits(r.amount, { unit: false }) : ""}</td>
               <td className="py-3 text-right">{r.explorer && <TxLink href={r.explorer}>View</TxLink>}</td>
               <td className="py-3 pr-4 pl-4 text-right">
@@ -188,7 +187,7 @@ function RefundButton({ base, row, onDone }: { base: string; row: ActivityItem; 
   if (state === "done") return <span className="text-[13px] text-emerald-700">Refunded</span>;
   return (
     <span className="inline-flex items-center gap-2">
-      {state === "error" && <span className="max-w-40 truncate text-[12px] text-wc-error" title={error}>{error}</span>}
+      {state === "error" && <span className="max-w-40 truncate text-[12px] text-kr-error" title={error}>{error}</span>}
       <Button
         variant="outline"
         size="xs"

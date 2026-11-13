@@ -44,7 +44,7 @@ export function AppProfileForm({ base, info, onSaved }: { base: string; info: Ap
     <div className="grid max-w-3xl gap-6 sm:grid-cols-2">
       <div className="flex items-center gap-4 sm:col-span-2">
         <BrandLogo src={form.logoUrl || info.logoUrl} name={form.name || info.name} className="size-14" />
-        <p className="text-[14px] leading-6 text-wc-text-muted">This is how {form.name || "your app"} appears on the network page and the connect page.</p>
+        <p className="text-[14px] leading-6 text-kr-text-muted">This is how {form.name || "your app"} appears on the network page and the connect page.</p>
       </div>
       <Field label="App name" value={form.name} onChange={(e) => set("name")(e.target.value)} />
       <SelectField label="Category" value={form.category} onChange={set("category")} options={CATEGORIES} />

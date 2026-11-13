@@ -34,7 +34,7 @@ const credits = new Credits({
 
 ## 3. Connect a user
 
-Send the user to our page to approve a spending limit. They come back with a code, which you swap for their address.
+Send the user to our page to approve a spending limit. They come back with a code, which you swap for their NEAR account.
 
 ```ts
 // Send them to approve a limit
@@ -50,7 +50,7 @@ const { user } = await credits.exchangeCode(req.query.code);
 await credits.charge({ user, credits: 5 });
 ```
 
-That's it. The charge settles on Whitechain before the call returns, and you withdraw your earnings in USDT from the dashboard.
+That's it. The charge settles on NEAR before the call returns, and you withdraw your earnings in USDT from the dashboard.
 
 ## Test mode
 

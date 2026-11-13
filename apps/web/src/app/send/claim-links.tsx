@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { CopyValue } from "@/components/copy";
 import { Notice, Spinner } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { ApiError, useAction, useApi } from "@/lib/api";
+import { newClaimKey } from "@/lib/claim-key";
 import { credits, parseCredits, type Amount } from "@/lib/format";
 import type { MyClaim } from "@/lib/me";
 import { AmountField } from "@/components/amount-field";
@@ -28,10 +28,9 @@ export function CreateClaimLink({ balance, onChange }: { balance: Amount; onChan
     setBusy(true);
     setError(undefined);
     try {
-      const key = generatePrivateKey();
-      const claimKey = privateKeyToAccount(key).address;
-      const res = await confirm<{ amount: Amount }>("claim", await prepare("claim", { claimKey, credits: parsed }));
-      setLink({ url: `${window.location.origin}/claim#key=${key}`, amount: res.amount });
+      const key = newClaimKey();
+      const res = await confirm<{ amount: Amount }>("claim", await prepare("claim", { claimKey: key.publicKey, credits: parsed }));
+      setLink({ url: `${window.location.origin}/claim#key=${key.secret}`, amount: res.amount });
       setAmount("");
       onChange();
     } catch (err) {
@@ -44,9 +43,9 @@ export function CreateClaimLink({ balance, onChange }: { balance: Amount; onChan
   return (
     <div className="space-y-6">
       {link && (
-        <div className="space-y-3 rounded-[16px] border border-wc-border-light bg-wc-bg p-5">
-          <p className="text-[16px] font-medium text-wc-text-1">Your link for {credits(link.amount)} is ready.</p>
-          <p className="text-[14px] text-wc-text-muted">Copy it now: it&apos;s shown only once. Anyone with the link can claim the credits.</p>
+        <div className="space-y-3 rounded-[16px] border border-kr-border-light bg-kr-bg p-5">
+          <p className="text-[16px] font-medium text-kr-text-1">Your link for {credits(link.amount)} is ready.</p>
+          <p className="text-[14px] text-kr-text-muted">Copy it now: it&apos;s shown only once. Anyone with the link can claim the credits.</p>
           <CopyValue value={link.url} label={link.url.replace(/#key=(.{6}).*$/, "#key=$1…")} />
         </div>
       )}
@@ -81,19 +80,19 @@ export function OpenClaims({ claims, onChange }: { claims: MyClaim[]; onChange: 
     }
   }
 
-  if (open.length === 0) return <p className="text-[14px] text-wc-icon-muted">No open links. Links you make show up here until someone claims them.</p>;
+  if (open.length === 0) return <p className="text-[14px] text-kr-icon-muted">No open links. Links you make show up here until someone claims them.</p>;
 
   return (
     <div className="space-y-3">
       {error && <Notice tone="error">{error}</Notice>}
-      <div className="divide-y divide-wc-border-light rounded-[14px] border border-wc-border-light bg-wc-surface">
+      <div className="divide-y divide-kr-border-light rounded-[14px] border border-kr-border-light bg-kr-surface">
         {open.map((c) => {
           const expired = Date.parse(c.expiresAt) <= now;
           return (
             <div key={c.claimKey} className="flex h-16 items-center justify-between gap-4 px-4">
               <div>
-                <p className="text-[15px] font-medium text-wc-text-1">{credits(c.amount)}</p>
-                <p className="text-[13px] text-wc-icon-muted">{expired ? "Expired" : `Expires ${new Date(c.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}</p>
+                <p className="text-[15px] font-medium text-kr-text-1">{credits(c.amount)}</p>
+                <p className="text-[13px] text-kr-icon-muted">{expired ? "Expired" : `Expires ${new Date(c.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}</p>
               </div>
               <Button variant="outline" size="xs" disabled={busy !== undefined} onClick={() => cancel(c.claimKey)}>
                 {busy === c.claimKey && <Spinner className="size-3" />}

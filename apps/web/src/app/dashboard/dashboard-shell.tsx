@@ -65,7 +65,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     };
   }, [fetchAll, identityToken]);
 
-  // Older links opened an app with ?app=0x...
+  // Older links opened an app with ?app=<id>.
   const legacy = params.get("app");
   useEffect(() => {
     if (legacy) router.replace(`/dashboard/apps/${legacy}`);
@@ -74,7 +74,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   if (ready && !authenticated) {
     return (
       <>
-        <PageTitle title="Bring your app to the network." lead="Register your app, set your prices, and withdraw what your users spend in USDT on Whitechain." />
+        <PageTitle title="Bring your app to the network." lead="Register your app, set your prices, and withdraw what your users spend in USDT on NEAR." />
         <SignInPanel title="Sign in to manage your apps." lead="Use your work email. Earnings are paid in USDT to your own wallet, or to any address you choose when you register an app." />
       </>
     );
@@ -91,10 +91,10 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   if (company === undefined || !apps) {
     return (
       <div className="grid min-h-[60vh] lg:grid-cols-[260px_1fr]">
-        <div className="hidden border-r border-wc-border-light bg-wc-bg lg:block" />
+        <div className="hidden border-r border-kr-border-light bg-kr-bg lg:block" />
         <div className="p-10">
-          <div className="h-10 w-72 animate-pulse rounded-control bg-wc-surface-2" />
-          <div className="mt-6 h-32 animate-pulse rounded-[16px] bg-wc-surface-2" />
+          <div className="h-10 w-72 animate-pulse rounded-control bg-kr-surface-2" />
+          <div className="mt-6 h-32 animate-pulse rounded-[16px] bg-kr-surface-2" />
         </div>
       </div>
     );
@@ -124,18 +124,18 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 function Sidebar({ company, apps }: { company: Company; apps: MyApp[] }) {
   const path = usePathname();
   const item = (active: boolean) =>
-    cn("flex h-10 items-center gap-3 rounded-[10px] px-3 text-[14px] font-medium transition-colors", active ? "bg-wc-surface text-wc-text-1 shadow-[0_1px_2px_rgba(8,10,40,0.06)] ring-1 ring-wc-border-light" : "text-wc-text-2 hover:bg-wc-surface/70 hover:text-wc-navy");
+    cn("flex h-10 items-center gap-3 rounded-[10px] px-3 text-[14px] font-medium transition-colors", active ? "bg-kr-surface text-kr-text-1 shadow-[0_1px_2px_rgba(8,10,40,0.06)] ring-1 ring-kr-border-light" : "text-kr-text-2 hover:bg-kr-surface/70 hover:text-kr-navy");
 
   return (
-    <aside className="border-b border-wc-border-light bg-wc-bg lg:sticky lg:top-[76px] lg:h-[calc(100vh-76px)] lg:overflow-y-auto lg:border-r lg:border-b-0">
+    <aside className="border-b border-kr-border-light bg-kr-bg lg:sticky lg:top-[76px] lg:h-[calc(100vh-76px)] lg:overflow-y-auto lg:border-r lg:border-b-0">
       <div className="flex flex-col gap-6 p-4 lg:p-5">
-        <Link href="/dashboard/company" className="flex items-center gap-3 rounded-[12px] p-2 transition-colors hover:bg-wc-surface">
+        <Link href="/dashboard/company" className="flex items-center gap-3 rounded-[12px] p-2 transition-colors hover:bg-kr-surface">
           <BrandLogo src={company.logoUrl} name={company.name} className="size-10 rounded-[12px] text-[16px]" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[15px] font-semibold text-wc-text-1">{company.name}</span>
-            <span className="block truncate text-[12px] text-wc-text-muted">{company.category ? CATEGORIES[company.category] : "Company"}</span>
+            <span className="block truncate text-[15px] font-semibold text-kr-text-1">{company.name}</span>
+            <span className="block truncate text-[12px] text-kr-text-muted">{company.category ? CATEGORIES[company.category] : "Company"}</span>
           </span>
-          <Settings className="size-4 text-wc-icon-muted" />
+          <Settings className="size-4 text-kr-icon-muted" />
         </Link>
 
         <nav className="flex flex-col gap-1">
@@ -151,8 +151,8 @@ function Sidebar({ company, apps }: { company: Company; apps: MyApp[] }) {
 
         <div>
           <div className="flex items-center justify-between px-3">
-            <p className="text-[12px] font-semibold tracking-wide text-wc-icon-muted uppercase">Apps</p>
-            <span className="text-[12px] text-wc-icon-muted">{apps.length}</span>
+            <p className="text-[12px] font-semibold tracking-wide text-kr-icon-muted uppercase">Apps</p>
+            <span className="text-[12px] text-kr-icon-muted">{apps.length}</span>
           </div>
           <div className="mt-2 flex flex-col gap-1">
             {apps.map((a) => {
@@ -162,22 +162,22 @@ function Sidebar({ company, apps }: { company: Company; apps: MyApp[] }) {
                   <BrandLogo src={a.logoUrl} name={a.name} className="size-7 rounded-[8px] text-[12px]" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{a.name}</span>
-                    <span className="block truncate text-[11px] font-normal text-wc-icon-muted">{usd(a.unpaidEarnings)} to withdraw</span>
+                    <span className="block truncate text-[11px] font-normal text-kr-icon-muted">{usd(a.unpaidEarnings)} to withdraw</span>
                   </span>
                 </Link>
               );
             })}
-            <Link href="/dashboard/new" className={cn(item(path === "/dashboard/new"), "text-wc-blue hover:text-wc-blue")}>
+            <Link href="/dashboard/new" className={cn(item(path === "/dashboard/new"), "text-kr-blue hover:text-kr-blue")}>
               <Plus className="size-4" />
               New app
             </Link>
           </div>
         </div>
 
-        <Link href="/docs" className="mt-auto flex items-center gap-3 rounded-[12px] border border-wc-border-light bg-wc-surface p-3 text-[13px] text-wc-text-2 transition-colors hover:border-wc-border">
-          <BookOpen className="size-4 shrink-0 text-wc-blue" />
+        <Link href="/docs" className="mt-auto flex items-center gap-3 rounded-[12px] border border-kr-border-light bg-kr-surface p-3 text-[13px] text-kr-text-2 transition-colors hover:border-kr-border">
+          <BookOpen className="size-4 shrink-0 text-kr-blue" />
           <span>
-            <span className="block font-medium text-wc-text-1">Integration guide</span>
+            <span className="block font-medium text-kr-text-1">Integration guide</span>
             Charge in about 20 lines.
           </span>
         </Link>

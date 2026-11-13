@@ -19,8 +19,8 @@ const credits = new Credits({ apiKey: process.env.CREDITS_API_KEY! });
 | Option | Default | Meaning |
 |---|---|---|
 | `apiKey` | required | Your app's live (`uc_live_`) or test (`uc_test_`) key |
-| `baseUrl` | `https://kredo-api.onrender.com` | The network's API |
-| `pagesUrl` | `https://kredo-omega.vercel.app` | The hosted connect, buy and account pages |
+| `baseUrl` | `https://kredo-near-api.onrender.com` | The network's API |
+| `pagesUrl` | `https://kredo-near.vercel.app` | The hosted connect, buy and account pages |
 | `retries` | `2` | Extra tries after a network failure or rate limit. Writes are safe to retry: each carries a ref |
 | `timeoutMs` | `60000` | Per request. Long enough for a transaction to confirm |
 
@@ -41,7 +41,7 @@ Amounts are credits, as a number or an exact decimal string such as `"0.5"`. Eve
 |---|---|
 | `connectUrl({ credits, returnTo, expiresInDays })` | Link to the connect page |
 | `exchangeCode(code)` | Swaps the one-time code for `{ user }` |
-| `user(address)` | Balance, limit, whether they're connected, and what's spendable now |
+| `user(account)` | Balance, limit, whether they're connected, and what's spendable now |
 | `session(user)` | Everything the React kit renders, for a user or `undefined` |
 | `buyUrl({ credits, returnTo })`, `accountUrl()` | Links to the buy and account pages |
 
@@ -63,10 +63,10 @@ Every result includes `txHash` and an `explorer` link.
 
 | Call | What it does |
 |---|---|
-| `payout()` | Pays unpaid earnings in USDT to your payout address |
+| `payout()` | Pays unpaid earnings in USDT to your payout account |
 | `activity()` | Everything that happened in your app, newest first |
 | `exportCsv()` | The same, as CSV |
-| `gas()` | Transactions and WBT the network spent for you |
+| `gas()` | Transactions and gas the network spent for you |
 | `setWebhook(url)` | Sets your endpoint and returns a new signing secret |
 | `webhookDeliveries()` | Recent deliveries and their status |
 

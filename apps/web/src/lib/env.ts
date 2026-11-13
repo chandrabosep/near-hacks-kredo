@@ -1,11 +1,11 @@
-import { anvil, whitechainSepolia } from "viem/chains";
-
 /** Public config, inlined at build time. */
 export const env = {
   privyAppId: process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "",
   apiUrl: (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/$/, ""),
-  chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? whitechainSepolia.id),
+  /** NEAR network the vault runs on. */
+  network: process.env.NEXT_PUBLIC_NEAR_NETWORK ?? "testnet",
+  explorerUrl: (process.env.NEXT_PUBLIC_EXPLORER_URL ?? "https://testnet.nearblocks.io").replace(/\/$/, ""),
 };
 
-/** Users only sign EIP-712 messages; the relayer sends every transaction and pays the gas. */
-export const chain = env.chainId === anvil.id ? anvil : whitechainSepolia;
+/** A NEAR account on the block explorer. */
+export const explorerAccount = (account: string) => `${env.explorerUrl}/address/${account}`;

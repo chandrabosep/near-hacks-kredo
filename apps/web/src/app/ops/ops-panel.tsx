@@ -1,24 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { formatEther } from "viem";
 import { Field, Notice, PageTitle, Stat, Tile, Tiles } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { env } from "@/lib/env";
+import { formatNear } from "@/lib/format";
 
 type Ops = {
   relayer: string;
-  balanceWei: string;
-  last24h: { transactions: number; wei: string };
-  allTime: { transactions: number; wei: string };
+  balanceYocto: string;
+  last24h: { transactions: number; yocto: string };
+  allTime: { transactions: number; yocto: string };
   daysOfRunway: number | null;
   exitsOnly: boolean;
-  indexer: { block: number; head: number; lag: number; backed: boolean; events: number; pendingWebhooks: number; error: string | null };
-  limits?: { dailyBudgetWei: string; budgetLeftWei: string; appDailyBudgetWei: string; minBalanceWei: string; maxTxGas: string; maxGasPriceWei: string };
+  indexer: { block: number; head: number; backed: boolean; events: number; pendingWebhooks: number; error: string | null };
+  limits?: { dailyBudgetYocto: string; budgetLeftYocto: string; appDailyBudgetYocto: string; minBalanceYocto: string; maxTxGas: string };
 };
 
 const KEY = "credits-ops-token";
-const wbt = (wei: string, digits = 4) => `${Number(formatEther(BigInt(wei))).toFixed(digits)} WBT`;
+const near = (yocto: string, digits = 4) => `${formatNear(yocto, digits)} NEAR`;
 
 /** The admin token stays in this browser's session storage only. */
 function readToken(): string {
@@ -91,7 +91,7 @@ export function OpsPanel() {
   }
 
   const l = ops?.limits;
-  const spentPct = l && ops ? Math.min(100, (Number(BigInt(ops.last24h.wei) * BigInt(10_000) / BigInt(l.dailyBudgetWei)) / 100)) : 0;
+  const spentPct = l && ops ? Math.min(100, (Number(BigInt(ops.last24h.yocto) * BigInt(10_000) / BigInt(l.dailyBudgetYocto)) / 100)) : 0;
 
   return (
     <>
@@ -127,13 +127,13 @@ export function OpsPanel() {
           )}
           <Tiles className="sm:grid-cols-2 lg:grid-cols-4">
             <Tile>
-              <Stat label="Relayer balance" value={wbt(ops.balanceWei, 3)} hint={l ? `Floor ${wbt(l.minBalanceWei, 2)}` : undefined} />
+              <Stat label="Relayer balance" value={near(ops.balanceYocto, 3)} hint={l ? `Floor ${near(l.minBalanceYocto, 2)}` : undefined} />
             </Tile>
             <Tile>
               <Stat label="Transactions, last 24h" value={ops.last24h.transactions} hint={`${ops.allTime.transactions} all time`} />
             </Tile>
             <Tile>
-              <Stat label="WBT spent, last 24h" value={wbt(ops.last24h.wei, 5)} hint={l ? `${spentPct.toFixed(1)}% of the ${wbt(l.dailyBudgetWei, 2)} budget` : undefined} />
+              <Stat label="Gas spent, last 24h" value={near(ops.last24h.yocto, 5)} hint={l ? `${spentPct.toFixed(1)}% of the ${near(l.dailyBudgetYocto, 2)} budget` : undefined} />
             </Tile>
             <Tile>
               <Stat label="Days of runway" value={ops.daysOfRunway ?? "∞"} hint="At the last 24 hours' rate" />
@@ -141,20 +141,19 @@ export function OpsPanel() {
           </Tiles>
 
           {l && (
-            <Tile className="border-t border-wc-border-light">
-              <p className="text-[13px] font-medium text-wc-text-muted">Daily budget</p>
-              <div className="mt-3 h-2 overflow-hidden rounded-chip bg-wc-surface-2">
-                <div className="h-full bg-wc-blue" style={{ width: `${spentPct}%` }} />
+            <Tile className="border-t border-kr-border-light">
+              <p className="text-[13px] font-medium text-kr-text-muted">Daily budget</p>
+              <div className="mt-3 h-2 overflow-hidden rounded-chip bg-kr-surface-2">
+                <div className="h-full bg-kr-blue" style={{ width: `${spentPct}%` }} />
               </div>
               <dl className="mt-8 grid gap-x-10 gap-y-3 text-[15px] sm:grid-cols-2">
                 {[
-                  ["Budget left today", wbt(l.budgetLeftWei, 5)],
-                  ["Per app, per day", wbt(l.appDailyBudgetWei, 3)],
-                  ["Gas per transaction", `${Number(l.maxTxGas).toLocaleString("en-US")} max`],
-                  ["Gas price", `${Number(BigInt(l.maxGasPriceWei) / BigInt(1_000_000_000))} gwei max`],
+                  ["Budget left today", near(l.budgetLeftYocto, 5)],
+                  ["Per app, per day", near(l.appDailyBudgetYocto, 3)],
+                  ["Gas per transaction", `${Number(BigInt(l.maxTxGas) / BigInt(10) ** BigInt(12))} Tgas max`],
                 ].map(([k, v]) => (
-                  <div key={k} className="flex justify-between border-b border-wc-border-light py-2">
-                    <dt className="text-wc-text-2">{k}</dt>
+                  <div key={k} className="flex justify-between border-b border-kr-border-light py-2">
+                    <dt className="text-kr-text-2">{k}</dt>
                     <dd className="font-mono text-[14px]">{v}</dd>
                   </div>
                 ))}
@@ -162,12 +161,12 @@ export function OpsPanel() {
             </Tile>
           )}
 
-          <Tiles className="border-t border-wc-border-light sm:grid-cols-2 lg:grid-cols-4">
+          <Tiles className="border-t border-kr-border-light sm:grid-cols-2 lg:grid-cols-4">
             <Tile>
-              <Stat label="Backing" value={ops.indexer.backed ? "OK" : "BROKEN"} hint="checkBacking(), every 2 seconds" />
+              <Stat label="Backing" value={ops.indexer.backed ? "OK" : "BROKEN"} hint="Vault USDT against totals(), every 5 seconds" />
             </Tile>
             <Tile>
-              <Stat label="Indexer lag" value={`${ops.indexer.lag} blocks`} hint={`At block ${ops.indexer.block.toLocaleString("en-US")}`} />
+              <Stat label="Latest event block" value={ops.indexer.block.toLocaleString("en-US")} hint={`Chain head ${ops.indexer.head.toLocaleString("en-US")}`} />
             </Tile>
             <Tile>
               <Stat label="Events indexed" value={ops.indexer.events} />

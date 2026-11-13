@@ -21,8 +21,9 @@ type Bought = { amount: Amount; explorer?: string };
 /**
  * /buy?credits=500&returnTo=https://...
  *
- * Turns test USDT in the user's wallet into credits, 1 USDT = 100 credits. The user signs a
- * USDT permit; our relayer deposits it into the vault and pays the gas.
+ * Turns test USDT in the user's NEAR account into credits, 1 USDT = 100 credits. The user signs
+ * a NEP-141 ft_transfer_call to the vault as a meta transaction; our relayer sends it and pays
+ * the gas.
  *
  * Sent here by an app (the React kit's buy and top up buttons, or the SDK's buyUrl), it's a
  * compact checkout sized for a popup. Opened from our own site, it's the full page.
@@ -93,7 +94,7 @@ function FullBuy() {
       {status === "signed-out" && <SignInPanel title="Sign in to buy credits." />}
       {status === "loading" && (
         <div className="px-6 py-14 sm:px-8 lg:px-16">
-          <div className="h-12 w-96 max-w-full animate-pulse rounded-control bg-wc-surface-2" />
+          <div className="h-12 w-96 max-w-full animate-pulse rounded-control bg-kr-surface-2" />
         </div>
       )}
       {status === "error" && (
@@ -111,26 +112,26 @@ function FullBuy() {
                 {!hasUsdt && !done && (
                   <>
                     {me.faucet?.available && <Faucet usdt={me.faucet.usdt} onDone={() => void refresh()} />}
-                    <p className="text-[15px] leading-6 text-wc-text-muted">
-                      {me.faucet?.available ? "Or send" : "Send"} Whitechain test USDT to your wallet address. The Whitechain team hands it out at their booth.
+                    <p className="text-[15px] leading-6 text-kr-text-muted">
+                      {me.faucet?.available ? "Or send" : "Send"} test USDT to your NEAR account.
                     </p>
-                    <CopyValue value={me.address} className="mt-5" />
-                    <dl className="mt-4 grid grid-cols-3 overflow-hidden rounded-[12px] border border-wc-border-light text-[13px]">
+                    <CopyValue value={me.account} className="mt-5" />
+                    <dl className="mt-4 grid grid-cols-3 overflow-hidden rounded-[12px] border border-kr-border-light text-[13px]">
                       {[
-                        ["Network", "Whitechain Sepolia"],
-                        ["Chain ID", "1874"],
+                        ["Network", "NEAR testnet"],
+                        ["Standard", "NEP-141"],
                         ["Token", "USDT"],
                       ].map(([k, v], i) => (
-                        <div key={k} className={cn("px-4 py-3", i > 0 && "border-l border-wc-border-light")}>
-                          <dt className="text-wc-icon-muted">{k}</dt>
-                          <dd className="mt-0.5 font-medium text-wc-text-1">{v}</dd>
+                        <div key={k} className={cn("px-4 py-3", i > 0 && "border-l border-kr-border-light")}>
+                          <dt className="text-kr-icon-muted">{k}</dt>
+                          <dd className="mt-0.5 font-medium text-kr-text-1">{v}</dd>
                         </div>
                       ))}
                     </dl>
-                    <p className="mt-5 flex items-center gap-2 text-[13px] text-wc-text-muted">
+                    <p className="mt-5 flex items-center gap-2 text-[13px] text-kr-text-muted">
                       <span className="relative flex size-2">
-                        <span className="absolute inline-flex size-full animate-ping rounded-full bg-wc-blue opacity-60" />
-                        <span className="relative inline-flex size-2 rounded-full bg-wc-blue" />
+                        <span className="absolute inline-flex size-full animate-ping rounded-full bg-kr-blue opacity-60" />
+                        <span className="relative inline-flex size-2 rounded-full bg-kr-blue" />
                       </span>
                       Waiting for USDT. This page updates on its own.
                     </p>
@@ -142,7 +143,7 @@ function FullBuy() {
               <Step n={2} title="Turn it into credits" state={done ? "done" : hasUsdt ? "active" : "locked"}>
                 {done ? (
                   <div>
-                    <p className="text-[16px] leading-6 text-wc-text-1">
+                    <p className="text-[16px] leading-6 text-kr-text-1">
                       <strong className="font-semibold">{credits(done.amount)}</strong> added. Your balance is now {credits(me.balance)}.
                     </p>
                     <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -171,7 +172,7 @@ function FullBuy() {
                       unit="USDT"
                       overText={`Your USDT covers ${credits(me.walletUsdt)}`}
                     />
-                    <div className="rounded-[14px] border border-wc-border-light bg-wc-bg">
+                    <div className="rounded-[14px] border border-kr-border-light bg-kr-bg">
                       <Row label="You pay" value={parsed ? `${usd(creditsToUsd(parsed))} USDT` : "Nothing yet"} />
                       <Row label="You get" value={parsed ? credits(parsed) : "No credits"} strong />
                       <Row label="Gas and fees" value="Free" muted />
@@ -183,14 +184,14 @@ function FullBuy() {
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-[15px] text-wc-icon-muted">Once your USDT arrives, choose how many credits to buy. 1 USDT buys 100 credits.</p>
+                  <p className="text-[15px] text-kr-icon-muted">Once your USDT arrives, choose how many credits to buy. 1 USDT buys 100 credits.</p>
                 )}
               </Step>
             </ol>
           </section>
 
-          <aside className="border-t border-wc-border-light bg-wc-bg px-6 py-10 sm:px-8 lg:border-t-0 lg:border-l lg:px-10 lg:py-14">
-            <p className="text-[15px] font-semibold text-wc-text-1">How buying works</p>
+          <aside className="border-t border-kr-border-light bg-kr-bg px-6 py-10 sm:px-8 lg:border-t-0 lg:border-l lg:px-10 lg:py-14">
+            <p className="text-[15px] font-semibold text-kr-text-1">How buying works</p>
             <ul className="mt-5 space-y-5">
               <Point icon={<Coins className="size-4" />} title="1 USDT buys 100 credits">
                 1 credit is $0.01, in every app on the network.
@@ -199,20 +200,20 @@ function FullBuy() {
                 You sign once. The network sends the transaction and pays for it.
               </Point>
               <Point icon={<ShieldCheck className="size-4" />} title="Backed 1:1">
-                Your USDT sits in the vault on Whitechain.{" "}
-                <Link href="/reserves" className="font-medium text-wc-blue hover:underline">
+                Your USDT sits in the vault on NEAR.{" "}
+                <Link href="/reserves" className="font-medium text-kr-blue hover:underline">
                   See the reserves
                 </Link>
               </Point>
               <Point icon={<Sparkles className="size-4" />} title="Spend anywhere">
                 Use them in{" "}
-                <Link href="/ecosystem" className="font-medium text-wc-blue hover:underline">
+                <Link href="/ecosystem" className="font-medium text-kr-blue hover:underline">
                   any app on the network
                 </Link>
                 .
               </Point>
             </ul>
-            <p className="mt-10 border-t border-wc-border-light pt-6 text-[13px] leading-5 text-wc-icon-muted">Your wallet was made for you when you signed in. Only you can sign with it.</p>
+            <p className="mt-10 border-t border-kr-border-light pt-6 text-[13px] leading-5 text-kr-icon-muted">Your wallet was made for you when you signed in. Only you can sign with it.</p>
           </aside>
         </div>
       )}
@@ -227,11 +228,11 @@ function Checkout() {
 
   return (
     <PopupFrame foot="1 credit = $0.01 · No gas or fees · Backed 1:1 by USDT">
-      <h1 className="text-[22px] font-semibold text-wc-text-1">Buy credits</h1>
-      <p className="mt-1 text-[14px] text-wc-text-muted">
+      <h1 className="text-[22px] font-semibold text-kr-text-1">Buy credits</h1>
+      <p className="mt-1 text-[14px] text-kr-text-muted">
         {me ? (
           <>
-            Balance <span className="font-medium text-wc-text-1">{credits(me.balance)}</span> · {usd(me.balance)}
+            Balance <span className="font-medium text-kr-text-1">{credits(me.balance)}</span> · {usd(me.balance)}
           </>
         ) : (
           "One balance for every app on Kredo."
@@ -241,24 +242,24 @@ function Checkout() {
       <PopupCard>
         {status === "signed-out" && (
           <>
-            <p className="text-[15px] leading-6 text-wc-text-muted">Sign in with your email to buy credits. No wallet to install, no gas.</p>
+            <p className="text-[15px] leading-6 text-kr-text-muted">Sign in with your email to buy credits. No wallet to install, no gas.</p>
             <Button size="lg" className="mt-4 h-11 w-full" onClick={() => login()}>
               Continue with email
             </Button>
           </>
         )}
-        {status === "loading" && <div className="h-40 animate-pulse rounded-[12px] bg-wc-surface-2" />}
+        {status === "loading" && <div className="h-40 animate-pulse rounded-[12px] bg-kr-surface-2" />}
         {status === "error" && <Notice tone="error">{expired ? "Your session expired. Sign out and sign in again." : "We couldn't load your account. Close this and try again."}</Notice>}
 
         {status === "ready" && me && done && (
           <div className="py-2 text-center">
-            <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-wc-mint-pastel text-wc-navy">
+            <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-kr-mint-pastel text-kr-navy">
               <Check className="size-5" />
             </span>
-            <p className="mt-4 text-[17px] font-semibold text-wc-text-1">{credits(done.amount)} added</p>
-            <p className="mt-1 text-[14px] text-wc-text-muted">New balance {credits(me.balance)}</p>
+            <p className="mt-4 text-[17px] font-semibold text-kr-text-1">{credits(done.amount)} added</p>
+            <p className="mt-1 text-[14px] text-kr-text-muted">New balance {credits(me.balance)}</p>
             {closing ? (
-              <p className="mt-5 text-[14px] text-wc-icon-muted">Taking you back to the app…</p>
+              <p className="mt-5 text-[14px] text-kr-icon-muted">Taking you back to the app…</p>
             ) : (
               <div className="mt-5 grid gap-2">
                 {returnTo && (
@@ -277,7 +278,7 @@ function Checkout() {
         {status === "ready" && me && !done && hasUsdt && (
           <div className="space-y-4">
             <AmountField value={amount} onChange={setAmount} balance={me.walletUsdt} quick={["100", "500", "1000"]} unit="USDT" overText={`Your USDT covers ${credits(me.walletUsdt)}`} />
-            <div className="rounded-[12px] border border-wc-border-light bg-wc-bg">
+            <div className="rounded-[12px] border border-kr-border-light bg-kr-bg">
               <Row label="You pay" value={parsed ? `${usd(creditsToUsd(parsed))} USDT` : "Nothing yet"} />
               <Row label="You get" value={parsed ? credits(parsed) : "No credits"} strong />
             </div>
@@ -292,12 +293,12 @@ function Checkout() {
         {status === "ready" && me && !done && !hasUsdt && (
           <div>
             {me.faucet?.available && <Faucet usdt={me.faucet.usdt} onDone={() => void refresh()} />}
-            <p className="text-[14px] leading-6 text-wc-text-muted">{me.faucet?.available ? "Or send" : "Send"} test USDT on Whitechain Sepolia to your wallet:</p>
-            <CopyValue value={me.address} className="mt-3" />
-            <p className="mt-4 flex items-center gap-2 text-[13px] text-wc-text-muted">
+            <p className="text-[14px] leading-6 text-kr-text-muted">{me.faucet?.available ? "Or send" : "Send"} test USDT on NEAR testnet to your account:</p>
+            <CopyValue value={me.account} className="mt-3" />
+            <p className="mt-4 flex items-center gap-2 text-[13px] text-kr-text-muted">
               <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-wc-blue opacity-60" />
-                <span className="relative inline-flex size-2 rounded-full bg-wc-blue" />
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-kr-blue opacity-60" />
+                <span className="relative inline-flex size-2 rounded-full bg-kr-blue" />
               </span>
               Waiting for USDT. This updates on its own.
             </p>
@@ -310,24 +311,24 @@ function Checkout() {
 
 function Hero({ balance, wallet }: { balance?: Amount; wallet?: Amount }) {
   return (
-    <section className="relative overflow-hidden border-b border-wc-border-light">
+    <section className="relative overflow-hidden border-b border-kr-border-light">
       <div aria-hidden className="bg-plus pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,#000,transparent)]" />
       <div className="relative grid gap-8 px-6 pt-section-t pb-12 sm:px-8 lg:grid-cols-[1fr_auto] lg:items-end lg:gap-16 lg:px-16">
         <div className="motion-safe:animate-rise">
-          <h1 className="type-hero max-w-2xl font-semibold text-balance text-wc-text-1">Buy credits once. Spend them anywhere.</h1>
-          <p className="mt-5 max-w-xl text-[17px] leading-[1.625] text-wc-text-muted">One balance for every app on the network, backed by USDT in the vault on Whitechain.</p>
+          <h1 className="type-hero max-w-2xl font-semibold text-balance text-kr-text-1">Buy credits once. Spend them anywhere.</h1>
+          <p className="mt-5 max-w-xl text-[17px] leading-[1.625] text-kr-text-muted">One balance for every app on the network, backed by USDT in the vault on NEAR.</p>
         </div>
         {balance && wallet && (
-          <div className="grid w-full grid-cols-2 overflow-hidden rounded-[16px] border border-wc-border-light bg-wc-surface lg:w-[400px]">
+          <div className="grid w-full grid-cols-2 overflow-hidden rounded-[16px] border border-kr-border-light bg-kr-surface lg:w-[400px]">
             <div className="px-6 py-5">
-              <p className="text-[13px] font-medium text-wc-text-muted">Your credits</p>
-              <p className="mt-1 text-[28px] leading-none text-wc-text-1">{credits(balance, { unit: false })}</p>
-              <p className="mt-1.5 text-[14px] text-wc-text-muted">{usd(balance)}</p>
+              <p className="text-[13px] font-medium text-kr-text-muted">Your credits</p>
+              <p className="mt-1 text-[28px] leading-none text-kr-text-1">{credits(balance, { unit: false })}</p>
+              <p className="mt-1.5 text-[14px] text-kr-text-muted">{usd(balance)}</p>
             </div>
-            <div className="border-l border-wc-border-light px-6 py-5">
-              <p className="text-[13px] font-medium text-wc-text-muted">USDT in wallet</p>
-              <p className="mt-1 text-[28px] leading-none text-wc-text-1">{usd(wallet)}</p>
-              <p className="mt-1.5 text-[14px] text-wc-text-muted">Buys {credits(wallet)}</p>
+            <div className="border-l border-kr-border-light px-6 py-5">
+              <p className="text-[13px] font-medium text-kr-text-muted">USDT in wallet</p>
+              <p className="mt-1 text-[28px] leading-none text-kr-text-1">{usd(wallet)}</p>
+              <p className="mt-1.5 text-[14px] text-kr-text-muted">Buys {credits(wallet)}</p>
             </div>
           </div>
         )}
@@ -336,7 +337,7 @@ function Hero({ balance, wallet }: { balance?: Amount; wallet?: Amount }) {
   );
 }
 
-/** Free test USDT from the network, once per account, so anyone can try it without the booth. */
+/** Free test USDT from the network, once per account, so anyone can try it without hunting for a faucet. */
 function Faucet({ usdt, onDone }: { usdt: string; onDone: () => void }) {
   const api = useApi();
   const [busy, setBusy] = useState(false);
@@ -358,11 +359,11 @@ function Faucet({ usdt, onDone }: { usdt: string; onDone: () => void }) {
   }
 
   return (
-    <div className="mb-6 rounded-[14px] border border-wc-blue/20 bg-wc-blue/5 p-5">
+    <div className="mb-6 rounded-[14px] border border-kr-blue/20 bg-kr-blue/5 p-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-[15px] font-semibold text-wc-text-1">Try it free</p>
-          <p className="mt-0.5 text-[14px] text-wc-text-muted">
+          <p className="text-[15px] font-semibold text-kr-text-1">Try it free</p>
+          <p className="mt-0.5 text-[14px] text-kr-text-muted">
             Get {usdt} test USDT, enough for {credits} credits. Once per account.
           </p>
         </div>
@@ -389,18 +390,18 @@ function Faucet({ usdt, onDone }: { usdt: string; onDone: () => void }) {
 /** A numbered step: done (check), active (open) or locked (greyed until the step before is done). */
 function Step({ n, title, state, aside, children }: { n: number; title: string; state: "done" | "active" | "locked"; aside?: string; children?: React.ReactNode }) {
   return (
-    <li className={cn("rounded-[16px] border p-6 transition-colors", state === "active" ? "border-wc-border bg-wc-surface shadow-[0_8px_24px_-16px_rgba(8,10,40,0.25)]" : "border-wc-border-light bg-wc-surface")}>
+    <li className={cn("rounded-[16px] border p-6 transition-colors", state === "active" ? "border-kr-border bg-kr-surface shadow-[0_8px_24px_-16px_rgba(8,10,40,0.25)]" : "border-kr-border-light bg-kr-surface")}>
       <div className="flex items-center gap-3">
         <span
           className={cn(
             "flex size-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold",
-            state === "done" ? "bg-wc-mint-pastel text-wc-navy" : state === "active" ? "bg-wc-blue text-white" : "bg-wc-surface-2 text-wc-icon-muted",
+            state === "done" ? "bg-kr-mint-pastel text-kr-navy" : state === "active" ? "bg-kr-blue text-white" : "bg-kr-surface-2 text-kr-icon-muted",
           )}
         >
           {state === "done" ? <Check className="size-4" /> : n}
         </span>
-        <p className={cn("flex-1 text-[17px] font-medium", state === "locked" ? "text-wc-icon-muted" : "text-wc-text-1")}>{title}</p>
-        {aside && <span className="text-[13px] font-medium text-wc-text-muted">{aside}</span>}
+        <p className={cn("flex-1 text-[17px] font-medium", state === "locked" ? "text-kr-icon-muted" : "text-kr-text-1")}>{title}</p>
+        {aside && <span className="text-[13px] font-medium text-kr-text-muted">{aside}</span>}
       </div>
       {children && <div className="mt-5 pl-10">{children}</div>}
     </li>
@@ -409,9 +410,9 @@ function Step({ n, title, state, aside, children }: { n: number; title: string; 
 
 function Row({ label, value, strong, muted }: { label: string; value: string; strong?: boolean; muted?: boolean }) {
   return (
-    <div className="flex h-11 items-center justify-between border-b border-wc-border-light px-4 text-[14px] last:border-b-0">
-      <span className="text-wc-text-muted">{label}</span>
-      <span className={cn(strong ? "text-[16px] font-semibold text-wc-text-1" : muted ? "text-emerald-700" : "font-medium text-wc-text-1")}>{value}</span>
+    <div className="flex h-11 items-center justify-between border-b border-kr-border-light px-4 text-[14px] last:border-b-0">
+      <span className="text-kr-text-muted">{label}</span>
+      <span className={cn(strong ? "text-[16px] font-semibold text-kr-text-1" : muted ? "text-emerald-700" : "font-medium text-kr-text-1")}>{value}</span>
     </div>
   );
 }
@@ -419,10 +420,10 @@ function Row({ label, value, strong, muted }: { label: string; value: string; st
 function Point({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
     <li className="flex gap-3">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-wc-border-light bg-wc-surface text-wc-blue">{icon}</span>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-kr-border-light bg-kr-surface text-kr-blue">{icon}</span>
       <div>
-        <p className="text-[14px] font-medium text-wc-text-1">{title}</p>
-        <p className="mt-0.5 text-[14px] leading-5 text-wc-text-muted">{children}</p>
+        <p className="text-[14px] font-medium text-kr-text-1">{title}</p>
+        <p className="mt-0.5 text-[14px] leading-5 text-kr-text-muted">{children}</p>
       </div>
     </li>
   );
