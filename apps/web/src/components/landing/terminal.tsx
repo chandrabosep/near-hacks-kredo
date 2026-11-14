@@ -4,7 +4,10 @@ import { useState } from "react";
 
 const CODE = `import { Credits } from "kredo";
 
-const credits = new Credits({ apiKey: process.env.CREDITS_API_KEY });
+const credits = new Credits({
+  apiKey: process.env.CREDITS_API_KEY,
+  signerKey: process.env.CREDITS_SIGNER_KEY, // only this key can charge for your app
+});
 
 // One-off actions: charge right away.
 await credits.charge({ user, action: "chat.message" });
@@ -53,6 +56,7 @@ export function Terminal() {
         <p className="text-kr-navy-mute">│ network  <span className="text-kr-text-dark-2">NEAR · USDT settled</span></p>
         <p className="text-kr-navy-mute">│ gas      <span className="text-kr-text-dark-2">paid by the relayer, never by users</span></p>
         <p className="text-kr-navy-mute">│ limit    <span className="text-kr-text-dark-2">enforced onchain, per app</span></p>
+        <p className="text-kr-navy-mute">│ signer   <span className="text-kr-text-dark-2">your app&apos;s own NEAR key, nothing else</span></p>
         <p className="mb-5">
           <span className="text-kr-lime">◆</span> <span className="text-white">ready</span>
         </p>

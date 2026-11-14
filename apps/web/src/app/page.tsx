@@ -3,6 +3,7 @@ import Link from "next/link";
 import { DitherField, PlusGrid } from "@/components/dots";
 import { Footer } from "@/components/footer";
 import { EcosystemPreview } from "@/components/landing/live";
+import { NearSection } from "@/components/landing/near";
 import { Terminal } from "@/components/landing/terminal";
 import { Header } from "@/components/shell";
 import { buttonVariants } from "@/components/ui/button";
@@ -46,7 +47,7 @@ const PLATFORM = [
   },
 ];
 
-const STEPS = ["Register your app and price each action.", "Users connect once and approve a limit.", "Charge per use and withdraw USDT."];
+const STEPS = ["Register your app, get its signer key, and price each action.", "Users connect once and approve a limit.", "Charge per use and withdraw USDT."];
 
 export default function Home() {
   return (
@@ -61,7 +62,7 @@ export default function Home() {
             <div className="relative z-10 px-6 py-16 motion-safe:animate-rise sm:px-8 md:px-14 lg:px-16">
               <p className="inline-flex items-center gap-2 rounded-[20px] border border-kr-border-light bg-kr-surface px-3 py-1 text-[13px] font-medium text-kr-text-2">
                 <span className="size-1.5 rounded-full bg-kr-mint-2" />
-                Live on NEAR
+                Live on NEAR testnet
               </p>
               <h1 className="type-hero mt-6 max-w-2xl font-semibold text-balance text-kr-text-1">The Unified Payment Layer for the AI Ecosystem.</h1>
               <p className="mt-5 text-[19px] font-medium tracking-[-0.01em] text-kr-blue sm:text-[21px]">One balance. One network. One interface.</p>
@@ -119,6 +120,8 @@ export default function Home() {
               ))}
             </div>
           </section>
+
+          <NearSection />
 
           {/* Build */}
           <section id="build" className="scroll-mt-16 border-t border-kr-border-light lg:scroll-mt-[76px]">
