@@ -19,7 +19,7 @@
 
 Kredo was first built at **ETHGlobal Mumbai** (5 to 7 Nov 2026) on **Whitechain Sepolia**, an EVM chain (chain ID 1874), with a Solidity `CreditVault`. That version is still live at [kredo-omega.vercel.app](https://kredo-omega.vercel.app), and `kredo@0.1.0` / `kredo-react@0.1.x` on npm (6 Nov) are its packages. For this hackathon it was ported to NEAR.
 
-**Old and new work, kept apart.** This repo's history starts with the EVM build's 85 commits exactly as they were made (5 to 7 Nov), ending at the tag `ethglobal-final`. Every commit after that tag is the NEAR port, committed on 13 Nov, plus README updates on 14 Nov.
+**Old and new work, kept apart.** This repo's history starts with the EVM build's 85 commits exactly as they were made (5 to 7 Nov), ending at the tag `ethglobal-final`. Every commit after that tag is the NEAR port, committed on 13 Nov. On 14 Nov came the landing page and docs, the `kredo@0.3.0` release, the merge of the NEAR Intents branch (its commits are from 13 Nov), and README updates.
 
 | | |
 |---|---|
@@ -37,12 +37,14 @@ Timeline, with outside records:
 | First NEAR vault, test USDT and first deposit | 13 Nov 14:52 | [vault deploy tx](https://testnet.nearblocks.io/txns/7fd62FuSFSDY6huZzcCZX1tPza75ZRuBrwczZLBqoegw) |
 | `kredo@0.2.0` and `0.2.1` published (NEAR) | 13 Nov 17:46 to 17:49 | [npm](https://www.npmjs.com/package/kredo?activeTab=versions) |
 | NEAR port committed | 13 Nov 18:11 | commits from `ethglobal-final` to `hackathon-submission` |
+| NEAR Intents branch committed (merged 14 Nov 09:33) | 13 Nov 18:55 to 19:00 | [`feat/intents`](https://github.com/chandrabosep/near-hacks-kredo/commits/feat/intents) |
 | NEP-145 storage and app-signed charges committed, `vault-v2` deployed | 13 Nov 18:44 to 20:45 | [PR #1](https://github.com/chandrabosep/near-hacks-kredo/pull/1), [vault-v2 deploy tx](https://testnet.nearblocks.io/txns/BesTccaHC9MdESr9yx5wMKSvrXZDQtnMAU4prjcwvUAL) |
 
 **New for NEAR** (everything else, such as the hosted pages, dashboard, docs site, SDK surface and the Parley and Lumen demos, was carried over and only adapted for NEAR account IDs):
 
 - **Vault contract rewritten in Rust** ([contracts/vault](contracts/vault/src/lib.rs)): deposits through `ft_transfer_call`, per-app limits, charge, hold, capture and release, refunds, transfers, claim links and payouts, with NEP-297 events and 61 unit tests. It replaces the Solidity `CreditVault` and its Foundry tests, which are removed.
 - **Apps sign their own charges** with a NEAR sub-account and a function-call key (see [Security](#security-who-can-move-money)). The EVM build had one operator that could charge for every app. On NEAR, Kredo's keys can't charge anyone.
+- **Buy credits from any chain with NEAR Intents** ([apps/api/src/intents.ts](apps/api/src/intents.ts), [routes/intents.ts](apps/api/src/routes/intents.ts), [buy/any-chain.tsx](apps/web/src/app/buy/any-chain.tsx)). See [Buy from any chain](#buy-from-any-chain-near-intents).
 - **NEP-145 storage, paid by whoever adds the state** ([`storage_deposit`](contracts/vault/src/lib.rs)). A deposit, approval or send can't make the vault pay NEAR for someone else's data.
 - **Test USDT as a NEP-141 token** ([contracts/usdt](contracts/usdt/src/lib.rs)), replacing the ERC-20 mock.
 - **NEAR chain client** ([apps/api/src/near.ts](apps/api/src/near.ts), [vault.ts](apps/api/src/vault.ts)) with typed vault views, replacing viem and the generated ABIs.
@@ -105,6 +107,19 @@ Addresses and transactions are also in [contracts/deployments/testnet.json](cont
 5. **Get paid.** The app withdraws its earnings in USDT whenever it likes.
 
 Every user action (buy, connect, disconnect, send, claim link) is a NEAR meta transaction (NEP-366). The API builds a delegate action for the user's own account, the browser signs its hash with the Privy NEAR wallet, and the relayer wraps it in a transaction and pays the gas. The vault sees the user as the caller, and the relayer can't change what was signed. Charges, holds, captures and refunds work the same way, but are signed by the app: the API prepares a delegate action for the app's signer account, the app's server checks it and signs it with its own key through the SDK, and the relayer pays the gas. Payouts go to the app's own payout account. The vault's NEP-297 events are read straight from each transaction's outcome into activity and webhooks.
+
+## Buy from any chain (NEAR Intents)
+
+A user can pay with USDC on Base, ETH, SOL, BTC and more, from the wallet they already have, without holding NEAR. The API asks NEAR Intents' 1Click API for an exact-output quote: exactly the credits' worth of USDT, delivered to the vault for that user. The user pays the deposit address 1Click returns, solvers fill the swap, and NEAR Intents withdraws the USDT to the vault with `ft_transfer_call` and `{"user": "<their account>"}` (1Click's `customRecipientMsg`). The vault's own `ft_on_transfer` then credits them, exactly as for a direct deposit. Before a live quote, the API registers the user's vault storage (NEP-145), so the deposit isn't refunded. Nobody holds the money in between.
+
+**On testnet this is a preview.** NEAR Intents runs only on mainnet, and this vault holds test USDT, so `/buy` shows real 1Click prices but no deposit address, and says so. For example, 1 USDT costs 1.0098 USDC on Base, with an estimated 37 seconds. Nothing settles until the vault is on mainnet. The mainnet path is in the repo but hasn't been run:
+
+```bash
+OWNER=you.near npm run deploy:mainnet     # vault against usdt.tether-token.near; asks before spending
+npx tsx scripts/intents-buy.ts --user <account> --credits 100 --from USDC@base --refund <your base address>
+```
+
+Live quotes turn on by themselves when `NEAR_NETWORK=mainnet`. Optional settings are `ONECLICK_JWT`, a cap per purchase with `INTENTS_MAX_CREDITS` (default 10,000), and `INTENTS_LIVE`. `customRecipientMsg` is marked experimental in 1Click's docs. If it misbehaves, the fallback is to deliver to the user's own account and run the usual `ft_transfer_call` buy.
 
 ## Integrate
 
@@ -237,7 +252,7 @@ Every service redeploys on a push to `main`. A database used by an earlier vault
 - Parley and Lumen are Kredo's own demos, so their payout account is Kredo's owner account, which can rotate their signers. A company's app pays out to its own account, and only that account can rotate its signer.
 - On testnet one account is the owner, and the relayer is the operator. In production the owner would be a multisig.
 - Storage isn't refunded when state shrinks (holds closing, claims settling).
-- Buying from another chain with NEAR Intents isn't included. NEAR Intents is mainnet-only, and this vault runs on testnet.
+- Buying from another chain is a preview on testnet (real quotes, nothing to pay), because NEAR Intents is mainnet-only. The mainnet deploy and buy scripts haven't been run.
 - Activity is built from transactions the network sends. A deposit made straight from another NEAR wallet shows in balances, not in activity.
 - Users can't cash credits out to USDT. They can send them or share a claim link. Only apps are paid out.
 - One charge per transaction, with no batching yet.
@@ -255,7 +270,7 @@ Every service redeploys on a push to `main`. A database used by an earlier vault
 | API | [near-api-js](https://github.com/near/near-api-js), Express, Drizzle ORM on Postgres (PGlite in tests), Zod, `@privy-io/node` |
 | Hosted pages | Next.js, React, `@privy-io/react-auth` (embedded NEAR wallets), shadcn/ui on Base UI, Tailwind, MDX with Shiki for the docs, `@noble/curves` and `@scure/base` for ed25519 and base58 |
 | Demos | Next.js; Parley uses the Anthropic SDK |
-| Infrastructure | FastNEAR RPC, NearBlocks, Privy, Vercel, Render |
+| Infrastructure | FastNEAR and dRPC RPC, NearBlocks, NEAR Intents (1Click API), Privy, Vercel, Render |
 
 **AI-assisted code.** Most of the code in this repo, on both the EVM build and the NEAR port, was written with [Claude Code](https://claude.com/claude-code) (Claude Opus) working under my direction: I set the design, reviewed the changes, and ran and tested them. 56 of the 85 EVM-build commits and every NEAR-port commit carry a `Co-Authored-By: Claude` trailer.
 
