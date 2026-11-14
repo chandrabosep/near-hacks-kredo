@@ -14,6 +14,7 @@ import { ApiError, useAction, useApi } from "@/lib/api";
 import { credits, creditsToUsd, parseCredits, safeReturnTo, usd, type Amount } from "@/lib/format";
 import { isPopup, postToOpener, returnUrl } from "@/lib/handoff";
 import { useMe } from "@/lib/me";
+import { AnyChainBuy } from "./any-chain";
 import { cn } from "@/lib/utils";
 
 type Bought = { amount: Amount; explorer?: string };
@@ -188,6 +189,9 @@ function FullBuy() {
                 )}
               </Step>
             </ol>
+            <div className="mt-4 max-w-xl">
+              <AnyChainBuy defaultCredits={parsed} onBought={() => void refresh()} />
+            </div>
           </section>
 
           <aside className="border-t border-kr-border-light bg-kr-bg px-6 py-10 sm:px-8 lg:border-t-0 lg:border-l lg:px-10 lg:py-14">

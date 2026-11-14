@@ -23,6 +23,8 @@
     "fund:testnet": "scripts/fund-testnet.sh",
     "dev:parley": "npm run dev -w @demo/parley",
     "dev:lumen": "npm run dev -w @demo/lumen",
-    "demos:keys": "scripts/demo-keys.sh"
+    "demos:keys": "scripts/demo-keys.sh",
+    "deploy:mainnet": "scripts/deploy-mainnet.sh",
+    "intents:buy": "tsx scripts/intents-buy.ts"
   }
 }
