@@ -1,14 +1,13 @@
 "use client";
 
-import { ArrowLeftRight, Check } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowLeftRight, Check, Clock } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CopyValue } from "@/components/copy";
-import { Notice, Spinner, TxLink } from "@/components/shell";
+import { Field, Notice, SelectField, Spinner, TxLink } from "@/components/shell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, useApi } from "@/lib/api";
-import { credits, parseCredits, usd, type Amount } from "@/lib/format";
+import { credits, creditsToUsd, parseCredits, usd, type Amount } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 type Asset = { assetId: string; symbol: string; chain: string; decimals: number; priceUsd: number };
 type Assets = { live: boolean; network: string; assets: Asset[] };
@@ -50,6 +49,7 @@ const chainName = (c: string) => CHAINS[c] ?? c.toUpperCase();
 const EVM = new Set(["base", "arb", "eth", "op", "pol", "bsc", "avax", "gnosis", "bera"]);
 /** The tokens most people hold, shown first. */
 const FAVOURITES = ["USDC@base", "USDC@arb", "USDC@eth", "USDC@sol", "USDT@eth", "ETH@eth", "SOL@sol", "BTC@btc"];
+const QUICK = ["100", "500", "1000"];
 
 const STEPS: Record<Status["status"], string> = {
   PENDING_DEPOSIT: "Waiting for your payment",
@@ -61,34 +61,44 @@ const STEPS: Record<Status["status"], string> = {
   FAILED: "The swap failed and will be refunded",
 };
 
+/** 5.047978 -> "5.048", 0.0000753 -> "0.0000753": four significant digits, no trailing zeros. */
+const tokenAmount = (s: string) => {
+  const n = Number(s);
+  return Number.isFinite(n) && n > 0 ? String(Number(n.toPrecision(4))) : s;
+};
+const duration = (s?: number) => (s === undefined ? "a minute or so" : s < 90 ? `about ${s} seconds` : `about ${Math.round(s / 60)} minutes`);
+
 /**
  * Pay for credits with a token on another chain, through NEAR Intents. The API asks 1Click for
  * exactly the credits' USDT, delivered to the vault for this user; the user pays a deposit address
  * from their own wallet, and the vault credits them when the swap settles.
+ *
+ * Off mainnet the quotes are dry: the price updates as you type, and there is nothing to pay.
  */
 export function AnyChainBuy({ defaultCredits = "500", onBought }: { defaultCredits?: string; onBought: () => void }) {
   const api = useApi();
-  const [input, setInput] = useState(defaultCredits);
+  const [input, setInput] = useState(defaultCredits || "500");
   const amount = parseCredits(input);
   const [assets, setAssets] = useState<Assets>();
-  const [assetId, setAssetId] = useState<string>();
+  const [assetId, setAssetId] = useState("");
   const [refundTo, setRefundTo] = useState("");
-  const [quote, setQuote] = useState<Quote>();
+  const [quote, setQuote] = useState<Quote & { assetId: string }>();
   const [status, setStatus] = useState<Status>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const latest = useRef(0);
 
   useEffect(() => {
     api<Assets>("GET", "/v1/intents/assets")
       .then((a) => {
         setAssets(a);
         const first = FAVOURITES.map((f) => a.assets.find((x) => `${x.symbol}@${x.chain}` === f)).find(Boolean);
-        setAssetId((first ?? a.assets[0])?.assetId);
+        setAssetId((first ?? a.assets[0])?.assetId ?? "");
       })
       .catch(() => setError("NEAR Intents is unreachable right now."));
   }, [api]);
 
-  const items = useMemo(() => {
+  const options = useMemo(() => {
     if (!assets) return {};
     const rank = (a: Asset) => {
       const i = FAVOURITES.indexOf(`${a.symbol}@${a.chain}`);
@@ -99,6 +109,35 @@ export function AnyChainBuy({ defaultCredits = "500", onBought }: { defaultCredi
   }, [assets]);
 
   const asset = assets?.assets.find((a) => a.assetId === assetId);
+  const preview = assets ? !assets.live : false;
+
+  async function getQuote() {
+    if (!amount || !assetId) return;
+    const id = ++latest.current;
+    setBusy(true);
+    setError(undefined);
+    setStatus(undefined);
+    try {
+      const body = { originAsset: assetId, credits: amount, ...(preview ? {} : { refundTo: refundTo.trim() }) };
+      const q = await api<Quote>("POST", "/v1/me/intents/quote", body);
+      if (id === latest.current) setQuote({ ...q, assetId });
+    } catch (err) {
+      if (id !== latest.current) return;
+      setQuote(undefined);
+      setError(err instanceof ApiError ? err.message : (err as Error).message);
+    } finally {
+      if (id === latest.current) setBusy(false);
+    }
+  }
+
+  // Preview: the price follows the amount and token, a moment after typing stops.
+  useEffect(() => {
+    if (!preview || !amount || !assetId) return;
+    const t = setTimeout(() => void getQuote(), 450);
+    return () => clearTimeout(t);
+    // getQuote reads the same state these name.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview, amount, assetId]);
 
   // Follow a live purchase until it settles.
   useEffect(() => {
@@ -116,107 +155,158 @@ export function AnyChainBuy({ defaultCredits = "500", onBought }: { defaultCredi
     return () => clearInterval(t);
   }, [api, quote, status?.settled, onBought]);
 
-  async function getQuote() {
-    if (!amount || !assetId) return;
-    setBusy(true);
-    setError(undefined);
-    setQuote(undefined);
-    setStatus(undefined);
-    try {
-      setQuote(await api<Quote>("POST", "/v1/me/intents/quote", { originAsset: assetId, credits: amount, refundTo: refundTo.trim() }));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : (err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const refundHint = !asset ? "" : EVM.has(asset.chain) ? "0x…" : asset.chain === "sol" ? "Your Solana address" : asset.chain === "btc" ? "bc1…" : `Your ${chainName(asset.chain)} address`;
+  // What the swap costs on top of the USDT: the solvers' spread and the origin chain's fees.
+  const swapCost = quote?.amountInUsd ? Number(quote.amountInUsd) - Number(quote.credits.usd) : undefined;
+  const awaitingPayment = Boolean(quote?.depositAddress);
+  // A quote for another amount or token is shown faded until the new one arrives.
+  const stale = busy || (quote !== undefined && (quote.assetId !== assetId || amount === undefined || Number(quote.credits.credits) !== Number(amount)));
 
   return (
-    <div className="rounded-[16px] border border-kr-border-light bg-kr-surface p-6">
-      <div className="flex items-center gap-3">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-kr-surface-2 text-kr-blue">
+    <div className="rounded-[16px] border border-kr-border-light bg-kr-surface p-5 sm:p-6">
+      <div className="flex items-start gap-3">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-kr-surface-2 text-kr-blue">
           <ArrowLeftRight className="size-4" />
         </span>
-        <p className="flex-1 text-[17px] font-medium text-kr-text-1">Or pay from another chain</p>
-        <span className="text-[13px] font-medium text-kr-text-muted">NEAR Intents</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="text-[17px] leading-8 font-medium text-kr-text-1">Or pay from another chain</p>
+            {preview && (
+              <span className="rounded-[20px] border border-kr-border-light bg-kr-bg px-2.5 py-0.5 text-[12px] font-medium text-kr-text-2" title="NEAR Intents runs on mainnet only">
+                Preview on {assets?.network}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-[15px] leading-6 text-kr-text-muted">USDC, ETH, SOL or BTC from the wallet you already have. No bridge, and no NEAR needed.</p>
+        </div>
       </div>
 
-      <div className="mt-5 space-y-4 pl-10">
-        <p className="text-[15px] leading-6 text-kr-text-muted">
-          Pay with USDC on Base, ETH, SOL, BTC and more from the wallet you already have. Solvers swap it into USDT and deliver it straight to the vault for you. No bridge, no NEAR needed.
-        </p>
+      {assets && !awaitingPayment && (
+        <div className="mt-6 space-y-5 sm:pl-11">
+          <SelectField label="Pay with" value={assetId} onChange={setAssetId} options={options} />
 
-        {assets && !assets.live && (
-          <Notice>Preview: NEAR Intents runs on mainnet and this server is on {assets.network}, so prices are real but there&apos;s nowhere to pay here.</Notice>
-        )}
-
-        {assets && (
-          <div className="grid gap-3 sm:grid-cols-[140px_1fr_1fr]">
-            <Input
-              className="h-12 rounded-control border-kr-border bg-kr-surface px-3 text-[15px] md:text-[15px]"
+          <div>
+            <Field
+              label="Credits"
               inputMode="decimal"
+              placeholder="0"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              aria-label="Credits to buy"
-              placeholder="Credits"
+              suffix={amount ? usd(creditsToUsd(amount)) : "$0.00"}
             />
-            <Select items={items} value={assetId ?? null} onValueChange={(v) => v && setAssetId(v as string)}>
-              <SelectTrigger aria-label="Pay with" className="h-12 w-full rounded-control border-kr-border bg-kr-surface px-3 text-[15px] data-[size=default]:h-12">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(items).map(([v, label]) => (
-                  <SelectItem key={v} value={v} className="text-[15px]">
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              className="h-12 rounded-control border-kr-border bg-kr-surface px-3 text-[15px] md:text-[15px]"
+            <div className="mt-3 flex flex-wrap gap-2">
+              {QUICK.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setInput(q)}
+                  className={cn(
+                    "h-8 rounded-[20px] border px-3 text-[13px] font-medium transition-colors",
+                    input === q ? "border-kr-navy bg-kr-navy text-white" : "border-kr-border-light text-kr-text-2 hover:border-kr-border hover:text-kr-navy",
+                  )}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {!preview && asset && (
+            <Field
+              label={`Your ${asset.symbol} address on ${chainName(asset.chain)}`}
               placeholder={refundHint}
               value={refundTo}
               onChange={(e) => setRefundTo(e.target.value)}
-              aria-label="Refund address"
               spellCheck={false}
+              autoComplete="off"
+              hint="Only used if the swap can't finish: your payment is sent back here."
             />
-          </div>
-        )}
-        <p className="text-[13px] text-kr-icon-muted">The refund address is yours on the paying chain. If the swap can&apos;t complete, the payment goes back there.</p>
+          )}
 
-        {error && <Notice tone="error">{error}</Notice>}
+          {error && <Notice tone="error">{error}</Notice>}
 
-        {!quote && (
-          <Button size="lg" variant="outline" className="h-12 w-full" disabled={!amount || !assetId || !refundTo.trim() || busy} onClick={getQuote}>
-            {busy && <Spinner />}
-            {busy ? "Getting a quote" : amount ? `Quote ${credits(amount)} in ${asset?.symbol ?? "…"}` : "Enter how many credits"}
-          </Button>
-        )}
-
-        {quote && (
-          <div className="rounded-[14px] border border-kr-border-light bg-kr-bg">
-            <Line label="You send" value={`${quote.amountInFormatted} ${asset?.symbol ?? ""} on ${asset ? chainName(asset.chain) : ""}`} strong />
-            {quote.amountInUsd && <Line label="Worth" value={`$${Number(quote.amountInUsd).toFixed(2)}`} />}
-            <Line label="You get" value={`${credits(quote.credits)} (${usd(quote.credits)} USDT in the vault)`} />
-            <Line label="Takes" value={`About ${quote.timeEstimate ?? "?"} seconds after your payment lands`} />
-            {quote.depositAddress ? (
-              <div className="border-t border-kr-border-light p-4">
-                <p className="text-[13px] font-medium text-kr-text-muted">
-                  Send exactly that to this address on {asset ? chainName(asset.chain) : "that chain"}, before {new Date(quote.deadline).toLocaleTimeString()}
+          {((quote && amount) || (preview && busy)) && (
+            <div className={cn("overflow-hidden rounded-[14px] border border-kr-border-light bg-kr-bg transition-opacity", stale && "opacity-60")} aria-live="polite">
+              <div className="px-4 pt-4 pb-5">
+                <p className="text-[13px] font-medium text-kr-text-muted">You pay</p>
+                {quote ? (
+                  <p className="mt-1 text-[24px] leading-8 font-semibold text-kr-text-1">
+                    {tokenAmount(quote.amountInFormatted)} <span className="text-kr-text-2">{asset?.symbol}</span>
+                  </p>
+                ) : (
+                  <p className="mt-1 flex h-8 items-center gap-2 text-[15px] text-kr-text-muted">
+                    <Spinner /> Getting a price
+                  </p>
+                )}
+                <p className="text-[14px] text-kr-text-muted">
+                  on {asset ? chainName(asset.chain) : "…"}
+                  {quote?.amountInUsd ? ` · $${Number(quote.amountInUsd).toFixed(2)}` : ""}
                 </p>
-                <CopyValue value={quote.depositAddress} className="mt-2" />
-                {quote.depositMemo && <CopyValue value={quote.depositMemo} label="Memo" className="mt-2" />}
               </div>
-            ) : (
-              <p className="border-t border-kr-border-light p-4 text-[13px] text-kr-text-muted">{quote.note}</p>
-            )}
-          </div>
-        )}
+              <div className="relative border-t border-kr-border-light">
+                <span className="absolute -top-3.5 left-4 flex size-7 items-center justify-center rounded-full border border-kr-border-light bg-kr-surface text-kr-text-muted">
+                  <ArrowDown className="size-3.5" />
+                </span>
+              </div>
+              <div className="px-4 pt-5 pb-4">
+                <p className="text-[13px] font-medium text-kr-text-muted">You get</p>
+                <p className="mt-1 text-[24px] leading-8 font-semibold text-kr-text-1">{quote ? credits(quote.credits) : amount ? credits(amount) : "…"}</p>
+                <p className="text-[14px] text-kr-text-muted">{quote ? `${usd(quote.credits)} USDT, credited by the vault` : " "}</p>
+              </div>
+              {quote && (
+                <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-kr-border-light px-4 py-3 text-[13px] text-kr-text-muted">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="size-3.5" /> Arrives {duration(quote.timeEstimate)} after you pay
+                  </span>
+                  {swapCost !== undefined && swapCost > 0.005 && <span>Swap cost ${swapCost.toFixed(2)}</span>}
+                </div>
+              )}
+              {preview && (
+                <p className="border-t border-kr-border-light bg-kr-surface px-4 py-3 text-[13px] leading-5 text-kr-text-muted">
+                  This price is live from NEAR Intents. Payment opens when Kredo moves to mainnet, since NEAR Intents doesn&apos;t run on {assets.network}.
+                </p>
+              )}
+            </div>
+          )}
 
-        {quote?.depositAddress && (
-          <div className="flex items-center gap-2 text-[14px]">
+          {!preview && (
+            <Button size="lg" className="h-12 w-full" disabled={!amount || !assetId || !refundTo.trim() || busy} onClick={getQuote}>
+              {busy && <Spinner />}
+              {busy ? "Getting a deposit address" : amount ? `Get the price and deposit address` : "Enter how many credits"}
+            </Button>
+          )}
+
+          <p className="text-[12px] text-kr-icon-muted">Swaps by NEAR Intents solvers. The USDT goes straight into the vault, and nobody holds your money in between.</p>
+        </div>
+      )}
+
+      {!assets && !error && (
+        <p className="mt-6 flex items-center gap-2 text-[14px] text-kr-text-muted sm:pl-11">
+          <Spinner /> Loading what you can pay with
+        </p>
+      )}
+      {!assets && error && (
+        <div className="mt-6 sm:pl-11">
+          <Notice tone="error">{error}</Notice>
+        </div>
+      )}
+
+      {quote?.depositAddress && (
+        <div className="mt-6 space-y-4 sm:pl-11">
+          <div className="rounded-[14px] border border-kr-border-light bg-kr-bg p-4">
+            <p className="text-[13px] font-medium text-kr-text-muted">
+              Send exactly this, on {asset ? chainName(asset.chain) : "that chain"}, before {new Date(quote.deadline).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+            </p>
+            <p className="mt-1 text-[24px] leading-8 font-semibold text-kr-text-1">
+              {quote.amountInFormatted} <span className="text-kr-text-2">{asset?.symbol}</span>
+            </p>
+            <p className="mt-4 text-[13px] font-medium text-kr-text-muted">To this address</p>
+            <CopyValue value={quote.depositAddress} className="mt-2" />
+            {quote.depositMemo && <CopyValue value={quote.depositMemo} label="Memo" className="mt-2" />}
+            <p className="mt-4 text-[13px] text-kr-text-muted">You get {credits(quote.credits)}, {duration(quote.timeEstimate)} after it lands.</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-[14px]">
             {status?.status === "SUCCESS" ? (
               <span className="flex items-center gap-2 font-medium text-emerald-700">
                 <Check className="size-4" /> {credits(quote.credits)} added{status.balance ? `. Balance ${credits(status.balance)}` : ""}.
@@ -233,29 +323,20 @@ export function AnyChainBuy({ defaultCredits = "500", onBought }: { defaultCredi
               </TxLink>
             ))}
           </div>
-        )}
 
-        {quote && (status?.settled || !quote.depositAddress) && (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setQuote(undefined);
-              setStatus(undefined);
-            }}
-          >
-            New quote
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Line({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex min-h-11 items-center justify-between gap-4 border-b border-kr-border-light px-4 py-2 text-[14px] last:border-b-0">
-      <span className="text-kr-text-muted">{label}</span>
-      <span className={strong ? "text-right text-[16px] font-semibold text-kr-text-1" : "text-right font-medium text-kr-text-1"}>{value}</span>
+          {status?.settled && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setQuote(undefined);
+                setStatus(undefined);
+              }}
+            >
+              Buy again
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

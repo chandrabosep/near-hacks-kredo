@@ -132,7 +132,17 @@ export function createIntents(opts: { fetch?: Fetch; baseUrl?: string; jwt?: str
      * Quotes exactly `units` of USDT (6 decimals) into `vault`, credited to `user`.
      * `dry` gets a real price without a deposit address, so nothing can be paid.
      */
-    async quote(q: { originAsset: string; units: bigint; user: AccountId; vault: AccountId; usdt: AccountId; refundTo: string; dry: boolean }): Promise<BuyQuote> {
+    async quote(q: {
+      originAsset: string;
+      units: bigint;
+      user: AccountId;
+      vault: AccountId;
+      usdt: AccountId;
+      /** An address on the paying chain, or with `refundType: "INTENTS"` a NEAR Intents account. */
+      refundTo: string;
+      refundType?: "ORIGIN_CHAIN" | "INTENTS";
+      dry: boolean;
+    }): Promise<BuyQuote> {
       if (q.units <= 0n) throw new IntentsError(400, "Nothing to buy", "zero_amount");
       const deadline = new Date(now() + QUOTE_TTL_MS).toISOString();
       const request = {
@@ -148,7 +158,7 @@ export function createIntents(opts: { fetch?: Fetch; baseUrl?: string; jwt?: str
         // NEAR Intents withdraws with ft_transfer_call and this msg, so the vault credits `user`.
         customRecipientMsg: depositMsg(q.user),
         refundTo: q.refundTo,
-        refundType: "ORIGIN_CHAIN",
+        refundType: q.refundType ?? "ORIGIN_CHAIN",
         deadline,
       };
       type Raw = {

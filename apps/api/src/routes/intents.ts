@@ -2,7 +2,7 @@
  * Buy credits from any chain, through NEAR Intents.
  *
  *   GET  /v1/intents/assets         tokens a user can pay with (public)
- *   POST /v1/me/intents/quote       { originAsset, credits, refundTo } -> a deposit address and price
+ *   POST /v1/me/intents/quote       { originAsset, credits, refundTo? } -> a deposit address and price
  *   GET  /v1/me/intents/status      ?depositAddress= -> where the swap is, and the user's balance
  *
  * On mainnet a quote is live: the API first registers the user's vault storage (NEP-145, paid by
@@ -23,7 +23,8 @@ const DEFAULT_MAX_CREDITS = 10_000; // $100
 const quoteBody = z.object({
   originAsset: z.string().min(3).max(200),
   credits: creditsSchema,
-  refundTo: z.string().min(2).max(200),
+  /** The user's address on the paying chain, where a failed swap is refunded. Live quotes only. */
+  refundTo: z.string().trim().min(2).max(200).optional(),
 });
 
 export function intentsRoutes(ctx: Context, opts: { intents?: Intents; env?: Record<string, string | undefined> } = {}): Router {
@@ -75,8 +76,12 @@ export function intentsRoutes(ctx: Context, opts: { intents?: Intents; env?: Rec
       if (units < creditsToUnits(1)) throw new HttpError(400, "The smallest purchase is 1 credit.", "below_minimum");
       if (units > creditsToUnits(maxCredits)) throw new HttpError(400, `The most one purchase can be is ${maxCredits} credits.`, "above_maximum");
       const user = userOf(res).address;
+      if (live && !body.refundTo) throw new HttpError(400, "Add your address on the paying chain, so a failed swap can be refunded to it.", "refund_address_required");
       if (live) await ensureVaultStorage(user);
-      const quote = await intents.quote({ originAsset: body.originAsset, units, user, vault: quoteVault, usdt: MAINNET_USDT, refundTo: body.refundTo, dry: !live });
+      // A dry quote moves nothing, so it needs no refund address from the user. Its price doesn't
+      // depend on one, so it names a NEAR Intents account instead.
+      const refund = live ? { refundTo: body.refundTo!, refundType: "ORIGIN_CHAIN" as const } : { refundTo: quoteVault, refundType: "INTENTS" as const };
+      const quote = await intents.quote({ originAsset: body.originAsset, units, user, vault: quoteVault, usdt: MAINNET_USDT, ...refund, dry: !live });
       if (quote.depositAddress) quotes.set(quote.depositAddress, { user, quote });
       res.json({
         ...quote,

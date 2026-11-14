@@ -150,9 +150,21 @@ describe("intents routes", () => {
     assert.equal(quoteBodies[0].recipient, ctx.config.vault);
     assert.equal(quoteBodies[0].amount, "5000000", "500 credits = $5 = 5,000,000 USDT units");
     assert.equal(quoteBodies[0].customRecipientMsg, JSON.stringify({ user: alice.account }));
+    assert.equal(quoteBodies[0].refundTo, buy.refundTo);
+    assert.equal(quoteBodies[0].refundType, "ORIGIN_CHAIN", "a failed live swap goes back to the user's own address");
     assert.equal(r.body.live, true);
     assert.equal(r.body.depositAddress, "0xdeposit1");
     assert.equal(r.body.credits.credits, "500");
+  });
+
+  test("live: refuses without a refund address, before registering anything", async () => {
+    const call = await serve({ INTENTS_LIVE: "true" });
+    const { refundTo: _, ...noRefund } = buy;
+    const r = await call("POST", "/v1/me/intents/quote", { user: "alice", body: noRefund });
+    assert.equal(r.status, 400);
+    assert.equal(r.body.code, "refund_address_required");
+    assert.deepEqual(storageDeposits, []);
+    assert.equal(quoteBodies.length, 0);
   });
 
   test("live: an already registered user isn't registered again", async () => {
@@ -164,9 +176,13 @@ describe("intents routes", () => {
 
   test("dry (testnet): a real price, no deposit address, and nothing written onchain", async () => {
     const call = await serve({ INTENTS_LIVE: "false" });
-    const r = await call("POST", "/v1/me/intents/quote", { user: "alice", body: buy });
-    assert.equal(r.status, 200);
+    const { refundTo: _, ...noRefund } = buy;
+    const r = await call("POST", "/v1/me/intents/quote", { user: "alice", body: noRefund });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
     assert.equal(quoteBodies[0].dry, true);
+    // Nothing can be paid, so the user isn't asked for a refund address: the quote names a NEAR Intents account.
+    assert.equal(quoteBodies[0].refundType, "INTENTS");
+    assert.equal(quoteBodies[0].refundTo, "intents.near");
     // 1Click only quotes to real mainnet accounts, so the preview uses stand-ins for the testnet vault and USDT.
     assert.equal(quoteBodies[0].recipient, "intents.near");
     assert.equal(quoteBodies[0].destinationAsset, `nep141:${MAINNET_USDT}`);
