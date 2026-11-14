@@ -1,10 +1,14 @@
 "use client";
 
-import { ArrowDown, ArrowLeftRight, Check, Clock } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown, ArrowLeftRight, ArrowRight, Check, Clock } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { AssetIcon, ChainIcon } from "@/components/asset-icon";
 import { CopyValue } from "@/components/copy";
-import { Field, Notice, SelectField, Spinner, TxLink } from "@/components/shell";
+import { Field, fieldInput, Notice, Spinner, TxLink } from "@/components/shell";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, useApi } from "@/lib/api";
 import { credits, creditsToUsd, parseCredits, usd, type Amount } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -67,6 +71,7 @@ const tokenAmount = (s: string) => {
   return Number.isFinite(n) && n > 0 ? String(Number(n.toPrecision(4))) : s;
 };
 const duration = (s?: number) => (s === undefined ? "a minute or so" : s < 90 ? `about ${s} seconds` : `about ${Math.round(s / 60)} minutes`);
+const brief = (s?: number) => (s === undefined ? "~1 min" : s < 90 ? `~${s}s` : `~${Math.round(s / 60)} min`);
 
 /**
  * Pay for credits with a token on another chain, through NEAR Intents. The API asks 1Click for
@@ -98,14 +103,13 @@ export function AnyChainBuy({ defaultCredits = "500", onBought }: { defaultCredi
       .catch(() => setError("NEAR Intents is unreachable right now."));
   }, [api]);
 
-  const options = useMemo(() => {
-    if (!assets) return {};
+  const sorted = useMemo(() => {
+    if (!assets) return [];
     const rank = (a: Asset) => {
       const i = FAVOURITES.indexOf(`${a.symbol}@${a.chain}`);
       return i === -1 ? FAVOURITES.length : i;
     };
-    const sorted = [...assets.assets].sort((a, b) => rank(a) - rank(b));
-    return Object.fromEntries(sorted.map((a) => [a.assetId, `${a.symbol} on ${chainName(a.chain)}`]));
+    return [...assets.assets].sort((a, b) => rank(a) - rank(b));
   }, [assets]);
 
   const asset = assets?.assets.find((a) => a.assetId === assetId);
@@ -178,37 +182,37 @@ export function AnyChainBuy({ defaultCredits = "500", onBought }: { defaultCredi
             )}
           </div>
           <p className="mt-1 text-[15px] leading-6 text-kr-text-muted">USDC, ETH, SOL or BTC from the wallet you already have. No bridge, and no NEAR needed.</p>
+          <div className="mt-3 flex items-center gap-2">
+            <span className="flex gap-1">
+              {["base", "eth", "arb", "sol", "btc", "near"].map((c) => (
+                <ChainIcon key={c} chain={c} size={24} className="border border-kr-border-light" />
+              ))}
+            </span>
+            {assets && <span className="text-[13px] text-kr-icon-muted">{new Set(assets.assets.map((a) => a.chain)).size} chains</span>}
+          </div>
         </div>
       </div>
 
       {assets && !awaitingPayment && (
         <div className="mt-6 space-y-5 sm:pl-11">
-          <SelectField label="Pay with" value={assetId} onChange={setAssetId} options={options} />
-
-          <div>
-            <Field
-              label="Credits"
-              inputMode="decimal"
-              placeholder="0"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              suffix={amount ? usd(creditsToUsd(amount)) : "$0.00"}
-            />
-            <div className="mt-3 flex flex-wrap gap-2">
-              {QUICK.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => setInput(q)}
-                  className={cn(
-                    "h-8 rounded-[20px] border px-3 text-[13px] font-medium transition-colors",
-                    input === q ? "border-kr-navy bg-kr-navy text-white" : "border-kr-border-light text-kr-text-2 hover:border-kr-border hover:text-kr-navy",
-                  )}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+            <TokenSelect assets={sorted} value={assetId} onChange={setAssetId} />
+            <CreditsInput value={input} onChange={setInput} usdValue={amount ? usd(creditsToUsd(amount)) : "$0.00"} />
+          </div>
+          <div className="-mt-1 flex flex-wrap items-center gap-2">
+            {QUICK.map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => setInput(q)}
+                className={cn(
+                  "h-8 rounded-[20px] border px-3 text-[13px] font-medium transition-colors",
+                  input === q ? "border-kr-navy bg-kr-navy text-white" : "border-kr-border-light text-kr-text-2 hover:border-kr-border hover:text-kr-navy",
+                )}
+              >
+                {q} credits
+              </button>
+            ))}
           </div>
 
           {!preview && asset && (
@@ -227,38 +231,52 @@ export function AnyChainBuy({ defaultCredits = "500", onBought }: { defaultCredi
 
           {((quote && amount) || (preview && busy)) && (
             <div className={cn("overflow-hidden rounded-[14px] border border-kr-border-light bg-kr-bg transition-opacity", stale && "opacity-60")} aria-live="polite">
-              <div className="px-4 pt-4 pb-5">
-                <p className="text-[13px] font-medium text-kr-text-muted">You pay</p>
-                {quote ? (
-                  <p className="mt-1 text-[24px] leading-8 font-semibold text-kr-text-1">
-                    {tokenAmount(quote.amountInFormatted)} <span className="text-kr-text-2">{asset?.symbol}</span>
+              <div className="grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+                <div className="min-w-0 px-4 pt-4 pb-5">
+                  <p className="text-[13px] font-medium text-kr-text-muted">You pay</p>
+                  {quote ? (
+                    <p className="mt-1.5 flex items-center gap-2.5 text-[22px] leading-8 font-semibold text-kr-text-1">
+                      {asset && <AssetIcon symbol={asset.symbol} chain={asset.chain} size={26} />}
+                      <span className="truncate">
+                        {tokenAmount(quote.amountInFormatted)}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="mt-1.5 flex h-8 items-center gap-2 text-[15px] text-kr-text-muted">
+                      <Spinner /> Getting a price
+                    </p>
+                  )}
+                  <p className="mt-1 flex items-center gap-1.5 text-[14px] text-kr-text-muted">
+                    {asset && <ChainIcon chain={asset.chain} size={14} />}
+                    <span className="truncate">
+                      <span className="font-medium text-kr-text-2">{asset?.symbol}</span> on {asset ? chainName(asset.chain) : "…"}
+                    </span>
                   </p>
-                ) : (
-                  <p className="mt-1 flex h-8 items-center gap-2 text-[15px] text-kr-text-muted">
-                    <Spinner /> Getting a price
+                </div>
+                <div className="relative flex items-center justify-center border-t border-kr-border-light sm:border-t-0 sm:border-l">
+                  <span className="absolute -top-3.5 left-4 flex size-7 items-center justify-center rounded-full border border-kr-border-light bg-kr-surface text-kr-text-muted sm:static sm:-ml-px sm:-translate-x-1/2">
+                    <ArrowDown className="size-3.5 sm:hidden" />
+                    <ArrowRight className="hidden size-3.5 sm:block" />
+                  </span>
+                </div>
+                <div className="min-w-0 px-4 pt-5 pb-5 sm:pt-4 sm:pl-2">
+                  <p className="text-[13px] font-medium text-kr-text-muted">You get</p>
+                  <p className="mt-1.5 flex h-8 items-center text-[22px] leading-8 font-semibold text-kr-text-1">
+                    <span className="truncate">{quote ? credits(quote.credits) : amount ? credits(amount) : "…"}</span>
                   </p>
-                )}
-                <p className="text-[14px] text-kr-text-muted">
-                  on {asset ? chainName(asset.chain) : "…"}
-                  {quote?.amountInUsd ? ` · $${Number(quote.amountInUsd).toFixed(2)}` : ""}
-                </p>
-              </div>
-              <div className="relative border-t border-kr-border-light">
-                <span className="absolute -top-3.5 left-4 flex size-7 items-center justify-center rounded-full border border-kr-border-light bg-kr-surface text-kr-text-muted">
-                  <ArrowDown className="size-3.5" />
-                </span>
-              </div>
-              <div className="px-4 pt-5 pb-4">
-                <p className="text-[13px] font-medium text-kr-text-muted">You get</p>
-                <p className="mt-1 text-[24px] leading-8 font-semibold text-kr-text-1">{quote ? credits(quote.credits) : amount ? credits(amount) : "…"}</p>
-                <p className="text-[14px] text-kr-text-muted">{quote ? `${usd(quote.credits)} USDT, credited by the vault` : " "}</p>
+                  <p className="mt-1 truncate text-[14px] text-kr-text-muted">{quote ? `${usd(quote.credits)} USDT in the vault` : "\u00a0"}</p>
+                </div>
               </div>
               {quote && (
-                <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-kr-border-light px-4 py-3 text-[13px] text-kr-text-muted">
+                <div className="flex flex-wrap justify-between gap-x-5 gap-y-1 border-t border-kr-border-light px-4 py-3 text-[13px] text-kr-text-muted">
                   <span className="inline-flex items-center gap-1.5">
-                    <Clock className="size-3.5" /> Arrives {duration(quote.timeEstimate)} after you pay
+                    <Clock className="size-3.5" /> Arrives {brief(quote.timeEstimate)} after you pay
                   </span>
-                  {swapCost !== undefined && swapCost > 0.005 && <span>Swap cost ${swapCost.toFixed(2)}</span>}
+                  {quote.amountInUsd && (
+                    <span>
+                      ${Number(quote.amountInUsd).toFixed(2)} total{swapCost !== undefined && swapCost > 0.005 ? `, incl. $${swapCost.toFixed(2)} swap cost` : ""}
+                    </span>
+                  )}
                 </div>
               )}
               {preview && (
@@ -297,8 +315,11 @@ export function AnyChainBuy({ defaultCredits = "500", onBought }: { defaultCredi
             <p className="text-[13px] font-medium text-kr-text-muted">
               Send exactly this, on {asset ? chainName(asset.chain) : "that chain"}, before {new Date(quote.deadline).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
             </p>
-            <p className="mt-1 text-[24px] leading-8 font-semibold text-kr-text-1">
-              {quote.amountInFormatted} <span className="text-kr-text-2">{asset?.symbol}</span>
+            <p className="mt-1 flex items-center gap-2.5 text-[24px] leading-8 font-semibold text-kr-text-1">
+              {asset && <AssetIcon symbol={asset.symbol} chain={asset.chain} size={26} />}
+              <span>
+                {quote.amountInFormatted} <span className="text-kr-text-2">{asset?.symbol}</span>
+              </span>
             </p>
             <p className="mt-4 text-[13px] font-medium text-kr-text-muted">To this address</p>
             <CopyValue value={quote.depositAddress} className="mt-2" />
@@ -337,6 +358,55 @@ export function AnyChainBuy({ defaultCredits = "500", onBought }: { defaultCredi
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** "Pay with": each token with its logo and the chain it's on. */
+function TokenSelect({ assets, value, onChange }: { assets: Asset[]; value: string; onChange: (v: string) => void }) {
+  const id = useId();
+  const byId = new Map(assets.map((a) => [a.assetId, a]));
+  const items = Object.fromEntries(assets.map((a) => [a.assetId, `${a.symbol} on ${chainName(a.chain)}`]));
+  const row = (a: Asset) => (
+    <span className="flex min-w-0 items-center gap-3">
+      <AssetIcon symbol={a.symbol} chain={a.chain} size={24} />
+      <span className="font-medium text-kr-text-1">{a.symbol}</span>
+      <span className="truncate text-kr-text-muted">on {chainName(a.chain)}</span>
+    </span>
+  );
+  return (
+    <div>
+      <Label htmlFor={id} className="text-[13px] leading-[19.5px] font-medium text-kr-text-muted">
+        Pay with
+      </Label>
+      <Select items={items} value={value || null} onValueChange={(v) => v && onChange(v as string)}>
+        <SelectTrigger id={id} className={cn(fieldInput, "mt-2 w-full pr-4 data-[size=default]:h-12")}>
+          <SelectValue>{(v: string | null) => (v && byId.get(v) ? row(byId.get(v)!) : "Choose a token")}</SelectValue>
+        </SelectTrigger>
+        <SelectContent className="max-h-80">
+          {assets.map((a) => (
+            <SelectItem key={a.assetId} value={a.assetId} className="py-2 text-[15px]">
+              {row(a)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+/** Credits, with their dollar value inside the field. */
+function CreditsInput({ value, onChange, usdValue }: { value: string; onChange: (v: string) => void; usdValue: string }) {
+  const id = useId();
+  return (
+    <div>
+      <Label htmlFor={id} className="text-[13px] leading-[19.5px] font-medium text-kr-text-muted">
+        Credits
+      </Label>
+      <div className="relative mt-2">
+        <Input id={id} className={cn(fieldInput, "pr-20")} inputMode="decimal" placeholder="0" value={value} onChange={(e) => onChange(e.target.value)} />
+        <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[15px] text-kr-text-muted">{usdValue}</span>
+      </div>
     </div>
   );
 }
