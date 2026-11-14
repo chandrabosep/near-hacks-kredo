@@ -105,8 +105,9 @@ function FullBuy() {
       )}
 
       {status === "ready" && me && (
-        <div className="grid lg:grid-cols-[1fr_400px]">
-          <section className="px-6 py-10 sm:px-8 lg:px-16 lg:py-14">
+        // Two ways to buy, side by side: USDT already on NEAR, or a token from another chain.
+        <div className="grid lg:grid-cols-2">
+          <section className="px-6 py-10 sm:px-8 lg:py-14 lg:pr-10 lg:pl-16">
             <ol className="max-w-xl space-y-4">
               {/* Step 1: USDT in the wallet. */}
               <Step n={1} title="Add USDT to your wallet" state={hasUsdt || done ? "done" : "active"} aside={hasUsdt ? `${usd(me.walletUsdt)} USDT ready` : undefined}>
@@ -189,14 +190,17 @@ function FullBuy() {
                 )}
               </Step>
             </ol>
-            <div className="mt-4 max-w-xl">
+          </section>
+
+          <section className="border-t border-kr-border-light px-6 py-10 sm:px-8 lg:border-t-0 lg:border-l lg:py-14 lg:pr-16 lg:pl-10">
+            <div className="max-w-xl">
               <AnyChainBuy defaultCredits={parsed} onBought={() => void refresh()} />
             </div>
           </section>
 
-          <aside className="border-t border-kr-border-light bg-kr-bg px-6 py-10 sm:px-8 lg:border-t-0 lg:border-l lg:px-10 lg:py-14">
+          <aside className="border-t border-kr-border-light bg-kr-bg px-6 py-10 sm:px-8 lg:col-span-2 lg:px-16 lg:py-12">
             <p className="text-[15px] font-semibold text-kr-text-1">How buying works</p>
-            <ul className="mt-5 space-y-5">
+            <ul className="mt-5 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
               <Point icon={<Coins className="size-4" />} title="1 USDT buys 100 credits">
                 1 credit is $0.01, in every app on the network.
               </Point>
@@ -217,7 +221,7 @@ function FullBuy() {
                 .
               </Point>
             </ul>
-            <p className="mt-10 border-t border-kr-border-light pt-6 text-[13px] leading-5 text-kr-icon-muted">Your wallet was made for you when you signed in. Only you can sign with it.</p>
+            <p className="mt-8 border-t border-kr-border-light pt-6 text-[13px] leading-5 text-kr-icon-muted">Your wallet was made for you when you signed in. Only you can sign with it.</p>
           </aside>
         </div>
       )}
