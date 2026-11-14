@@ -13,7 +13,10 @@ No dependencies. Node 18+. It talks to the live network on NEAR testnet by defau
 ```ts
 import { Credits } from "kredo";
 
-const credits = new Credits({ apiKey: process.env.CREDITS_API_KEY! });
+const credits = new Credits({
+  apiKey: process.env.CREDITS_API_KEY!,
+  signerKey: process.env.CREDITS_SIGNER_KEY, // your app's own NEAR key: only it can charge for your app
+});
 
 // Prices in credits. 1 credit = $0.01.
 await credits.setPrices({
@@ -34,7 +37,15 @@ try {
 }
 ```
 
-Keep the API key on your server. Never ship it to a browser.
+Keep both keys on your server. Never ship them to a browser.
+
+## Your app signs its own charges
+
+Since 0.3.0, live charges, holds, captures, refunds and conversions are NEAR transactions from your app's own signer account, such as `<app id>.apps.kredo-network.testnet`. The vault takes them from no one else, Kredo included. That account has one function-call key, which can only call `charge`, `hold`, `capture`, `release` and `refund` on the vault. Pass it as `signerKey` (`ed25519:...`, as near-cli stores it).
+
+Each signed write is two requests. The API prepares the vault call as a NEP-366 delegate action and returns its hash. The SDK checks the hash against the transaction bytes, and checks that the key is yours and that the method, user and ref match your request (and the amount, when you pass `credits`). Then it signs locally and sends only the signature. The network sends the transaction and pays the gas. Your key never leaves your server.
+
+Without `signerKey`, live writes fail with `missing_signer`. Test keys don't need it.
 
 ## Test mode
 
