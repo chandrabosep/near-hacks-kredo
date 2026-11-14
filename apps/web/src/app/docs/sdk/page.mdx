@@ -13,12 +13,16 @@ npm install kredo
 ```ts
 import { Credits } from "kredo";
 
-const credits = new Credits({ apiKey: process.env.CREDITS_API_KEY! });
+const credits = new Credits({
+  apiKey: process.env.CREDITS_API_KEY!,
+  signerKey: process.env.CREDITS_SIGNER_KEY, // signs your live charges
+});
 ```
 
 | Option | Default | Meaning |
 |---|---|---|
 | `apiKey` | required | Your app's live (`uc_live_`) or test (`uc_test_`) key |
+| `signerKey` | none | Your app's NEAR key, `ed25519:...`. Live charges, holds, captures, refunds and conversions are signed with it. It never leaves your server: the SDK signs locally and sends only the signature. See [who signs a charge](/docs/charging#who-signs-a-charge) |
 | `baseUrl` | `https://kredo-near-api.onrender.com` | The network's API |
 | `pagesUrl` | `https://kredo-near.vercel.app` | The hosted connect, buy and account pages |
 | `retries` | `2` | Extra tries after a network failure or rate limit. Writes are safe to retry: each carries a ref |
@@ -58,6 +62,8 @@ Amounts are credits, as a number or an exact decimal string such as `"0.5"`. Eve
 | `convert({ user, credits, ref })` | Light mode: returns `appCredits`, how many of yours to add |
 
 Every result includes `txHash` and an `explorer` link.
+
+On a live key, `charge`, `hold`, `capture`, `refund` and `convert` make two requests. The API prepares the vault call as a transaction from your app's signer account. The SDK checks it (the method, user and ref are what you asked for, and the key is yours) and signs it. The network then pays its gas and sends it. `release` doesn't need your key: it only returns credits to the user.
 
 ## Money and reporting
 

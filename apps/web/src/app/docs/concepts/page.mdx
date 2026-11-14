@@ -20,13 +20,21 @@ Before you can charge a user, they approve a limit for your app, such as 200 cre
 - The same charge can't go through twice.
 - The user can lower or remove the limit any time in their account.
 
-Not even our own servers can charge past a limit.
+Our own servers can't charge at all. Only your app's key can, and only up to the limit.
+
+## Your app's key
+
+Your app has its own NEAR account, with one key that can only charge, hold, capture, release and refund on the vault. Charges must come from that account, so a leak, a bug or Kredo itself can't charge your users. Your payout account controls which account signs for your app. See [who signs a charge](/docs/charging#who-signs-a-charge).
 
 ## Charges and holds
 
 A **charge** takes credits right away. Use it for quick things: a message, an image, an API call.
 
 A **hold** reserves credits for a long job. When it's done, you charge what it actually cost and the rest goes back. If it fails, the user keeps everything.
+
+## Storage
+
+On NEAR, data costs a small deposit of NEAR. The vault follows NEP-145: an account is registered with a storage deposit before it holds anything, and each write is paid from the storage balance of whoever caused it. The network registers users for you, and funds your app's signer once when you register. A deposit to an account nobody registered is sent back in full.
 
 ## Fees and gas
 

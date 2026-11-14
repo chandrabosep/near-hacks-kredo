@@ -44,6 +44,17 @@ await credits.refund({ user, credits: 5 });
 
 You can refund up to what the user spent with your app. You can also refund any charge from the dashboard.
 
+## Who signs a charge
+
+Every live charge, hold, capture and refund is a NEAR transaction from **your app's own account**, such as `app-39cbd0db321ad08a.apps.kredo-network.testnet`. The vault accepts them from no one else, including Kredo's servers.
+
+- That account has a single **function-call key**. It can call `charge`, `hold`, `capture`, `release` and `refund` on the vault, and nothing else. It can't move USDT or NEAR, or add keys.
+- If the key leaks, it can only charge your app's users, within the limits they approved, into your own earnings.
+- Your payout account can move your app to a new signer at any time by calling `set_app_signer` on the vault. Kredo can't.
+- You never pay gas. The SDK signs a meta transaction (NEP-366), and the network sends it and pays.
+
+On testnet, Kredo creates your signer account and gives you its key once. The dashboard doesn't do this yet. Since that key passed through Kredo, rotate it if you want a key only you have ever held: make your own account with a function-call key for those five methods, then point your app at it with `set_app_signer`.
+
 ## No double charges
 
 Pass your own `ref`, such as a message or order id. The same ref always returns the first result, so a retry can never charge twice.

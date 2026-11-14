@@ -8,12 +8,15 @@ Kredo is a shared value network for applications. Users fund one balance and spe
 
 <Flow />
 
-## 1. Get an API key
+## 1. Get your keys
 
 Open the [dashboard](/dashboard), sign in with your email and register your app. You get an API key. Keep it on your server.
 
+Live charges also need your app's **signer key**. Your app gets its own NEAR account, and only that account's key can charge for your app. Not even Kredo can. See [who signs a charge](/docs/charging#who-signs-a-charge).
+
 ```bash
 CREDITS_API_KEY=uc_live_...
+CREDITS_SIGNER_KEY=ed25519:...   # live only; test keys don't need it
 ```
 
 ## 2. Install the SDK
@@ -27,6 +30,7 @@ import { Credits } from "kredo";
 
 const credits = new Credits({
   apiKey: process.env.CREDITS_API_KEY!,
+  signerKey: process.env.CREDITS_SIGNER_KEY,
   baseUrl: process.env.CREDITS_API_URL,
   pagesUrl: process.env.CREDITS_PAGES_URL,
 });
@@ -54,7 +58,7 @@ That's it. The charge settles on NEAR before the call returns, and you withdraw 
 
 ## Test mode
 
-Use a `uc_test_` key while you build. Nothing goes onchain, every test user starts with 1,000 credits, and the rules are the same as live.
+Use a `uc_test_` key while you build. You don't need a signer key yet. Nothing goes onchain, every test user starts with 1,000 credits, and the rules are the same as live.
 
 ## Next
 
