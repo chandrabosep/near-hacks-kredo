@@ -19,13 +19,14 @@
 
 Kredo was first built at **ETHGlobal Mumbai** (5 to 7 Nov 2026) on **Whitechain Sepolia**, an EVM chain (chain ID 1874), with a Solidity `CreditVault`. That version is still live at [kredo-omega.vercel.app](https://kredo-omega.vercel.app), and `kredo@0.1.0` / `kredo-react@0.1.x` on npm (6 Nov) are its packages. For this hackathon it was ported to NEAR.
 
-**Old and new work, kept apart.** This repo's history starts with the EVM build's 85 commits exactly as they were made (5 to 7 Nov), ending at the tag `ethglobal-final`. Every commit after that tag is the NEAR port, committed on 13 Nov.
+**Old and new work, kept apart.** This repo's history starts with the EVM build's 85 commits exactly as they were made (5 to 7 Nov), ending at the tag `ethglobal-final`. Every commit after that tag is the NEAR port, committed on 13 Nov, plus README updates on 14 Nov.
 
 | | |
 |---|---|
 | Original EVM build | tag [`ethglobal-final`](https://github.com/chandrabosep/near-hacks-kredo/tree/ethglobal-final) and every commit before it |
-| This submission | tag [`hackathon-submission`](https://github.com/chandrabosep/near-hacks-kredo/tree/hackathon-submission) |
-| Everything the port changed, as one diff | [`ethglobal-final...hackathon-submission`](https://github.com/chandrabosep/near-hacks-kredo/compare/ethglobal-final...hackathon-submission) |
+| First cut of the port (13 Nov 18:11, the v1 vault) | tag [`hackathon-submission`](https://github.com/chandrabosep/near-hacks-kredo/tree/hackathon-submission) |
+| **This submission** (adds NEP-145 storage, app-signed charges and `vault-v2`) | tag [`hackathon-final`](https://github.com/chandrabosep/near-hacks-kredo/tree/hackathon-final) |
+| Everything the port changed, as one diff | [`ethglobal-final...hackathon-final`](https://github.com/chandrabosep/near-hacks-kredo/compare/ethglobal-final...hackathon-final) |
 
 Timeline, with outside records:
 
